@@ -3,7 +3,7 @@ from models.pre_processing import post_processing_utils
 from nltk.stem import PorterStemmer
 
 
-from datasets.process_datasets import *
+from src.geo_kpe_multidoc.datasets.process_datasets import *
 
 from models.base_KP_model import BaseKPModel
 from models.embedrank.embedrank_document_abstraction import Document

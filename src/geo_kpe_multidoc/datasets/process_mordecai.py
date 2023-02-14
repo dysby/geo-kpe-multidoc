@@ -1,11 +1,16 @@
 import json
+from os import path
+
 import plotly.express as px
 from mordecai import Geoparser
 
-def process_MKDUC01():
-	parser = Geoparser()
+from geo_kpe_multidoc import GEO_KPE_MULTIDOC_RAWDATA_PATH, MAPBOX_KEY, GEO_KPE_MULTIDOC_MORDECAI_ES_URL
 
-	with open('/home/aguimaraes/Thesis/KP_Extraction/datasets/raw_data/MKDUC-01/MKDUC01.json', 'r') as s_json:
+
+def process_MKDUC01():
+	parser = Geoparser(es_hosts=GEO_KPE_MULTIDOC_MORDECAI_ES_URL)
+
+	with open(path.join(GEO_KPE_MULTIDOC_RAWDATA_PATH, 'MKDUC-01/MKDUC01.json'), 'r') as s_json:
 		docs = json.load(s_json)
 		res = {}
 
@@ -14,11 +19,11 @@ def process_MKDUC01():
 			for doc in docs[doc_group]["documents"]:
 				res[doc_group][doc] = str(parser.geoparse(docs[doc_group]["documents"][doc]))
 
-	with open('/home/aguimaraes/Thesis/KP_Extraction/datasets/raw_data/MKDUC-01/MKDUC01-mordecai.json', 'w') as d_json:
+	with open(path.join(GEO_KPE_MULTIDOC_RAWDATA_PATH, "MKDUC-01/MKDUC01-mordecai.json"), 'w') as d_json:
 		json.dump(res, d_json, indent=4, separators=(',', ': '))
 
 def build_map():
-	with open('C:\\Users\\artur\\Desktop\\stuff\\IST\\Thesis\\Code\\KP_Extraction\\datasets\\raw_data\\MKDUC-01\\MKDUC01-mordecai.json', 'r') as s_json:
+	with open(path.join(GEO_KPE_MULTIDOC_RAWDATA_PATH,"MKDUC-01/MKDUC01-mordecai.json"), 'r') as s_json:
 		source = json.load(s_json)
 		res = {"geo_loc" : [], "country_loc" : [], "full_p" : []}
 		geo_locations = []
@@ -44,13 +49,13 @@ def build_map():
 					else:
 						res["country_loc"].append(entry["country_predicted"])
 
-		with open('C:\\Users\\artur\\Desktop\\stuff\\IST\\Thesis\\Code\\KP_Extraction\\datasets\\raw_data\\MKDUC-01\\MKDUC01-geo_locations.json', 'w') as d_json:
+		with open(path.join(GEO_KPE_MULTIDOC_RAWDATA_PATH,"MKDUC-01/MKDUC01-geo_locations.json"), 'w') as d_json:
 			json.dump(res, d_json, indent=4, separators=(',', ': '))
 
-		px.set_mapbox_access_token("pk.eyJ1IjoiYXJhYWcyIiwiYSI6ImNsMjF6aHo3bDBndWMzYm1xMDlxZG80NWYifQ.EntsjZjhOld8owIpZ8GJmA")	
+		px.set_mapbox_access_token(MAPBOX_KEY)	
 		fig = px.scatter_mapbox(res["full_p"], lat="lat", lon="lon", hover_name = "word", hover_data = ["word", "country_predicted", "country_conf", "country_code3", "geonameid", "place_name"], size_max=15, zoom=1, width=1000, height=800)
 		#fig.data[0].marker = dict(size = 5, color="red")
 		fig.show()
 
 #process_MKDUC01()
-build_map()
+# build_map()

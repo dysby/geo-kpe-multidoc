@@ -1,15 +1,16 @@
-import os, os.path
 import json
+import os
+from os import path
 import re
-import simplemma
-
 from typing import List, Tuple
-from bs4 import BeautifulSoup
 
-from utils.IO import read_from_file, write_to_file
+import simplemma
+from bs4 import BeautifulSoup
 from models.pre_processing.pos_tagging import *
-from datasets.config import DATASET_DIR
 from nltk.stem import PorterStemmer
+from utils.IO import read_from_file, write_to_file
+
+from geo_kpe_multidoc import GEO_KPE_MULTIDOC_RAWDATA_PATH
 
 
 class DataSet:
@@ -59,11 +60,11 @@ class DataSet:
                 self.dataset_content[dataset] =  self.extract_from_dataset(dataset, self.supported_datasets[dataset])
 
     def extract_from_dataset(self, dataset_name: str = "DUC", data_t : str = "xml") -> List[Tuple[str,List[str]]]:
-        dataset_dir = f'{DATASET_DIR}/raw_data/{dataset_name}'
+        dataset_dir = path.join(GEO_KPE_MULTIDOC_RAWDATA_PATH, dataset_name)
         
-        p_data_path = f'{DATASET_DIR}/processed_data/{dataset_name}/{dataset_name}_processed'
+        p_data_path = path.join(GEO_KPE_MULTIDOC_RAWDATA_PATH, "processed_data", dataset_name, f"{dataset_name}_processed")
 
-        if os.path.isfile(f'{p_data_path}.txt'):
+        if path.isfile(f'{p_data_path}.txt'):
             return read_from_file(p_data_path)
 
         res = None

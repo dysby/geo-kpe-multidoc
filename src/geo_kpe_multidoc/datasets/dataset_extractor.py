@@ -1,32 +1,35 @@
 import csv
-import os, os.path
-import re
-import doi
-
-import metapub
 import json
-from typing import List
-from utils.IO import read_from_file, write_to_file
+import os
+from os import path
+import re
 from io import StringIO
-from scidownl import scihub_download
+from typing import List
 
+import doi
+import metapub
 from nltk.stem import PorterStemmer
 from pdfminer.converter import TextConverter
 from pdfminer.layout import LAParams
 from pdfminer.pdfdocument import PDFDocument
-from pdfminer.pdfinterp import PDFResourceManager, PDFPageInterpreter
+from pdfminer.pdfinterp import PDFPageInterpreter, PDFResourceManager
 from pdfminer.pdfpage import PDFPage
 from pdfminer.pdfparser import PDFParser
+from scidownl import scihub_download
+from utils.IO import read_from_file, write_to_file
+
+from geo_kpe_multidoc import GEO_KPE_MULTIDOC_RAWDATA_PATH
+
 
 def map_orig_links(dir_input : str, dir_output : str) -> None:
     with open(dir_input, 'r', encoding='utf-8') as file:
         id_types = ["DOI", "PMID", "ISSN", "Web", "Other"]
         results = {id:set() for id in id_types}
 
-        regex = {"DOI" : re.compile("^10.\d{4,9}[/=][-._;()/:a-zA-Z0-9]+"), 
-                 "PMID" : re.compile("[0-9]{6,8}"), 
-                 "ISSN" : re.compile("ISSN:.*"), 
-                 "Web" : re.compile("https?://.*"), 
+        regex = {"DOI" : re.compile(r"^10.\d{4,9}[/=][-._;()/:a-zA-Z0-9]+"), 
+                 "PMID" : re.compile(r"[0-9]{6,8}"), 
+                 "ISSN" : re.compile(r"ISSN:.*"), 
+                 "Web" : re.compile(r"https?://.*"), 
                  "Other" : True}
 
         for line in [line.rstrip() for line in file.readlines()]:
@@ -47,9 +50,9 @@ def extract_files_from_link(dir_input : str, dir_output : str) -> None:
     doc_ids = read_from_file(dir_input)
     c_f = 0
 
-    output = "./raw_data/ResisBank/src/documents/pdfs/"
+    output = path.join(GEO_KPE_MULTIDOC_RAWDATA_PATH, "ResisBank/src/documents/pdfs/")
     
-    with open("./raw_data/ResisBank/src/documents/downloaded_pdfs.txt", "a") as output_doi:
+    with open(path.join(GEO_KPE_MULTIDOC_RAWDATA_PATH, "ResisBank/src/documents/downloaded_pdfs.txt"), "a") as output_doi:
         for type in doc_ids:
             print(f'{type} = {len(doc_ids[type])} entries')
 
@@ -76,9 +79,9 @@ def extract_files_from_link(dir_input : str, dir_output : str) -> None:
     print(f'Found {c_f} files in total')
 
 def pdf_to_txt():
-    pdf_source = "./raw_data/ResisBank/src/documents/pdfs/"
-    txt_destiny = "./raw_data/ResisBank/src/documents/txt/"
-    reference_destiny = "./raw_data/ResisBank/src/documents/references/"
+    pdf_source = path.join(GEO_KPE_MULTIDOC_RAWDATA_PATH, "ResisBank/src/documents/pdfs/")
+    txt_destiny = path.join(GEO_KPE_MULTIDOC_RAWDATA_PATH, "ResisBank/src/documents/txt/")
+    reference_destiny = path.join(GEO_KPE_MULTIDOC_RAWDATA_PATH, "ResisBank/src/documents/references/")
 
     stemmed_dic = {}
     stemmer = PorterStemmer()

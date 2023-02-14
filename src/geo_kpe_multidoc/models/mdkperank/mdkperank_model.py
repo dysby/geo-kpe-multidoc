@@ -5,7 +5,7 @@ from nltk.stem import PorterStemmer
 from statistics import mean
 
 
-from datasets.process_datasets import *
+from src.geo_kpe_multidoc.datasets.process_datasets import *
 
 from models.base_KP_model import BaseKPModel
 from models.embedrank.embedrank_model import EmbedRank
