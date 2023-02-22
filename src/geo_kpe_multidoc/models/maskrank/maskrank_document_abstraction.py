@@ -72,9 +72,7 @@ class Document:
         Method that embeds the document, having several modes according to usage.
         The default value just embeds the document normally.
         """
-
-        self.raw_text = self.raw_text.lower()
-        doc_info = model.embed_full(self.raw_text) 
+        doc_info = model.embed_full(self.raw_text) # encode(documents, show_progress_bar=False, output_value = None)
 
         self.doc_token_ids = doc_info["input_ids"].squeeze().tolist()
         self.doc_token_embeddings = doc_info["token_embeddings"]
@@ -83,7 +81,7 @@ class Document:
         return doc_info["sentence_embedding"].detach().numpy()
 
     def global_embed_doc(self, model):
-        pass
+        raise NotImplemented
 
     def embed_candidates(self, model, stemmer : Callable = None, cand_mode: str = "", post_processing : List[str] = []):
         """
