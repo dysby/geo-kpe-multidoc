@@ -1,6 +1,6 @@
 import simplemma
 
-from models.pre_processing.pos_tagging import POS_tagger_spacy
+from geo_kpe_multidoc.models.pre_processing.pos_tagging import POS_tagger_spacy
 
 pos_taggers = { "DUC"      : "en_core_web_trf", 
                 "NUS"      : "en_core_web_trf", 

@@ -1,19 +1,19 @@
-from typing import List, Set, Tuple
-
-import torch
+from typing import List, Tuple, Set
 from nltk.stem import PorterStemmer
 
-from ..base_KP_model import BaseKPModel
-from ..pre_processing.language_mapping import choose_lemmatizer, choose_tagger
-from ..pre_processing.pos_tagging import POS_tagger_spacy
-from ..pre_processing.pre_processing_utils import (remove_punctuation,
-                                                   remove_whitespaces)
-from .embedrank_document_abstraction import Document
 
+from datasets.process_datasets import *
 
-class EmbedRank(BaseKPModel):
+from models.base_KP_model import BaseKPModel
+from models.maskrank.maskrank_document_abstraction import Document
+
+from models.pre_processing.language_mapping import choose_tagger, choose_lemmatizer
+from models.pre_processing.pos_tagging import POS_tagger_spacy
+from models.pre_processing.pre_processing_utils import remove_punctuation, remove_whitespaces
+
+class MaskRank(BaseKPModel):
     """
-    Simple class to encapsulate EmbedRank functionality. Uses
+    Simple class to encapsulate MaskRank functionality. Uses
     the KeyBert backend to retrieve models
     """
 
@@ -46,7 +46,7 @@ class EmbedRank(BaseKPModel):
         torch.cuda.empty_cache()
     
         return (doc, cand_embeds, candidate_set)
-    
+
     def extract_kp_from_doc(self, doc, top_n, min_len, stemmer = None, lemmer = None, **kwargs) -> Tuple[List[Tuple], List[str]]:
         """
         Concrete method that extracts key-phrases from a given document, with optional arguments
@@ -54,15 +54,13 @@ class EmbedRank(BaseKPModel):
         """
 
         doc = Document(doc, self.counter)
-
         doc.pos_tag(self.tagger, False if "pos_tag_memory" not in kwargs else kwargs["pos_tag_memory"], self.counter)
         doc.extract_candidates(min_len, self.grammar, lemmer)
-        
+
         top_n, candidate_set = doc.top_n_candidates(self.model, top_n, min_len, stemmer, **kwargs)
 
         print(f'document {self.counter} processed\n')
         self.counter += 1
-        torch.cuda.empty_cache()
 
         return (top_n, candidate_set)
 
@@ -75,7 +73,7 @@ class EmbedRank(BaseKPModel):
         self.counter = 0
         self.update_tagger(dataset)
 
-        stemmer = PorterStemmer() if stemming else None
-        lemmer = choose_lemmatizer(dataset) if lemmatize else None
+        stemer = None if not stemming else PorterStemmer()
+        lemmer = None if not lemmatize else choose_lemmatizer(dataset)
 
-        return [self.extract_kp_from_doc(doc[0], top_n, min_len, stemmer, lemmer, **kwargs) for doc in corpus]
+        return [self.extract_kp_from_doc(doc[0], top_n, min_len, stemer, lemmer, **kwargs) for doc in corpus]

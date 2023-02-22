@@ -1,20 +1,19 @@
-import re
 import time
-from typing import Callable, List, Set, Tuple
-
+import re
+import torch
 import numpy as np
 import simplemma
-import torch
+
 from nltk import RegexpParser
-from sklearn.metrics.pairwise import cosine_similarity
 from sklearn.preprocessing import normalize
+from sklearn.metrics.pairwise import cosine_similarity
+from typing import List, Tuple, Set, Callable
 
-from ...keybert.mmr import mmr
-from ...utils.IO import read_from_file
-from ..pre_processing.post_processing_utils import (embed_hf, mean_pooling,
-                                                    z_score_normalization)
-from ..pre_processing.pre_processing_utils import filter_ids, tokenize_hf
+from keybert.mmr import mmr
+from models.pre_processing.pre_processing_utils import tokenize_hf, filter_ids
+from models.pre_processing.post_processing_utils import embed_hf, z_score_normalization, mean_pooling
 
+from utils.IO import read_from_file
 
 class Document:
     """

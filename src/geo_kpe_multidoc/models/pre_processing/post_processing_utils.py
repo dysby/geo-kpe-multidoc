@@ -6,7 +6,7 @@ import torch
 import gc
 import random
 
-from models.pre_processing.pre_processing_utils import tokenize_hf
+from geo_kpe_multidoc.models.pre_processing.pre_processing_utils import tokenize_hf
 from typing import Callable, List, Tuple
 
 def z_score_normalization(candidate_set_embeded : List[List[float]], raw_document : str, model : Callable) -> List[List[float]] :

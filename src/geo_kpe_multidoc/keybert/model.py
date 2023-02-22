@@ -8,9 +8,9 @@ from sklearn.metrics.pairwise import cosine_similarity
 from sklearn.feature_extraction.text import CountVectorizer
 
 # KeyBERT
-from keybert.mmr import mmr
-from keybert.maxsum import max_sum_similarity
-from keybert.backend._utils import select_backend
+from .mmr import mmr
+from .maxsum import max_sum_similarity
+from .backend._utils import select_backend
 
 
 class KeyBERT:

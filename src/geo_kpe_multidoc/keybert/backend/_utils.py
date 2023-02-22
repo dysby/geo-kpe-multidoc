@@ -14,27 +14,27 @@ def select_backend(embedding_model) -> BaseEmbedder:
 
     # Longmodels model
     elif "longformer" in str(embedding_model) or "bigbird" in str(embedding_model):
-        from keybert.backend._longmodels import load_longmodel
+        from ._longmodels import load_longmodel
         return load_longmodel(embedding_model)
 
     # Flair word embeddings
     elif "flair" in str(type(embedding_model)):
-        from keybert.backend._flair import FlairBackend
+        from ._flair import FlairBackend
         return FlairBackend(embedding_model)
 
     # Spacy embeddings
     elif "spacy" in str(type(embedding_model)):
-        from keybert.backend._spacy import SpacyBackend
+        from ._spacy import SpacyBackend
         return SpacyBackend(embedding_model)
 
     # Gensim embeddings
     elif "gensim" in str(type(embedding_model)):
-        from keybert.backend._gensim import GensimBackend
+        from ._gensim import GensimBackend
         return GensimBackend(embedding_model)
 
     # USE embeddings
     elif "tensorflow" and "saved_model" in str(type(embedding_model)):
-        from keybert.backend._use import USEBackend
+        from ._use import USEBackend
         return USEBackend(embedding_model)
 
     # Sentence Transformer embeddings

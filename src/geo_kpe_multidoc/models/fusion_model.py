@@ -1,9 +1,11 @@
 import re
-import numpy as np 
-
-from typing import Callable, List, Tuple, Set
-from keybert.backend._utils import select_backend
 from itertools import repeat
+from typing import Callable, List, Set, Tuple
+
+import numpy as np
+
+from ..keybert.backend._utils import select_backend
+
 
 class FusionModel:
     """

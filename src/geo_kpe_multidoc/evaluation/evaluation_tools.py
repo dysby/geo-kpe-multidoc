@@ -8,7 +8,7 @@ from nltk.stem import PorterStemmer
 from time import gmtime, strftime
 from utils.IO import write_to_file
 
-from geo_kpe_multidoc import GEO_KPE_MULTIDOC_OUTPUT_PATH
+from ...geo_kpe_multidoc import GEO_KPE_MULTIDOC_OUTPUT_PATH
 
 
 def extract_res_labels(

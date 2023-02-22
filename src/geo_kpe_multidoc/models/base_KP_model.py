@@ -1,7 +1,8 @@
 import re
 
 from typing import List, Tuple, Set
-from keybert.backend._utils import select_backend
+
+from ..keybert.backend._utils import select_backend
 
 class BaseKPModel:
     """

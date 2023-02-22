@@ -5,16 +5,16 @@ from nltk.stem import PorterStemmer
 from statistics import mean
 
 
-from src.geo_kpe_multidoc.datasets.process_datasets import *
+# from datasets.process_datasets import *
 
-from models.base_KP_model import BaseKPModel
-from models.embedrank.embedrank_model import EmbedRank
-from models.maskrank.maskrank_model import MaskRank
-from models.fusion_model import FusionModel
+from ..base_KP_model import BaseKPModel
+from ..embedrank import EmbedRank
+from ..maskrank.maskrank_model import MaskRank
+from ..fusion_model import FusionModel
 
-from models.pre_processing.language_mapping import choose_tagger, choose_lemmatizer
-from models.pre_processing.pos_tagging import POS_tagger_spacy
-from models.pre_processing.pre_processing_utils import remove_punctuation, remove_whitespaces
+from ..pre_processing.language_mapping import choose_tagger, choose_lemmatizer
+from ..pre_processing.pos_tagging import POS_tagger_spacy
+from ..pre_processing.pre_processing_utils import remove_punctuation, remove_whitespaces
 
 class MDKPERank(BaseKPModel):
     def __init__(self, model, tagger):

@@ -6,7 +6,7 @@ from typing import List, Tuple
 
 
 
-from utils.IO import write_to_file, read_from_file
+from geo_kpe_multidoc.utils.IO import write_to_file, read_from_file
 
 class POS_tagger(ABC):
     """

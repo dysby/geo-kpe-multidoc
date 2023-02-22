@@ -5,7 +5,7 @@ import os
 from nltk.stem import PorterStemmer
 from typing import List, Tuple, Set
 
-from utils.IO import read_from_file, write_to_file
+from geo_kpe_multidoc.utils.IO import read_from_file, write_to_file
 
 class EmbeddingsMemory:
     """
