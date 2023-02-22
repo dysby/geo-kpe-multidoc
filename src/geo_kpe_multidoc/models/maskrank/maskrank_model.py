@@ -1,15 +1,15 @@
-from typing import List, Tuple, Set
+from typing import List, Set, Tuple
+
 from nltk.stem import PorterStemmer
 
+from ...datasets.process_datasets import *
+from ..base_KP_model import BaseKPModel
+from ..pre_processing.language_mapping import choose_lemmatizer, choose_tagger
+from ..pre_processing.pos_tagging import POS_tagger_spacy
+from ..pre_processing.pre_processing_utils import (remove_punctuation,
+                                                   remove_whitespaces)
+from .maskrank_document_abstraction import Document
 
-from datasets.process_datasets import *
-
-from models.base_KP_model import BaseKPModel
-from models.maskrank.maskrank_document_abstraction import Document
-
-from models.pre_processing.language_mapping import choose_tagger, choose_lemmatizer
-from models.pre_processing.pos_tagging import POS_tagger_spacy
-from models.pre_processing.pre_processing_utils import remove_punctuation, remove_whitespaces
 
 class MaskRank(BaseKPModel):
     """

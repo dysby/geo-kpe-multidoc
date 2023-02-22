@@ -1,7 +1,7 @@
 def main():
     from geo_kpe_multidoc.models.embedrank import EmbedRank
     backend_model = 'longformer-paraphrase-multilingual-mpnet-base-v2'
-    parser = 'en_core_web_sm'
+    parser = 'en_core_web_trf'
     kpe = EmbedRank( backend_model, parser)
 
     doc = """INDUSTRIAL SOCIETY AND ITS FUTURE

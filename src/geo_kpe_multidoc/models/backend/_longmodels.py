@@ -10,7 +10,8 @@ from transformers import BigBirdModel, BigBirdConfig
 from transformers import LongformerSelfAttention, LongformerConfig, LongformerModel, LongformerTokenizerFast
 from transformers import XLMRobertaTokenizer, XLMRobertaModel, XLMRobertaConfig, AutoModel, AutoTokenizer
 from transformers import RobertaForMaskedLM, RobertaTokenizerFast
-from ._utils import select_backend
+# from ...keybert.backend._utils import select_backend
+from .select_backend import select_backend
 from geo_kpe_multidoc import GEO_KPE_MULTIDOC_MODELS_PATH
 
 
@@ -121,16 +122,19 @@ def create_long_model(embedding_model, save_model_to, attention_window, max_pos)
     config.attention_window = [attention_window] * config.num_hidden_layers
     for i, layer in enumerate(model.encoder.layer):
         longformer_self_attn = LongformerSelfAttention(config, layer_id=i)
-        longformer_self_attn.query = layer.attention.self.query
-        longformer_self_attn.key = layer.attention.self.key
-        longformer_self_attn.value = layer.attention.self.value
+        longformer_self_attn.query = copy.deepcopy(layer.attention.self.query)
+        longformer_self_attn.key = copy.deepcopy(layer.attention.self.key)
+        longformer_self_attn.value = copy.deepcopy(layer.attention.self.value)
+
         longformer_self_attn.query_global = copy.deepcopy(layer.attention.self.query)
         longformer_self_attn.key_global = copy.deepcopy(layer.attention.self.key)
         longformer_self_attn.value_global = copy.deepcopy(layer.attention.self.value)
+        
         layer.attention.self = longformer_self_attn
 
     if not os.path.exists(save_model_to):
             os.makedirs(save_model_to)
+    
     model.save_pretrained(save_model_to)
     tokenizer.save_pretrained(save_model_to)
     return callable_model

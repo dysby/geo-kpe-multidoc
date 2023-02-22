@@ -9,7 +9,7 @@ from nltk import RegexpParser
 from sklearn.metrics.pairwise import cosine_similarity
 from sklearn.preprocessing import normalize
 
-from ...keybert.mmr import mmr
+from keybert._mmr import mmr
 from ...utils.IO import read_from_file
 from ..pre_processing.post_processing_utils import (embed_hf, mean_pooling,
                                                     z_score_normalization)
