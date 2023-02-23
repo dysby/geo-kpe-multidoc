@@ -11,7 +11,7 @@ from vincenty import vincenty
     }
 
     keyphrase_coordinates = {
-        "candidate 1" : [ boston ,newyork ],
+        "candidate 1" : [ boston, newyork ],
         "candidate 2" : [ boston ]
     }
 
@@ -20,7 +20,7 @@ from vincenty import vincenty
     GetisOrdG(keyphrase_scores , keyphrase_coordinates)
 """
 
-def MoranI( scores, coordinates ):
+def MoranI( keyphrase_scores, keyphrase_coordinates ):
   scores = [ ]
   coordinates = [ ]
   for key, value_list in keyphrase_coordinates.items():
@@ -42,7 +42,7 @@ def MoranI( scores, coordinates ):
   moranI = moranI * ( sum1 / sum2 )
   return moranI
 
-def GearyC( scores, coordinates ):
+def GearyC( keyphrase_scores, keyphrase_coordinates ):
   scores = [ ]
   coordinates = [ ]
   for key, value_list in keyphrase_coordinates.items():
@@ -63,7 +63,7 @@ def GearyC( scores, coordinates ):
   gearyC = ( ( ( n - 1.0 ) * sum1 ) / ( 2.0 * sum2 * sum_adjusted_scores ) )
   return gearyC
 
-def GetisOrdG( scores, coordinates ):
+def GetisOrdG( keyphrase_scores, keyphrase_coordinates ):
   scores = [ ]
   coordinates = [ ]
   for key, value_list in keyphrase_coordinates.items():

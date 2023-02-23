@@ -1,8 +1,9 @@
 def main():
-    from geo_kpe_multidoc.models.embedrank import EmbedRank
+    from geo_kpe_multidoc.models import EmbedRank, MaskRank
     backend_model = 'longformer-paraphrase-multilingual-mpnet-base-v2'
-    parser = 'en_core_web_sm'
-    kpe = EmbedRank( backend_model, parser)
+    parser = 'en_core_web_trf'
+    kpe_embed = EmbedRank( backend_model, parser)
+    kpe_mask = MaskRank( backend_model, parser)
 
     doc = """INDUSTRIAL SOCIETY AND ITS FUTURE
 
@@ -19,7 +20,14 @@ def main():
     5. In this article we give attention to only some of the negative developments that have grown out of the industrial-technological system. Other such developments we mention only briefly or ignore altogether. This does not mean that we regard these other developments as unimportant. For practical reasons we have to confine our discussion to areas that have received insufficient public attention or in which we have something new to say. For example, since there are well-developed environmental and wilderness movements, we have written very little about environmental degradation or the destruction of wild nature, even though we consider these to be highly important.
     """
     
-    top_n, candidate_set = kpe.extract_kp_from_doc(doc=doc, top_n=5, min_len=2)
+    top_n, candidate_set = kpe_embed.extract_kp_from_doc(doc=doc, top_n=5, min_len=2)
+    print("Embed Rank")
+    print(top_n)
+    print("===========================================")
+    print(candidate_set)
+    
+    top_n, candidate_set = kpe_mask.extract_kp_from_doc(doc=doc, top_n=5, min_len=2)
+    print("Mask Rank")
     print(top_n)
     print("===========================================")
     print(candidate_set)

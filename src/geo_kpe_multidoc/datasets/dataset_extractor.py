@@ -1,9 +1,9 @@
 import csv
 import json
 import os
-from os import path
 import re
 from io import StringIO
+from os import path
 from typing import List
 
 import doi
@@ -16,9 +16,10 @@ from pdfminer.pdfinterp import PDFPageInterpreter, PDFResourceManager
 from pdfminer.pdfpage import PDFPage
 from pdfminer.pdfparser import PDFParser
 from scidownl import scihub_download
-from utils.IO import read_from_file, write_to_file
 
 from geo_kpe_multidoc import GEO_KPE_MULTIDOC_RAWDATA_PATH
+
+from ..utils.IO import read_from_file, write_to_file
 
 
 def map_orig_links(dir_input : str, dir_output : str) -> None:
