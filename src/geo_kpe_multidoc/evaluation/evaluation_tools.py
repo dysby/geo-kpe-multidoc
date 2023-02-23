@@ -230,8 +230,7 @@ def evaluate_kp_extraction(
 
         if save:
             res_dic[dataset] = {}
-            for (name, dic) in [("candidates", results_c), ("kp", results_kp)]:
-
+            for name, dic in [("candidates", results_c), ("kp", results_kp)]:
                 res_dic[name] = {}
                 for measure in dic:
                     res_dic[name][measure] = dic[measure]

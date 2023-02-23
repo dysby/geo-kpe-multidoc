@@ -4,6 +4,7 @@ from typing import List, Tuple, Set
 
 from .backend.select_backend import select_backend
 
+
 class BaseKPModel:
     """
     Simple abstract class to encapsulate all KP models
@@ -12,7 +13,9 @@ class BaseKPModel:
     def __init__(self, model):
         if model != "":
             self.model = select_backend(model)
-        self.name = "{}_{}".format(str(self.__str__).split()[3], re.sub("-", "_",model))
+        self.name = "{}_{}".format(
+            str(self.__str__).split()[3], re.sub("-", "_", model)
+        )
 
     def pre_process(self, doc) -> str:
         """
@@ -32,20 +35,33 @@ class BaseKPModel:
         """
         pass
 
-    def top_n_candidates(self, doc, candidate_list, top_n, min_len, **kwargs) -> List[Tuple]:
+    def top_n_candidates(
+        self, doc, candidate_list, top_n, min_len, **kwargs
+    ) -> List[Tuple]:
         """
         Abstract method to retrieve top_n candidates
         """
         pass
 
-    def extract_kp_from_doc(self, doc, top_n, min_len, stemming, **kwargs) -> Tuple[List[Tuple], List[str]]:
+    def extract_kp_from_doc(
+        self, doc, top_n, min_len, stemming, **kwargs
+    ) -> Tuple[List[Tuple], List[str]]:
         """
         Abstract method that extracts key-phrases from a given document, with optional arguments
         relevant to its specific functionality
         """
         pass
 
-    def extract_kp_from_corpus(self, corpus, dataset, top_n=5, min_len=0, stemming=True, lemmatize=False, **kwargs) -> List[List[Tuple]]:
+    def extract_kp_from_corpus(
+        self,
+        corpus,
+        dataset,
+        top_n=5,
+        min_len=0,
+        stemming=True,
+        lemmatize=False,
+        **kwargs
+    ) -> List[List[Tuple]]:
         """
         Concrete method that extracts key-phrases from a list of given documents, with optional arguments
         relevant to its specific functionality
