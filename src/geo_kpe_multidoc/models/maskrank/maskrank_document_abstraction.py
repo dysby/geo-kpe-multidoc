@@ -47,6 +47,7 @@ class Document:
         """
         Method that embeds the document.
         """
+
         # doc_info = model.embed_full(self.raw_text) # encode(documents, show_progress_bar=False, output_value = None)
         doc_info = model.embedding_model.encode(self.raw_text, show_progress_bar=False, output_value = None)
 
@@ -57,7 +58,10 @@ class Document:
         return doc_info["sentence_embedding"].detach().numpy()
 
     def embed_global(self, model):
-        pass
+        raise NotImplemented
+
+    def global_embed_doc(self, model):
+        raise NotImplemented
 
     def embed_candidates(self, model, stemmer : Callable = None, cand_mode: str = "MaskAll", attention : str = ""):
         """
