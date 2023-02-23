@@ -47,7 +47,8 @@ class Document:
         """
         Method that embeds the document.
         """
-        doc_info = model.embed_full(self.raw_text) # encode(documents, show_progress_bar=False, output_value = None)
+        # doc_info = model.embed_full(self.raw_text) # encode(documents, show_progress_bar=False, output_value = None)
+        doc_info = model.embedding_model.encode(self.raw_text, show_progress_bar=False, output_value = None)
 
         self.doc_token_ids = doc_info["input_ids"].squeeze().tolist()
         self.doc_token_embeddings = doc_info["token_embeddings"]
@@ -167,7 +168,9 @@ class Document:
         print(f'Embed Doc = {time.time() -  t:.2f}')
 
         t = time.time()
-        self.embed_candidates(model, stemmer, "MaskAll" if ("cand_mode" not in kwargs or kwargs["cand_mode"] == "") else kwargs["cand_mode"], "global_attention" if "global_attention" in kwargs else "")
+        self.embed_candidates(model, stemmer, 
+                              "MaskAll" if ("cand_mode" not in kwargs or kwargs["cand_mode"] == "") else kwargs["cand_mode"], 
+                              "global_attention" if "global_attention" in kwargs else "")
         print(f'Embed Candidates = {time.time() -  t:.2f}')
 
         doc_sim = []

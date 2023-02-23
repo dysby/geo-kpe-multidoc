@@ -74,8 +74,9 @@ class Document:
         The default value just embeds the document normally.
         """
 
+        # TODO: check why lower
         self.raw_text = self.raw_text.lower()
-        doc_info = model.embed_full(self.raw_text) 
+        doc_info = model.embedding_model.encode(self.raw_text, show_progress_bar=False, output_value = None)
 
         self.doc_token_ids = doc_info["input_ids"].squeeze().tolist()
         self.doc_token_embeddings = doc_info["token_embeddings"]
