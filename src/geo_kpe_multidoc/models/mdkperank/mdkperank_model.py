@@ -3,6 +3,8 @@ from typing import List, Tuple, Set
 from nltk.stem import PorterStemmer
 from statistics import mean
 
+from geo_kpe_multidoc.datasets.dataset import TextDataset
+
 
 # from datasets.process_datasets import *
 
@@ -20,7 +22,7 @@ class MDKPERank(BaseKPModel):
     def __init__(self, model, tagger):
         self.base_model_embed = EmbedRank(model, tagger)
         self.base_model_mask = MaskRank(model, tagger)
-        super().__init__(model)
+        # super().__init__(model)
 
     def extract_kp_from_doc(
         self, doc, top_n, min_len, stemmer=None, lemmer=None, **kwargs
@@ -42,17 +44,13 @@ class MDKPERank(BaseKPModel):
         stemming: bool = False,
         lemmatize: bool = False,
         **kwargs
-    ) -> List[List[Tuple]]:
+    ) -> Tuple[list[Tuple], list]:
         topic_res = [
             self.extract_kp_from_doc(doc, -1, min_len, stemming, lemmatize, **kwargs)
             for doc in topic[0]
         ]
         cands = {}
-        for doc in topic_res:
-            doc_abs = doc[0]
-            cand_embeds = doc[1]
-            cand_set = doc[2]
-
+        for doc_abs, cand_embeds, cand_set in topic_res:
             for i in range(len(cand_set)):
                 if cand_set[i] not in cands:
                     cands[cand_set[i]] = []
@@ -78,18 +76,19 @@ class MDKPERank(BaseKPModel):
         for cand in scores_per_candidate:
             scores_per_candidate[cand] = mean(scores_per_candidate[cand])
 
-        scores = sorted(
+        scores: List = sorted(
             [(cand, scores_per_candidate[cand]) for cand in scores_per_candidate],
             reverse=True,
             key=lambda x: x[1],
         )
-        cand_set = [cand[0] for cand in scores]
+        cand_set = [cand for cand, _ in scores]
 
+        # TODO: simplify scores, cand_set to cand_set, cand_score
         return scores, cand_set
 
     def extract_kp_from_corpus(
         self,
-        corpus,
+        corpus: TextDataset,
         dataset: str = "MKDUC01",
         top_n: int = 15,
         min_len: int = 5,
@@ -98,14 +97,23 @@ class MDKPERank(BaseKPModel):
         **kwargs
     ) -> List[List[Tuple]]:
         """
-        Concrete method that extracts key-phrases from a list of given documents, with optional arguments
+        Extracts key-phrases from a list of given documents, with optional arguments
         relevant to its specific functionality
+
+        Parameters:
+        ------
+            corpus: TextDataset
+                Iterable container with tuple (doc/docs, keyphrases} items.
+
+        Returns:
+        ------
+            list of results with ((candidate, scores), candidate) items
         """
         res = [
             self.extract_kp_from_topic(
-                topic, dataset, top_n, min_len, stemming, lemmatize, **kwargs
+                sample, dataset, top_n, min_len, stemming, lemmatize, **kwargs
             )
-            for topic in corpus
+            for sample, _label in corpus
         ]
 
         return res

@@ -1,4 +1,5 @@
 from os import write
+from pathlib import Path
 from typing import List, Dict, Tuple, Callable
 import numpy as np
 import simplemma
@@ -6,9 +7,9 @@ import json
 
 from nltk.stem import PorterStemmer
 from time import gmtime, strftime
-from utils.IO import write_to_file
 
-from ...geo_kpe_multidoc import GEO_KPE_MULTIDOC_OUTPUT_PATH
+from geo_kpe_multidoc import GEO_KPE_MULTIDOC_OUTPUT_PATH
+from geo_kpe_multidoc.utils.IO import write_to_file
 
 
 def extract_res_labels(
@@ -236,6 +237,9 @@ def evaluate_kp_extraction(
                     res_dic[name][measure] = dic[measure]
 
     if save:
+        Path(f"{GEO_KPE_MULTIDOC_OUTPUT_PATH}/raw/{stamp} raw.txt").parent.mkdir(
+            exist_ok=True, parents=True
+        )
         with open(f"{GEO_KPE_MULTIDOC_OUTPUT_PATH}/raw/{stamp} raw.txt", "a") as f:
             f.write(res.rstrip())
 

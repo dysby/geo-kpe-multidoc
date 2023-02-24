@@ -4,7 +4,7 @@ from typing import Callable, List, Set, Tuple
 
 import numpy as np
 
-from ..keybert.backend._utils import select_backend
+from keybert.backend._utils import select_backend
 
 
 class FusionModel:

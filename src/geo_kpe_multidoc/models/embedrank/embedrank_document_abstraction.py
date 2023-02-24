@@ -115,7 +115,7 @@ class Document:
         return doc_info["sentence_embedding"].detach().numpy()
 
     def global_embed_doc(self, model):
-        pass
+        raise NotImplemented
 
     def embed_candidates(
         self,
