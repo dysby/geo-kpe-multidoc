@@ -13,7 +13,7 @@ from geo_kpe_multidoc.utils.IO import write_to_file
 
 
 def extract_res_labels(
-    model_results, stemmer: Callable = None, lemmer: Callable = None
+    model_results: Dict, stemmer: Callable = None, lemmer: Callable = None
 ):
     """
     Code snippet to correctly model results
@@ -124,7 +124,12 @@ def evaluate_kp_extraction(
     **kwargs,
 ) -> None:
     """
-    Function that evaluates the model result in each dataset it ran on, considering the true labels of said dataset.
+    Evaluate model results for each dataset, considering the true labels.
+
+    Parameters
+    ----------
+        model_results:  Dict[str, List]
+            Dictionary whit dataset Names as keys and Results as values
     """
 
     stamp = ""

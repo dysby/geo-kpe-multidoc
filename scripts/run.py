@@ -1,9 +1,13 @@
+from loguru import logger
+
+
 def main():
     from geo_kpe_multidoc.models import EmbedRank, MaskRank
-    backend_model = 'longformer-paraphrase-multilingual-mpnet-base-v2'
-    parser = 'en_core_web_trf'
-    kpe_embed = EmbedRank( backend_model, parser)
-    kpe_mask = MaskRank( backend_model, parser)
+
+    backend_model = "longformer-paraphrase-multilingual-mpnet-base-v2"
+    parser = "en_core_web_trf"
+    kpe_embed = EmbedRank(backend_model, parser)
+    kpe_mask = MaskRank(backend_model, parser)
 
     doc = """INDUSTRIAL SOCIETY AND ITS FUTURE
 
@@ -19,19 +23,43 @@ def main():
 
     5. In this article we give attention to only some of the negative developments that have grown out of the industrial-technological system. Other such developments we mention only briefly or ignore altogether. This does not mean that we regard these other developments as unimportant. For practical reasons we have to confine our discussion to areas that have received insufficient public attention or in which we have something new to say. For example, since there are well-developed environmental and wilderness movements, we have written very little about environmental degradation or the destruction of wild nature, even though we consider these to be highly important.
     """
-    
+
     top_n, candidate_set = kpe_embed.extract_kp_from_doc(doc=doc, top_n=5, min_len=2)
     print("Embed Rank")
     print(top_n)
     print("===========================================")
     print(candidate_set)
-    
+
     top_n, candidate_set = kpe_mask.extract_kp_from_doc(doc=doc, top_n=5, min_len=2)
     print("Mask Rank")
     print(top_n)
     print("===========================================")
     print(candidate_set)
-    
+
+
+def test_2():
+    from geo_kpe_multidoc.datasets import TextDataset
+    from geo_kpe_multidoc.models.mdkperank.mdkperank_model import MDKPERank
+
+    BACKEND_MODEL_NAME = "longformer-paraphrase-multilingual-mpnet-base-v2"
+    PARSER_NAME = "en_core_web_trf"
+    DATASET_LIST = ["MKDUC01"]
+    TOPN = 3
+
+    logger.info(f"Reading Datasets: {DATASET_LIST}")
+    datasets = TextDataset.build_datasets(DATASET_LIST)
+
+    kpe_model = MDKPERank(BACKEND_MODEL_NAME, PARSER_NAME)
+    for corpus in datasets:
+        logger.info(f"KPE for {corpus.name} with {len(corpus)} topics")
+        kpe_output = kpe_model.extract_kp_from_corpus(corpus=corpus)
+        for topic_kpe_output in kpe_output:
+            print(f"Top {TOPN} Keyphrases for topic")
+            for keyphrase, score in topic_kpe_output[:TOPN]:
+                print(keyphrase, score)
+            print("==========================")
+    logger.info("KPE finish")
+
 
 if __name__ == "__main__":
     # print(os.environ["PYTHONPATH"])
@@ -41,4 +69,4 @@ if __name__ == "__main__":
     # debugpy.wait_for_client()
     # debugpy.breakpoint()
     # print('break on this line')
-    main()
+    test_2()

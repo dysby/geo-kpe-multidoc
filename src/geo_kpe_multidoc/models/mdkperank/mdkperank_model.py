@@ -5,10 +5,11 @@ from statistics import mean
 
 from geo_kpe_multidoc.datasets.dataset import TextDataset
 
+from dataclasses import dataclass
 
 # from datasets.process_datasets import *
 
-from ..base_KP_model import BaseKPModel
+from ..base_KP_model import BaseKPModel, KPEScore
 from ..embedrank import EmbedRank
 from ..maskrank import MaskRank
 from ..fusion_model import FusionModel
@@ -16,6 +17,23 @@ from ..fusion_model import FusionModel
 from ..pre_processing.language_mapping import choose_tagger, choose_lemmatizer
 from ..pre_processing.pos_tagging import POS_tagger_spacy
 from ..pre_processing.pre_processing_utils import remove_punctuation, remove_whitespaces
+
+
+@dataclass
+class KpeModelScores:
+    candidates: List[str]
+    scores: List[float]
+
+    def __len__(self):
+        return len(self.candidates)
+
+    def __getitem__(self, index):
+        return self.candidates[index], self.scores[index]
+
+
+@dataclass
+class MDKPERankOutput:
+    results: List[KPEScore]
 
 
 class MDKPERank(BaseKPModel):
@@ -44,13 +62,21 @@ class MDKPERank(BaseKPModel):
         stemming: bool = False,
         lemmatize: bool = False,
         **kwargs
-    ) -> Tuple[list[Tuple], list]:
+    ) -> list[KPEScore]:
+        """
+        Extract keyphrases from list of documents
+
+        Parameters
+        ----------
+            topic: List[KPEScore]
+                List KPE extracted from the agregation of documents set, with their score(/embeding?)
+        """
         topic_res = [
             self.extract_kp_from_doc(doc, -1, min_len, stemming, lemmatize, **kwargs)
-            for doc in topic[0]
+            for doc in topic
         ]
         cands = {}
-        for doc_abs, cand_embeds, cand_set in topic_res:
+        for _doc_abs, cand_embeds, cand_set in topic_res:
             for i in range(len(cand_set)):
                 if cand_set[i] not in cands:
                     cands[cand_set[i]] = []
@@ -67,8 +93,8 @@ class MDKPERank(BaseKPModel):
         ]
         scores_per_candidate = {}
 
-        for doc in res_p_doc:
-            for cand_t in doc[0]:
+        for doc, _ in res_p_doc:
+            for cand_t in doc:
                 if cand_t[0] not in scores_per_candidate:
                     scores_per_candidate[cand_t[0]] = []
                 scores_per_candidate[cand_t[0]].append(cand_t[1])
@@ -76,15 +102,13 @@ class MDKPERank(BaseKPModel):
         for cand in scores_per_candidate:
             scores_per_candidate[cand] = mean(scores_per_candidate[cand])
 
-        scores: List = sorted(
+        scores = sorted(
             [(cand, scores_per_candidate[cand]) for cand in scores_per_candidate],
             reverse=True,
             key=lambda x: x[1],
         )
-        cand_set = [cand for cand, _ in scores]
 
-        # TODO: simplify scores, cand_set to cand_set, cand_score
-        return scores, cand_set
+        return scores
 
     def extract_kp_from_corpus(
         self,
@@ -95,7 +119,7 @@ class MDKPERank(BaseKPModel):
         stemming: bool = False,
         lemmatize: bool = False,
         **kwargs
-    ) -> List[List[Tuple]]:
+    ) -> List[List[KPEScore]]:
         """
         Extracts key-phrases from a list of given documents, with optional arguments
         relevant to its specific functionality

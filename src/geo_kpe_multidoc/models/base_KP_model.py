@@ -4,6 +4,8 @@ from typing import List, Tuple, Set
 
 from .backend.select_backend import select_backend
 
+KPEScore = Tuple[str, float]
+
 
 class BaseKPModel:
     """

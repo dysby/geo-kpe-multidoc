@@ -39,7 +39,7 @@ class EmbedRank(BaseKPModel):
 
     def extract_mdkpe_embeds(
         self, txt, top_n, min_len, stemmer=None, lemmer=None, **kwargs
-    ) -> Tuple[List[Tuple], List[str]]:
+    ) -> Tuple[Document, List[Tuple], List[str]]:
         doc = Document(txt, self.counter)
         doc.pos_tag(
             self.tagger,
@@ -106,6 +106,6 @@ class EmbedRank(BaseKPModel):
         lemmer = choose_lemmatizer(dataset) if lemmatize else None
 
         return [
-            self.extract_kp_from_doc(doc[0], top_n, min_len, stemmer, lemmer, **kwargs)
-            for doc in corpus
+            self.extract_kp_from_doc(doc, top_n, min_len, stemmer, lemmer, **kwargs)
+            for doc, _ in corpus
         ]

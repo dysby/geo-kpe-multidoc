@@ -52,7 +52,8 @@ class TextDataset(Dataset):
         a factory method.
     """
 
-    def __init__(self, content: Union[DKPE_LIST, MDKPE_LIST]) -> None:
+    def __init__(self, name: str, content: Union[DKPE_LIST, MDKPE_LIST]) -> None:
+        self.name = name
         self.content = content
 
     def __len__(self):
@@ -67,7 +68,7 @@ class TextDataset(Dataset):
         return self.content[idx][0], self.content[idx][1]
 
     @classmethod
-    def build_dataset(cls: Type[T], names: List[str] = ["DUC"]) -> T:
+    def build_datasets(cls: Type[T], names: List[str] = ["DUC"]) -> List[T]:
         """
         Load datasets from files. Only supported datasets can be loaded.
 
@@ -80,15 +81,16 @@ class TextDataset(Dataset):
         -------
         TextDataset
         """
-        content = {}
+        datasets = []
         for name in names:
             if name not in SUPPORTED_DATASETS.keys():
                 raise ValueError(
                     f"Requested dataset {name} is not implemented in supported datasets\n {SUPPORTED_DATASETS.keys()}"
                 )
 
-            content[name] = extract_from_dataset(name, SUPPORTED_DATASETS[name])
-        return cls(content)
+            content = extract_from_dataset(name, SUPPORTED_DATASETS[name])
+            datasets.append(cls(name, content))
+        return datasets
 
 
 def extract_from_dataset(
@@ -132,9 +134,12 @@ def extract_mdkpe(dataset_dir) -> MDKPE_LIST:
 
     res = []
     for topic in dataset:
-        docs_for_topic = [doc for doc in dataset[topic]["documents"]]
+        doc_content_for_topic = [
+            doc_content
+            for _doc_name, doc_content in dataset[topic]["documents"].items()
+        ]
         kps_for_topic = list(itertools.chain(*dataset[topic]["keyphrases"]))
-        res.append((docs_for_topic, kps_for_topic))
+        res.append((doc_content_for_topic, kps_for_topic))
 
     if len(res) == 0:
         logger.warning(f"Extracted **zero** results")
