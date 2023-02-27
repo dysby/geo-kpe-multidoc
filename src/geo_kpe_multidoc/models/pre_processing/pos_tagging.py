@@ -1,11 +1,12 @@
-import spacy
-import torch
 import os
 from abc import ABC, abstractmethod
 from typing import List, Tuple
 
+import spacy
+import torch
+from loguru import logger
 
-from geo_kpe_multidoc.utils.IO import write_to_file, read_from_file
+from geo_kpe_multidoc.utils.IO import read_from_file, write_to_file
 
 
 class POS_tagger(ABC):
@@ -86,7 +87,7 @@ class POS_tagger_spacy(POS_tagger):
     def pos_tag_text_sents_words(
         self, text: str = "", memory: bool = False, id: int = 0
     ) -> Tuple[List[List[Tuple[str, str]]], List[str], List[List[str]]]:
-        print(f"{memory}{id}")
+        logger.debug(f"Cache:{memory} Id:{id}")
         doc = self.tagger(text) if not memory else read_from_file(f"{memory}{id}")
         tagged_text = []
         doc_word_sents = []
@@ -129,6 +130,6 @@ class POS_tagger_spacy(POS_tagger):
 
         for i in range(index, len(input_docs)):
             torch.cuda.empty_cache()
-            print(self.pos_tag_str(input_docs[i][0]))
+            logger.info(self.pos_tag_str(input_docs[i][0]))
             write_to_file(f"{output_path}{i}", self.pos_tag_str(input_docs[i][0]))
-            print(f"Tagged and saved document {i}")
+            logger.info(f"Tagged and saved document {i}")

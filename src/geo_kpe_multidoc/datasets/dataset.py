@@ -44,7 +44,8 @@ class TextDataset(Dataset):
     Attributes
     ----------
     content : List[Tuple[List[str], List[str]]]
-        a list container with (doc/docs, keyphrases).
+        a list container with (doc/docs, keyphrases),
+        or a list with (topic name, docs, keyphrases)
 
     Methods
     -------
@@ -63,9 +64,10 @@ class TextDataset(Dataset):
         """
         Returns
         -----
-            (sample, label)
+            (sample, label) or (topic_name, sample, label )
+
         """
-        return self.content[idx][0], self.content[idx][1]
+        return self.content[idx]
 
     @classmethod
     def build_datasets(cls: Type[T], names: List[str] = ["DUC"]) -> List[T]:
@@ -139,7 +141,7 @@ def extract_mdkpe(dataset_dir) -> MDKPE_LIST:
             for _doc_name, doc_content in dataset[topic]["documents"].items()
         ]
         kps_for_topic = list(itertools.chain(*dataset[topic]["keyphrases"]))
-        res.append((doc_content_for_topic, kps_for_topic))
+        res.append((topic, doc_content_for_topic, kps_for_topic))
 
     if len(res) == 0:
         logger.warning(f"Extracted **zero** results")
