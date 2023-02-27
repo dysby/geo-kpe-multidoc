@@ -9,6 +9,7 @@ from nltk.stem import PorterStemmer
 from time import gmtime, strftime
 
 from geo_kpe_multidoc import GEO_KPE_MULTIDOC_OUTPUT_PATH
+from geo_kpe_multidoc.evaluation.metrics import MAP, f1_score, nDCG, precision, recall
 from geo_kpe_multidoc.utils.IO import write_to_file
 
 
@@ -155,25 +156,26 @@ def evaluate_kp_extraction(
 
         for i in range(len(model_results[dataset])):
             top_kp = model_results[dataset][i][0]
-            len_top_kp = float(len(top_kp))
 
             candidates = model_results[dataset][i][1]
-            len_candidates = float(len(candidates))
 
             true_label = true_labels[dataset][i]
-            len_true_label = float(len(true_label))
 
             # Precision, Recall and F1-Score for candidates
-            p = min(
-                1.0, len([kp for kp in candidates if kp in true_label]) / len_candidates
-            )
-            r = min(
-                1.0, len([kp for kp in candidates if kp in true_label]) / len_true_label
-            )
-            f1 = 0.0
+            p = precision(top_kp[:k], true_label)
+            r = recall(top_kp[:k], true_label)
+            f1 = f1_score(p_k, r_k)
 
-            if p != 0 and r != 0:
-                f1 = (2.0 * p * r) / (p + r)
+            # p = min(
+            #     1.0, len([kp for kp in candidates if kp in true_label]) / len_candidates
+            # )
+            # r = min(
+            #     1.0, len([kp for kp in candidates if kp in true_label]) / len_true_label
+            # )
+            # f1 = 0.0
+
+            # if p != 0 and r != 0:
+            #     f1 = (2.0 * p * r) / (p + r)
 
             results_c["Precision"].append(p)
             results_c["Recall"].append(r)
@@ -182,43 +184,33 @@ def evaluate_kp_extraction(
             if kp_eval:
                 # Precision_k, Recall_k, F1-Score_k, MAP and nDCG for KP
                 for k in k_set:
-                    p_k = min(
-                        1.0,
-                        len([kp for kp in top_kp[:k] if kp in true_label])
-                        / float(len(top_kp[:k])),
-                    )
-                    r_k = min(
-                        1.0,
-                        (
-                            len([kp for kp in top_kp[:k] if kp in true_label])
-                            / len_true_label
-                        ),
-                    )
-                    f1_k = 0.0
+                    p_k = precision(top_kp[:k], true_label)
+                    # p_k = min(
+                    #     1.0,
+                    #     len([kp for kp in top_kp[:k] if kp in true_label])
+                    #     / float(len(top_kp[:k])),
+                    # )
+                    r_k = recall(top_kp[:k], true_label)
+                    # r_k = min(
+                    #     1.0,
+                    #     (
+                    #         len([kp for kp in top_kp[:k] if kp in true_label])
+                    #         / len_true_label
+                    #     ),
+                    # )
+                    # f1_k = 0.0
 
-                    if p_k != 0 and r_k != 0:
-                        f1_k = (2.0 * p_k * r_k) / (p_k + r_k)
+                    # if p_k != 0 and r_k != 0:
+                    #     f1_k = (2.0 * p_k * r_k) / (p_k + r_k)
+
+                    f1_k = f1_score(p_k, r_k)
 
                     results_kp[f"Precision_{k}"].append(p_k)
                     results_kp[f"Recall_{k}"].append(r_k)
                     results_kp[f"F1_{k}"].append(f1_k)
 
-                ap = [
-                    len([k for k in top_kp[:i] if k in true_label]) / float(i)
-                    for i in range(1, len(top_kp) + 1)
-                    if top_kp[i - 1] in true_label
-                ]
-                map = np.sum(ap) / float(len(true_label))
-                ndcg = np.sum(
-                    [
-                        1.0 / np.log2(i + 1)
-                        for i in range(1, len(top_kp) + 1)
-                        if top_kp[i - 1] in true_label
-                    ]
-                )
-                ndcg = ndcg / np.sum(
-                    [1.0 / np.log2(i + 1) for i in range(1, len(true_label) + 1)]
-                )
+                map = MAP(top_kp, true_label)
+                ndcg = nDCG(top_kp, true_label)
 
                 results_kp["MAP"].append(map)
                 results_kp["nDCG"].append(ndcg)
