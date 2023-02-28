@@ -9,9 +9,11 @@ import random
 from .pre_processing_utils import tokenize_hf
 from typing import Callable, List, Tuple
 
+from keybert.backend._base import BaseEmbedder
+
 
 def z_score_normalization(
-    candidate_set_embeded: List[List[float]], raw_document: str, model: Callable
+    candidate_set_embeded: List[List[float]], raw_document: str, model: BaseEmbedder
 ) -> List[List[float]]:
     split_doc_embeded = model.embed(raw_document.split(" "))
     mean = np.mean(split_doc_embeded, axis=0)
@@ -47,7 +49,7 @@ def whitening_np(embeddings: torch.tensor) -> np.array:
     return vecs / (vecs**2).sum(axis=1, keepdims=True) ** 0.5
 
 
-def l1_l12_embed(text: str, model: Callable) -> Tuple:
+def l1_l12_embed(text: str, model: BaseEmbedder) -> Tuple:
     inputs = model.embedding_model.tokenizer(
         text, return_tensors="pt", max_length=4096, return_attention_mask=True
     )
@@ -81,7 +83,7 @@ def max_pooling(token_embeddings, attention_mask):
     return torch.max(token_embeddings, 1)[0]
 
 
-def embed_hf(text: str, model: Callable) -> Tuple:
+def embed_hf(text: str, model: BaseEmbedder) -> Tuple:
     # Tokenize sentences
     inputs = tokenize_hf(text, model)
 
@@ -94,7 +96,7 @@ def embed_hf(text: str, model: Callable) -> Tuple:
     return embed.detach().numpy()
 
 
-def embed_hf_global_att(text: str, model: Callable) -> Tuple:
+def embed_hf_global_att(text: str, model: BaseEmbedder) -> Tuple:
     text = text.strip()
     text = text.lower()
 

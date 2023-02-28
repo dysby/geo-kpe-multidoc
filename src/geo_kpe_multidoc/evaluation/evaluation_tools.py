@@ -6,6 +6,7 @@ import simplemma
 import json
 
 from nltk.stem import PorterStemmer
+from nltk.stem.api import StemmerI
 from time import gmtime, strftime
 
 from geo_kpe_multidoc import GEO_KPE_MULTIDOC_OUTPUT_PATH
@@ -14,7 +15,7 @@ from geo_kpe_multidoc.utils.IO import write_to_file
 
 
 def extract_res_labels(
-    model_results: Dict, stemmer: Callable = None, lemmer: Callable = None
+    model_results: Dict, stemmer: StemmerI = None, lemmer: Callable = None
 ):
     """
     Code snippet to correctly model results
@@ -50,7 +51,7 @@ def extract_res_labels(
 
 
 def extract_res_labels_x(
-    model_results, stemmer: Callable = None, lemmer: Callable = None
+    model_results, stemmer: StemmerI = None, lemmer: Callable = None
 ):
     """
     Code snippet to correctly model results
@@ -59,6 +60,7 @@ def extract_res_labels_x(
     for dataset in model_results:
         res[dataset] = []
         for doc in model_results[dataset]:
+            # TODO: If not stemmer results empty?
             if stemmer:
                 res[dataset].append(
                     (
@@ -89,7 +91,7 @@ def extract_res_labels_x(
 
 
 def extract_dataset_labels(
-    corpus_true_labels, stemmer: Callable = None, lemmer: Callable = None
+    corpus_true_labels, stemmer: StemmerI = None, lemmer: Callable = None
 ):
     """
     Code snippet to correctly format dataset true labels
@@ -166,17 +168,6 @@ def evaluate_kp_extraction(
             r = recall(top_kp[:k], true_label)
             f1 = f1_score(p_k, r_k)
 
-            # p = min(
-            #     1.0, len([kp for kp in candidates if kp in true_label]) / len_candidates
-            # )
-            # r = min(
-            #     1.0, len([kp for kp in candidates if kp in true_label]) / len_true_label
-            # )
-            # f1 = 0.0
-
-            # if p != 0 and r != 0:
-            #     f1 = (2.0 * p * r) / (p + r)
-
             results_c["Precision"].append(p)
             results_c["Recall"].append(r)
             results_c["F1"].append(f1)
@@ -185,24 +176,7 @@ def evaluate_kp_extraction(
                 # Precision_k, Recall_k, F1-Score_k, MAP and nDCG for KP
                 for k in k_set:
                     p_k = precision(top_kp[:k], true_label)
-                    # p_k = min(
-                    #     1.0,
-                    #     len([kp for kp in top_kp[:k] if kp in true_label])
-                    #     / float(len(top_kp[:k])),
-                    # )
                     r_k = recall(top_kp[:k], true_label)
-                    # r_k = min(
-                    #     1.0,
-                    #     (
-                    #         len([kp for kp in top_kp[:k] if kp in true_label])
-                    #         / len_true_label
-                    #     ),
-                    # )
-                    # f1_k = 0.0
-
-                    # if p_k != 0 and r_k != 0:
-                    #     f1_k = (2.0 * p_k * r_k) / (p_k + r_k)
-
                     f1_k = f1_score(p_k, r_k)
 
                     results_kp[f"Precision_{k}"].append(p_k)

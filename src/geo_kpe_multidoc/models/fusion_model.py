@@ -10,10 +10,16 @@ from keybert.backend._utils import select_backend
 class FusionModel:
     """
     Ensemble model to combine results from various models in a single source.
+
+    Averaging strategy = ["aritmetic", "harmonic", "weighted"]
+
     """
 
     def __init__(
-        self, models: List[Callable] = [], models_weights: List[float] = [0.5, 0.5]
+        self,
+        models: List[Callable] = [],
+        averaging_strategy: str = "weighted",
+        models_weights: List[float] = [0.5, 0.5],
     ):
         self.models = models if models != [] else print("Invalid models argument given")
 
@@ -22,6 +28,7 @@ class FusionModel:
             temp_name += f"{str(model.__str__).split()[3]}_"
         self.name = f"{temp_name[:-1]}]"
 
+        self.averaging_strategy = averaging_strategy
         self.weights = models_weights
 
     def extract_kp_from_corpus(
@@ -40,22 +47,26 @@ class FusionModel:
         initialized
         """
 
-        res_models = []
-        for model in self.models:
-            res_models.append(
-                model.extract_kp_from_corpus(
-                    corpus, dataset, -1, min_len, stemming, **kwargs
-                )
+        # kpe extraction results for each topic in corpus by each model in the ensemble
+        # res_by_model[model_idx]
+        res_by_model = [
+            model.extract_kp_from_corpus(
+                corpus, dataset, -1, min_len, stemming, **kwargs
             )
+            for model in self.model
+        ]
 
-        doc_num = len(res_models[0])
+        doc_num = len(res_by_model[0])  # number of docs/topics processed by model 0.
 
-        res_docs = [[] for i in repeat(None, doc_num)]
-        for model_res in res_models:
+        res_docs = [[] for _ in range(doc_num)]
+        # res_docs[doc_idx][model_idx]
+        for model_res in res_by_model:
             for i in range(doc_num):
                 res_docs[i].append(
                     [model_res[i][1], [np.float64(x[1]) for x in model_res[i][0]]]
                 )
+
+        #     [ [model_res[i][1], [np.float64(x[1]) for x in model_res[i][0]]] for model_res
 
         kp_score = {k: {} for k in range(doc_num)}
         for i in range(doc_num):
@@ -109,3 +120,9 @@ class FusionModel:
             (kp_score[i][:top_n], [kp[0] for kp in kp_score[i]])
             for i in range(len(kp_score))
         ]
+
+    def _harmonic_mean(self, res_docs_i):
+        ...
+
+    def _weighted_mean(self):
+        ...

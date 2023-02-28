@@ -14,18 +14,21 @@ class POS_tagger(ABC):
     Abstract data class for POS tagging
     """
 
+    @abstractmethod
     def pos_tag_str(self, text: str = "") -> None:
         """
         POS tag a string and return it in model representation form
         """
-        pass
+        ...
 
+    @abstractmethod
     def pos_tag_doc(self, text: str = "") -> List[List[Tuple[str, str]]]:
         """
         POS tag a document and return it's result in form List of sentences with each word as a Tuple (text, token.pos_)
         """
-        pass
+        ...
 
+    @abstractmethod
     def pos_tag_doc_sents(
         self, text: str = ""
     ) -> Tuple[List[List[Tuple[str, str]]], List[str]]:
@@ -33,8 +36,9 @@ class POS_tagger(ABC):
         POS tag a document and return it's result in Tuple form, with the first element being a List of sentences with each
         word as a Tuple (text, token.pos_), and the second a list of document sentences
         """
-        pass
+        ...
 
+    @abstractmethod
     def pos_tag_text_sents_words(
         self, text: str = "", memory: bool = False, id: int = 0
     ) -> Tuple[List[List[Tuple[str, str]]], List[str], List[List[str]]]:
@@ -42,15 +46,16 @@ class POS_tagger(ABC):
         POS tag a document and return it's result in Tuple form, with the first element being a List of sentences with each
         word as a Tuple (text, token.pos_), the second a list of document sentences and the third a list of words in each sentence.
         """
-        pass
+        ...
 
+    @abstractmethod
     def pos_tag_to_file(
         self, input_docs: List[str], output_path: str = "", index: int = 0
     ) -> None:
         """
         POS tag a list of documents and save it to a file
         """
-        pass
+        ...
 
 
 class POS_tagger_spacy(POS_tagger):

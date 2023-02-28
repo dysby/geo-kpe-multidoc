@@ -2,17 +2,24 @@ import re
 import string
 from typing import Callable, List, Tuple
 
+from keybert.backend._base import BaseEmbedder
 from nltk.corpus import stopwords
+
+from geo_kpe_multidoc.models.base_KP_model import BaseKPModel
 
 from .stopwords import ENGLISH_STOP_WORDS
 
-SPECIAL_IDS = {0, 1, 2, 3, 250001}
+SPECIAL_TOKEN_IDS = {0, 1, 2, 3, 250001}
 
 
 def remove_punctuation(text: str = "") -> str:
     """
     Quick snippet to remove punctuation marks
     """
+    # self.punctuation_regex = (
+    #         "[!\"#\$%&'\(\)\*\+,\.\/:;<=>\?@\[\]\^_`{\|}~\-\–\—\‘\’\“\”]"
+    #     )
+    # TODO: why this is different from document pontuation regex?
     return re.sub("[.,;:\"'!?`´()$£€\-^|=/<>]", " ", text)
 
 
@@ -36,26 +43,28 @@ def remove_stopwords(text: str = "") -> str:
     return res[1:]
 
 
-def filter_ids(input_ids: List[List[int]]) -> List[int]:
-    return [i for i in input_ids.squeeze().tolist() if i not in SPECIAL_IDS]
+def filter_token_ids(input_ids: List[List[int]]) -> List[int]:
+    return [i for i in input_ids.squeeze().tolist() if i not in SPECIAL_TOKEN_IDS]
 
 
-def tokenize(text: str, model: Callable) -> Tuple:
+def tokenize(text: str, model: BaseEmbedder) -> Tuple:
     tokenized = model.embedding_model.tokenizer(
         text, return_tensors="pt", return_attention_mask=True
     )
-    tokens = [i for i in tokenized.input_ids.squeeze().tolist() if i not in special_ids]
+    tokens = [
+        i for i in tokenized.input_ids.squeeze().tolist() if i not in SPECIAL_TOKEN_IDS
+    ]
 
     return tokens, [model.embedding_model.tokenizer.decode(t) for t in tokens]
 
 
-def tokenize_hf(text: str, model: Callable) -> List:
+def tokenize_hf(text: str, model: BaseEmbedder) -> List:
     return model.embedding_model.tokenizer(
         text, padding=True, truncation=True, return_tensors="pt"
     )
 
 
-def tokenize_attention_embed(text: str, model: Callable) -> Tuple:
+def tokenize_attention_embed(text: str, model: BaseEmbedder) -> Tuple:
     inputs = model.embedding_model.tokenizer(text, return_tensors="pt", max_length=2048)
     outputs = model.embedding_model._modules["0"]._modules["auto_model"](**inputs)
 
@@ -65,13 +74,8 @@ def tokenize_attention_embed(text: str, model: Callable) -> Tuple:
 
 
 def sentence_transformer_tokenize(text: str) -> List[int]:
-    tokens = text.split()
-
-    tokens_filtered = []
-    for token in tokens:
-        if token in ENGLISH_STOP_WORDS or token.lower() in ENGLISH_STOP_WORDS:
-            continue
-
-        tokens_filtered.append(token.lower())
+    tokens_filtered = [
+        token for token in text.lower().split() if token not in ENGLISH_STOP_WORDS
+    ]
 
     return tokens_filtered

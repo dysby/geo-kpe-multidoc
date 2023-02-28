@@ -3,6 +3,7 @@ import re
 from typing import List, Tuple, Set
 
 from .backend.select_backend import select_backend
+from keybert.backend._base import BaseEmbedder
 
 KPEScore = Tuple[str, float]
 
