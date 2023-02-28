@@ -74,10 +74,7 @@ class EmbedRank(BaseKPModel):
         doc = Document(txt, self.counter)
 
         # TODO: when use stemming?
-
-        use_cache = (
-            False if "pos_tag_memory" not in kwargs else kwargs["pos_tag_memory"]
-        )
+        use_cache = kwargs.get("pos_tag_memory", False)
 
         self.pos_tag_doc(
             doc=doc,
@@ -90,7 +87,7 @@ class EmbedRank(BaseKPModel):
             doc, min_len, stemmer, **kwargs
         )
 
-        logger.info(f"document #{self.counter} processed")
+        logger.info(f"Document #{self.counter} processed")
         self.counter += 1
         torch.cuda.empty_cache()
 
@@ -112,19 +109,14 @@ class EmbedRank(BaseKPModel):
 
         doc = Document(txt, self.counter)
 
-        use_cache = (
-            False if "pos_tag_memory" not in kwargs else kwargs["pos_tag_memory"]
-        )
+        use_cache = kwargs.get("pos_tag_memory", False)
+
         self.pos_tag_doc(
             doc=doc,
             stemming=None,
             memory=use_cache,
         )
-        # self.pos_tag_doc(
-        #     doc,
-        #     False if "pos_tag_memory" not in kwargs else kwargs["pos_tag_memory"],
-        #     self.counter,
-        # )
+
         self.extract_candidates(doc, min_len, self.grammar, lemmer)
 
         top_n, candidate_set = self.top_n_candidates(
@@ -162,10 +154,11 @@ class EmbedRank(BaseKPModel):
             for doc, _ in corpus
         ]
 
-    def embed_sents_words(self, doc, stemmer: Callable = None, memory=False):
+    def embed_sents_words(self, doc, stemmer: Optional[StemmerI] = None, memory=False):
         """
         Embed each word in the sentence by it self
-        TODO:NOT USED?
+        TODO: embed_sent_words NOT USED?
+        TODO: correct cache/memory usage
         """
         if not memory:
             # self.doc_sents_words_embed = []
@@ -182,14 +175,18 @@ class EmbedRank(BaseKPModel):
             doc.doc_sents_words_embed = read_from_file(f"{memory}/{doc.id}")
 
     def evaluate_n_candidates(
-        self, doc_embed, candidate_set_embed, candidate_set
+        self, doc_embed: np.ndarray, candidate_set_embed, candidate_set
     ) -> List[Tuple]:
         # doc_embed = doc.doc_embed.reshape(1, -1)
         doc_sim = np.absolute(
             cosine_similarity(candidate_set_embed, doc_embed.reshape(1, -1))
         )
         candidate_score = sorted(
-            [(candidate_set[i], doc_sim[i][0]) for i in range(len(doc_sim))],
+            [
+                (candidate, candidate_doc_sim[0])
+                for (candidate, candidate_doc_sim) in zip(candidate_set, doc_sim)
+            ],
+            # [(candidate_set[i], doc_sim[i][0]) for i in range(len(doc_sim))],
             reverse=True,
             key=lambda x: x[1],
         )
@@ -198,7 +195,7 @@ class EmbedRank(BaseKPModel):
 
     def embed_doc(
         self,
-        doc,
+        doc: Document,
         stemmer: Callable = None,
         doc_mode: str = "",
         post_processing: List[str] = [],
@@ -225,8 +222,8 @@ class EmbedRank(BaseKPModel):
 
     def embed_candidates(
         self,
-        doc,
-        stemmer: Callable = None,
+        doc: Document,
+        stemmer: Optional[StemmerI] = None,
         cand_mode: str = "",
         post_processing: List[str] = [],
     ):
@@ -296,6 +293,7 @@ class EmbedRank(BaseKPModel):
                 temp_cand_set.append(" ".join(word for word, tag in subtree.leaves()))
 
             for candidate in temp_cand_set:
+                # TODO: why candidate max length is 5?
                 if len(candidate) > min_len and len(candidate.split(" ")) <= 5:
                     l_candidate = (
                         " ".join(
@@ -317,21 +315,31 @@ class EmbedRank(BaseKPModel):
 
         doc.candidate_set = sorted(list(doc.candidate_set), key=len, reverse=True)
 
-    def embed_n_candidates(self, doc, min_len, stemmer, **kwargs) -> List[Tuple]:
+    def embed_n_candidates(
+        self, doc, min_len, stemmer, **kwargs
+    ) -> Tuple[np.ndarray, List[str]]:
+        """
+        TODO: Why embed_n_candidates
+
+        Return
+        ------
+            candidate_set_embed:    np.ndarray of the embedings for each candidate.
+            candicate_set:          List of candidates.
+        """
         doc_mode = ""
         cand_mode = "global_attention" if "global_attention" in kwargs else ""
         post_processing = [""]
 
         t = time()
-        self.doc_embed = self.embed_doc(doc, stemmer, doc_mode, post_processing)
-        logger.info(f"Embed Doc in {time.time() -  t:.2f}s")
+        doc.doc_embed = self.embed_doc(doc, stemmer, doc_mode, post_processing)
+        logger.info(f"Embed Doc in {time() -  t:.2f}s")
 
         t = time()
         self.embed_candidates(doc, stemmer, cand_mode, post_processing)
-        print(f"Embed Candidates in {time.time() -  t:.2f}s")
+        print(f"Embed Candidates in {time() -  t:.2f}s")
 
         if cand_mode == "global_attention":
-            self.doc_embed = self.global_embed_doc(doc)
+            doc.doc_embed = self.global_embed_doc(doc)
 
         return self.candidate_set_embed, self.candidate_set
 

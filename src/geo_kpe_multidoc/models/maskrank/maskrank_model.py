@@ -1,13 +1,26 @@
-from typing import List, Set, Tuple
+import re
+from time import time
+from typing import Callable, List, Optional, Set, Tuple
 
+import numpy as np
+import torch
+from loguru import logger
+from nltk import RegexpParser
 from nltk.stem import PorterStemmer
+from nltk.stem.api import StemmerI
+from sklearn.metrics.pairwise import cosine_similarity
 
-from ...datasets.process_datasets import *
-from ..base_KP_model import BaseKPModel
-from ..pre_processing.language_mapping import choose_lemmatizer, choose_tagger
-from ..pre_processing.pos_tagging import POS_tagger_spacy
-from ..pre_processing.pre_processing_utils import remove_punctuation, remove_whitespaces
-from .maskrank_document_abstraction import Document
+from geo_kpe_multidoc.document import Document
+from geo_kpe_multidoc.models.base_KP_model import BaseKPModel
+from geo_kpe_multidoc.models.pre_processing.language_mapping import (
+    choose_lemmatizer,
+    choose_tagger,
+)
+from geo_kpe_multidoc.models.pre_processing.pos_tagging import POS_tagger_spacy
+from geo_kpe_multidoc.models.pre_processing.pre_processing_utils import (
+    remove_punctuation,
+    remove_whitespaces,
+)
 
 
 class MaskRank(BaseKPModel):
@@ -37,49 +50,74 @@ class MaskRank(BaseKPModel):
         doc = remove_punctuation(doc)
         return remove_whitespaces(doc)[1:]
 
+    def pos_tag_doc(self, doc: Document, stemming, memory, **kwargs) -> None:
+        (
+            doc.tagged_text,
+            doc.doc_sentences,
+            doc.doc_sentences_words,
+        ) = self.tagger.pos_tag_text_sents_words(doc.raw_text, memory, doc.id)
+
+        doc.doc_sentences = [
+            sent.text for sent in doc.doc_sentences if sent.text.strip()
+        ]
+
     def extract_mdkpe_embeds(
         self, txt, top_n, min_len, stemmer=None, lemmer=None, **kwargs
-    ) -> Tuple[List[Tuple], List[str]]:
+    ) -> Tuple[Document, List[Tuple], List[str]]:
         doc = Document(txt, self.counter)
-        doc.pos_tag(
-            self.tagger,
-            False if "pos_tag_memory" not in kwargs else kwargs["pos_tag_memory"],
-            self.counter,
-        )
-        doc.extract_candidates(min_len, self.grammar, lemmer)
 
-        cand_embeds, candidate_set = doc.embed_n_candidates(
-            self.model, min_len, stemmer, **kwargs
+        use_cache = kwargs.get("pos_tag_memory", False)
+
+        self.pos_tag_doc(
+            doc=doc,
+            stemming=None,
+            memory=use_cache,
+        )
+        self.extract_candidates(doc, min_len, self.grammar, lemmer)
+
+        cand_embeds, candidate_set = self.embed_n_candidates(
+            doc, min_len, stemmer, **kwargs
         )
 
-        print(f"document {self.counter} processed\n")
+        logger.info(f"Document #{self.counter} processed")
         self.counter += 1
         torch.cuda.empty_cache()
 
         return (doc, cand_embeds, candidate_set)
 
     def extract_kp_from_doc(
-        self, doc, top_n, min_len, stemmer=None, lemmer=None, **kwargs
+        self,
+        txt,
+        top_n,
+        min_len,
+        stemmer: Optional[StemmerI] = None,
+        lemmer: Optional[Callable] = None,
+        **kwargs,
     ) -> Tuple[List[Tuple], List[str]]:
         """
         Concrete method that extracts key-phrases from a given document, with optional arguments
         relevant to its specific functionality
         """
 
-        doc = Document(doc, self.counter)
-        doc.pos_tag(
-            self.tagger,
-            False if "pos_tag_memory" not in kwargs else kwargs["pos_tag_memory"],
-            self.counter,
-        )
-        doc.extract_candidates(min_len, self.grammar, lemmer)
+        doc = Document(txt, self.counter)
 
-        top_n, candidate_set = doc.top_n_candidates(
-            self.model, top_n, min_len, stemmer, **kwargs
+        use_cache = kwargs.get("pos_tag_memory", False)
+
+        self.pos_tag_doc(
+            doc=doc,
+            stemming=None,
+            memory=use_cache,
         )
 
-        print(f"document {self.counter} processed\n")
+        self.extract_candidates(doc, min_len, self.grammar, lemmer)
+
+        top_n, candidate_set = self.top_n_candidates(
+            doc, top_n, min_len, stemmer, **kwargs
+        )
+
+        logger.info(f"Document #{self.counter} processed")
         self.counter += 1
+        torch.cuda.empty_cache()
 
         return (top_n, candidate_set)
 
@@ -100,10 +138,227 @@ class MaskRank(BaseKPModel):
         self.counter = 0
         self.update_tagger(dataset)
 
-        stemer = None if not stemming else PorterStemmer()
-        lemmer = None if not lemmatize else choose_lemmatizer(dataset)
+        stemmer = PorterStemmer() if stemming else None
+        lemmer = choose_lemmatizer(dataset) if lemmatize else None
 
         return [
-            self.extract_kp_from_doc(doc[0], top_n, min_len, stemer, lemmer, **kwargs)
-            for doc in corpus
+            self.extract_kp_from_doc(doc, top_n, min_len, stemmer, lemmer, **kwargs)
+            for doc, _ in corpus
         ]
+
+    def embed_doc(self, doc: Document, stemmer: Callable = None) -> np.ndarray:
+        """
+        Method that embeds the document.
+        """
+
+        # doc_info = model.embed_full(self.raw_text) # encode(documents, show_progress_bar=False, output_value = None)
+        doc_embedings = self.model.embedding_model.encode(
+            doc.raw_text, show_progress_bar=False, output_value=None
+        )
+
+        doc.doc_token_ids = doc_embedings["input_ids"].squeeze().tolist()
+        doc.doc_token_embeddings = doc_embedings["token_embeddings"]
+        doc.doc_attention_mask = doc_embedings["attention_mask"]
+
+        return doc_embedings["sentence_embedding"].detach().numpy()
+
+    def embed_global(self, model):
+        raise NotImplemented
+
+    def global_embed_doc(self, model):
+        raise NotImplemented
+
+    def embed_candidates(
+        self,
+        doc: Document,
+        stemmer: Callable = None,
+        cand_mode: str = "MaskAll",
+        attention: str = "",
+    ):
+        """
+        Method that embeds the current candidate set, having several modes according to usage.
+            cand_mode
+            | MaskFirst only masks the first occurence of a candidate;
+            | MaskAll masks all occurences of said candidate
+
+            The default value is MaskAll.
+        """
+        doc.candidate_set_embed = []
+
+        if cand_mode == "MaskFirst" or cand_mode == "MaskAll":
+            occurences = 1 if cand_mode == "MaskFirst" else 0
+
+            escaped_docs = [
+                re.sub(re.escape(candidate), "<mask>", doc.raw_text, occurences)
+                for candidate in doc.candidate_set
+            ]
+            doc.candidate_set_embed = self.model.embed(escaped_docs)
+
+        elif cand_mode == "MaskHighest":
+            for candidate in doc.candidate_set:
+                candidate = re.escape(candidate)
+                candidate_embeds = []
+
+                for match in re.finditer(candidate, doc.raw_text):
+                    masked_text = f"{doc.raw_text[:match.span()[0]]}<mask>{doc.raw_text[match.span()[1]:]}"
+                    if attention == "global_attention":
+                        candidate_embeds.append(self.embed_global(masked_text))
+                    else:
+                        candidate_embeds.append(self.model.embed(masked_text))
+                doc.candidate_set_embed.append(candidate_embeds)
+
+        elif cand_mode == "MaskSubset":
+            doc.candidate_set = sorted(
+                doc.candidate_set, reverse=True, key=lambda x: len(x)
+            )
+            seen_candidates = {}
+
+            for candidate in doc.candidate_set:
+                prohibited_pos = []
+                len_candidate = len(candidate)
+                for prev_candidate in seen_candidates:
+                    if len_candidate == len(prev_candidate):
+                        break
+
+                    elif candidate in prev_candidate:
+                        prohibited_pos.extend(seen_candidates[prev_candidate])
+
+                pos = [
+                    (match.span()[0], match.span()[1])
+                    for match in re.finditer(re.escape(candidate), doc.raw_text)
+                ]
+
+                seen_candidates[candidate] = pos
+                subset_pos = []
+                for p in pos:
+                    subset_flag = True
+                    for prob in prohibited_pos:
+                        if p[0] >= prob[0] and p[1] <= prob[1]:
+                            subset_flag = False
+                            break
+                    if subset_flag:
+                        subset_pos.append(p)
+
+                masked_doc = doc.raw_text
+                for i in range(len(subset_pos)):
+                    masked_doc = f"{masked_doc[:(subset_pos[i][0] + i*(len_candidate - 5))]}<mask>{masked_doc[subset_pos[i][1] + i*(len_candidate - 5):]}"
+                doc.candidate_set_embed.append(self.model.embed(masked_doc))
+        else:
+            RuntimeError("cand_mode not set!")
+
+    def extract_candidates(
+        self, doc, min_len: int = 5, grammar: str = "", lemmer: Callable = None
+    ):
+        """
+        Method that uses Regex patterns on POS tags to extract unique candidates from a tagged document and
+        stores the sentences each candidate occurs in
+        """
+        candidate_set = set()
+
+        parser = RegexpParser(grammar)
+        np_trees = list(parser.parse_sents(doc.tagged_text))
+
+        for i in range(len(np_trees)):
+            temp_cand_set = []
+            for subtree in np_trees[i].subtrees(filter=lambda t: t.label() == "NP"):
+                temp_cand_set.append(" ".join(word for word, tag in subtree.leaves()))
+
+            for candidate in temp_cand_set:
+                if len(candidate) > min_len:
+                    candidate_set.add(candidate)
+
+        doc.candidate_set = list(candidate_set)
+
+    def embed_n_candidates(
+        self, doc: Document, min_len: int, stemmer: Optional[StemmerI] = None, **kwargs
+    ) -> Tuple[np.ndarray, List[str]]:
+        """
+        Return
+        ------
+            candidate_set_embed:    np.ndarray of the embedings for each candidate.
+            candicate_set:          List of candidates.
+        """
+        # TODO: why embed_doc in MaskRank is different, no post_processing or doc_mode
+        t = time()
+        doc.doc_embed = self.embed_doc(doc, stemmer)
+        logger.info(f"Embed Doc in {time() -  t:.2f}s")
+
+        t = time()
+        self.embed_candidates(doc, stemmer, cand_mode="MaskAll")
+        print(f"Embed Candidates in {time() -  t:.2f}s")
+
+        return doc.candidate_set_embed, doc.candidate_set
+
+    def evaluate_n_candidates(
+        self, doc_embed: np.ndarray, candidate_set_embed, candidate_set
+    ) -> List[Tuple]:
+        # doc_embed = doc.doc_embed.reshape(1, -1)
+        doc_sim = np.absolute(
+            cosine_similarity(candidate_set_embed, doc_embed.reshape(1, -1))
+        )
+        # TODO: Why MaskRank candidate score is diferent from EmbedRank? Least similar? doc_sim is the masked document?
+        candidate_score = sorted(
+            [
+                (candidate, 1.0 - candidate_doc_sim[0])
+                for (candidate, candidate_doc_sim) in zip(candidate_set, doc_sim)
+            ],
+            # [(candidate_set[i], 1.0 - doc_sim[i][0]) for i in range(len(doc_sim))],
+            reverse=True,
+            key=lambda x: x[1],
+        )
+
+        return candidate_score, [candidate[0] for candidate in candidate_score]
+
+    def top_n_candidates(
+        self,
+        doc,
+        top_n: int = 5,
+        min_len: int = 5,
+        stemmer: Callable = None,
+        **kwargs,
+    ) -> List[Tuple]:
+        cand_mode = kwargs.get("cand_mode", "MaskAll")
+        attention = kwargs.get("global_attention", "global_attention")
+
+        t = time()
+        doc.doc_embed = self.embed_doc(doc, stemmer)
+        logger.info(f"Embed Doc in {time() -  t:.2f}s")
+
+        t = time()
+        self.embed_candidates(doc, stemmer, cand_mode, attention)
+        logger.info(f"Embed Candidates in {time() -  t:.2f}s")
+
+        doc_sim = []
+        # TODO: simplify cand_mode if to test only MaskHighest
+        if "cand_mode" not in kwargs or kwargs["cand_mode"] != "MaskHighest":
+            doc_sim = np.absolute(
+                cosine_similarity(doc.candidate_set_embed, doc.doc_embed.reshape(1, -1))
+            )
+
+        elif kwargs["cand_mode"] == "MaskHighest":
+            doc_embed = doc.doc_embed.reshape(1, -1)
+            for mask_cand_occur in doc.candidate_set_embed:
+                if mask_cand_occur != []:
+                    doc_sim.append(
+                        [
+                            np.ndarray.min(
+                                np.absolute(
+                                    cosine_similarity(mask_cand_occur, doc_embed)
+                                )
+                            )
+                        ]
+                    )
+                else:
+                    doc_sim.append([1.0])
+
+        # TODO: refactor candidate scores sorting
+        candidate_score = sorted(
+            [(doc.candidate_set[i], 1.0 - doc_sim[i][0]) for i in range(len(doc_sim))],
+            reverse=True,
+            key=lambda x: x[1],
+        )
+
+        if top_n == -1:
+            return candidate_score, [candidate[0] for candidate in candidate_score]
+
+        return candidate_score[:top_n], [candidate[0] for candidate in candidate_score]
