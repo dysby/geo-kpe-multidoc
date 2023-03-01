@@ -32,14 +32,38 @@ def f1_score(precision, recall):
     return f1
 
 
+"""
+    ap = [
+        len([k for k in top_kp[:i] if k in true_label]) / float(i)
+        for i in range(1, len(top_kp) + 1)
+        if top_kp[i - 1] in true_label
+    ]
+    map = np.sum(ap) / float(len(true_label))
+"""
+
+
 def MAP(top_kp, true_label):
     ap = [
-        len([k for k in top_kp[: i + 1] if k in true_label]) / float(i)
+        len([k for k in top_kp[: i + 1] if k in true_label]) / float(i + 1)
         for i in range(len(top_kp))
         if top_kp[i] in true_label
     ]
     map = np.sum(ap) / float(len(true_label))
     return map
+
+
+"""
+    ndcg = np.sum(
+        [
+            1.0 / np.log2(i + 1)
+            for i in range(1, len(top_kp) + 1)
+            if top_kp[i - 1] in true_label
+        ]
+    )
+    ndcg = ndcg / np.sum(
+        [1.0 / np.log2(i + 1) for i in range(1, len(true_label) + 1)]
+    )
+"""
 
 
 def nDCG(top_kp, true_label):

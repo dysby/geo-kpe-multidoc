@@ -2,6 +2,8 @@ import simplemma
 
 from geo_kpe_multidoc.models.pre_processing.pos_tagging import POS_tagger_spacy
 
+# TODO: why pt_core_news_lg not trf?
+
 pos_taggers = {
     "DUC": "en_core_web_trf",
     "NUS": "en_core_web_trf",

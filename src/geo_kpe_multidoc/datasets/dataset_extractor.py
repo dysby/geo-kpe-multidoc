@@ -4,10 +4,12 @@ import os
 import re
 from io import StringIO
 from os import path
+from pathlib import Path
 from typing import List
 
 import doi
 import metapub
+from loguru import logger
 from nltk.stem import PorterStemmer
 from pdfminer.converter import TextConverter
 from pdfminer.layout import LAParams
@@ -20,8 +22,6 @@ from scidownl import scihub_download
 from geo_kpe_multidoc import GEO_KPE_MULTIDOC_DATA_PATH, GEO_KPE_MULTIDOC_OUTPUT_PATH
 
 from ..utils.IO import read_from_file, write_to_file
-
-from pathlib import Path
 
 
 def map_orig_links(dir_input: str, dir_output: str) -> None:
@@ -43,13 +43,12 @@ def map_orig_links(dir_input: str, dir_output: str) -> None:
                 results[pat].add(line)
                 break
 
-        print("Extraction statistics:")
+        logger.debug("Extraction statistics:")
         for type in results:
-            print(f"{type} = {len(results[type])} entries")
+            logger.debug(f"{type} = {len(results[type])} entries")
 
-    print(f"Outputing to {dir_output}")
+    logger.info(f"Outputing to {dir_output}")
     write_to_file(dir_output, results)
-    print("Success!")
 
 
 def extract_files_from_link(dir_input: str, dir_output: str) -> None:
@@ -136,7 +135,7 @@ def pdf_to_txt():
             n_docs = len(stemmed_dic)
             json.dump(stemmed_dic, ref_file_stem)
 
-    print(
+    logger.debug(
         f"""Dataset Statistics:
     N_docs = {n_docs}
     Avg word count = {word_count/n_docs:.3}

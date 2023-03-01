@@ -2,7 +2,7 @@ import json
 import os
 import re
 from os import path
-from typing import Type, List, Tuple
+from typing import List, Tuple, Type
 
 import simplemma
 from bs4 import BeautifulSoup
@@ -12,8 +12,8 @@ from geo_kpe_multidoc import GEO_KPE_MULTIDOC_DATA_PATH
 
 from ..models.pre_processing.pos_tagging import *
 from ..utils.IO import read_from_file, write_to_file
-
 from .dataset import SUPPORTED_DATASETS
+
 
 class DataSet:
     """
@@ -52,10 +52,10 @@ class DataSet:
                     dataset, self.supported_datasets[dataset]
                 )
 
+
 def extract_from_dataset(
     dataset_name: str = "DUC", data_t: str = "xml"
 ) -> List[Tuple[str, List[str]]]:
-
     dataset_dir = path.join(GEO_KPE_MULTIDOC_DATA_PATH, dataset_name)
 
     p_data_path = path.join(
@@ -80,6 +80,7 @@ def extract_from_dataset(
 
     return res
 
+
 def extract_mdkpe(dataset_dir):
     with open(f"{dataset_dir}/MKDUC01.json", "r") as source_f:
         dataset = json.load(source_f)
@@ -93,6 +94,7 @@ def extract_mdkpe(dataset_dir):
                 kps.append(kp[0])
             res.append((docs, kps))
     return res
+
 
 def extract_xml(self, dataset_dir):
     res = []
@@ -136,10 +138,11 @@ def extract_xml(self, dataset_dir):
 
                 res.append((doc, [r[0] for r in refs[file[:-4]]]))
 
-                print(f"doc number {file[:-4]}")
+                logger.debug(f"doc number {file[:-4]}")
                 # print(doc)
                 # print(f'{res[-1][1]} \n')
     return res
+
 
 def extract_txt(self, dataset_dir):
     res = []
@@ -180,11 +183,11 @@ def extract_txt(self, dataset_dir):
                             #            print(doc)
 
                             res.append((doc, kp))
-                            print(f"doc number {file[:-4]}")
+                            logger.debug(f"doc number {file[:-4]}")
 
             # print("|Statistics for PL-PAK|")
             # print(f'Found Key-Phrases: {found_keywords}')
             # print(f'Total Key-Phrases: {total_keywords}')
             # print(f'Percentage of unavailable key-phrases: {((1 - found_keywords/total_keywords)*100):.3}%')
-    print(len(res))
+    logger.debug(f"Extract {len(res)}")
     return res

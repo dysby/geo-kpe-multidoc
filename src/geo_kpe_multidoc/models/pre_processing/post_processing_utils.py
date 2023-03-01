@@ -1,15 +1,15 @@
-import re
-from xml.sax.xmlreader import InputSource
-import sklearn
-import numpy as np
-import torch
 import gc
 import random
+import re
+from typing import Callable, List, Tuple
+from xml.sax.xmlreader import InputSource
+
+import numpy as np
+import sklearn
+import torch
+from keybert.backend._base import BaseEmbedder
 
 from .pre_processing_utils import tokenize_hf
-from typing import Callable, List, Tuple
-
-from keybert.backend._base import BaseEmbedder
 
 
 def z_score_normalization(
@@ -101,6 +101,7 @@ def embed_hf_global_att(text: str, model: BaseEmbedder) -> Tuple:
     text = text.lower()
 
     # Tokenize sentences
+    # TODO: why max_lenght is 2048 and not 4096?
     inputs = model.embedding_model.tokenizer(
         text,
         padding=True,

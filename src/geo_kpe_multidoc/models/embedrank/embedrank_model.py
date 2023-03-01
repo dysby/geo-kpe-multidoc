@@ -105,6 +105,11 @@ class EmbedRank(BaseKPModel):
         """
         Concrete method that extracts key-phrases from a given document, with optional arguments
         relevant to its specific functionality
+
+        Returns:
+        --------
+            top_n: List[Tuple] - Top N cadidates and score
+            candidate_set - full list of candidates
         """
 
         doc = Document(txt, self.counter)
