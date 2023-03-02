@@ -79,10 +79,12 @@ class KPEDataset(Dataset):
 
     def __init__(self, name, zip_file, root_dir, transform=None):
         """
-        Args:
-            zip_file (string): Path to the zip file with docs and annoations.
-            root_dir (string): Data path.
-            transform (callable, optional): Optional transform to be applied
+        Parameters
+        ----------
+            name: str = Name of the Dataset
+            zip_file: str = Path to the zip file with docs and annoations.
+            root_dir: str = Data path.
+            transform: Optional[Callable]: Optional transform to be applied
                 on a sample.
         """
         self.name = name

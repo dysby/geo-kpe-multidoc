@@ -1,13 +1,13 @@
+import json
 from os import write
 from pathlib import Path
-from typing import List, Dict, Tuple, Callable
+from time import gmtime, strftime
+from typing import Callable, Dict, List, Tuple
+
 import numpy as np
 import simplemma
-import json
-
 from nltk.stem import PorterStemmer
 from nltk.stem.api import StemmerI
-from time import gmtime, strftime
 
 from geo_kpe_multidoc import GEO_KPE_MULTIDOC_OUTPUT_PATH
 from geo_kpe_multidoc.evaluation.metrics import MAP, f1_score, nDCG, precision, recall
@@ -133,6 +133,11 @@ def evaluate_kp_extraction(
     ----------
         model_results:  Dict[str, List]
             Dictionary whit dataset Names as keys and Results as values
+            ***NOTE*** that each results does not have top n candidate score
+            ex: model_results["dataset_name"][(doc1_top_n, doc1_candidates), (doc2...)]
+        true_labels: Dict[str, Tuple[List]]
+            keys are the dataset names, and values are the list of gold keyphrases for each document
+            ex: true_labels["dataset_name"][[doc1_kp1, doc1_kp2], [doc2...]]
     """
 
     stamp = ""
@@ -157,16 +162,16 @@ def evaluate_kp_extraction(
             results_kp[f"F1_{k}"] = []
 
         for i in range(len(model_results[dataset])):
-            top_kp = model_results[dataset][i][0]
+            top_kp = [kp for kp, _score in model_results[dataset][i][0]]
 
             candidates = model_results[dataset][i][1]
 
             true_label = true_labels[dataset][i]
 
             # Precision, Recall and F1-Score for candidates
-            p = precision(top_kp[:k], true_label)
-            r = recall(top_kp[:k], true_label)
-            f1 = f1_score(p_k, r_k)
+            p = precision(candidates, true_label)
+            r = recall(candidates, true_label)
+            f1 = f1_score(p, r)
 
             results_c["Precision"].append(p)
             results_c["Recall"].append(r)
@@ -220,11 +225,21 @@ def evaluate_kp_extraction(
 def output_top_cands(
     model_results: Dict[str, List] = {}, true_labels: Dict[str, Tuple[List]] = {}
 ):
+    """
+    Print Top N candidates that are in Gold Candidate list
+
+    Parameters:
+    -----------
+        model_results: values are a list with results for each document [((doc1_top_n_candidates, doc1_top_n_scores], doc1_candidates), ...]
+    """
     top_cand_l = []
     for dataset in model_results:
         for i in range(len(model_results[dataset])):
-            top_kp = model_results[dataset][i][0]
+            top_kp_and_score = model_results[dataset][i][0]
             true_label = true_labels[dataset][i]
             top_cand_l += [
-                round(float(kp[1]), 2) for kp in top_kp if kp[0] in true_label
+                round(float(score), 2)
+                for kp, score in top_kp_and_score
+                if kp in true_label
             ]
+    print(top_cand_l)

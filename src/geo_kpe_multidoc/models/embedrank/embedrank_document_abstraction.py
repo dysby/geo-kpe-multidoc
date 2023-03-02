@@ -1,22 +1,26 @@
 import re
 import time
+from dataclasses import dataclass
+from enum import Enum
 from typing import Callable, List, Set, Tuple
 
 import numpy as np
 import simplemma
-import torch
+from keybert._mmr import mmr
 from nltk import RegexpParser
 from sklearn.metrics.pairwise import cosine_similarity
 from sklearn.preprocessing import normalize
 
-from keybert._mmr import mmr
-from ...utils.IO import read_from_file
-from ..pre_processing.post_processing_utils import (
+from geo_kpe_multidoc.models.pre_processing.post_processing_utils import (
     embed_hf,
     mean_pooling,
     z_score_normalization,
 )
-from ..pre_processing.pre_processing_utils import filter_ids, tokenize_hf
+from geo_kpe_multidoc.models.pre_processing.pre_processing_utils import (
+    filter_ids,
+    tokenize_hf,
+)
+from geo_kpe_multidoc.utils.IO import read_from_file
 
 
 class TokenizedDocument:
@@ -57,7 +61,8 @@ class Document:
             "[!\"#\$%&'\(\)\*\+,\.\/:;<=>\?@\[\]\^_`{\|}~\-\–\—\‘\’\“\”]"
         )
         self.single_word_grammar = {"PROPN", "NOUN", "ADJ"}
-        self.doc_sents = []
+        self.doc_sentences = []
+        self.doc_sentences_words = []
         self.id = id
 
         # Tokenized document
@@ -72,10 +77,13 @@ class Document:
         """
         (
             self.tagged_text,
-            self.doc_sents,
-            self.doc_sents_words,
+            self.doc_sentences,
+            self.doc_sentences_words,
         ) = tagger.pos_tag_text_sents_words(self.raw_text, memory, id)
-        self.doc_sents = [sent.text for sent in self.doc_sents if sent.text.strip()]
+
+        self.doc_sentences = [
+            sent.text for sent in self.doc_sentences if sent.text.strip()
+        ]
 
     def embed_sents_words(self, model, stemmer: Callable = None, memory=False):
         if not memory:
@@ -104,15 +112,15 @@ class Document:
 
         # TODO: check why lower
         self.raw_text = self.raw_text.lower()
-        doc_info = model.embedding_model.encode(
+        doc_embedings = model.embedding_model.encode(
             self.raw_text, show_progress_bar=False, output_value=None
         )
 
-        self.doc_token_ids = doc_info["input_ids"].squeeze().tolist()
-        self.doc_token_embeddings = doc_info["token_embeddings"]
-        self.doc_attention_mask = doc_info["attention_mask"]
+        self.doc_token_ids = doc_embedings["input_ids"].squeeze().tolist()
+        self.doc_token_embeddings = doc_embedings["token_embeddings"]
+        self.doc_attention_mask = doc_embedings["attention_mask"]
 
-        return doc_info["sentence_embedding"].detach().numpy()
+        return doc_embedings["sentence_embedding"].detach().numpy()
 
     def global_embed_doc(self, model):
         raise NotImplemented
