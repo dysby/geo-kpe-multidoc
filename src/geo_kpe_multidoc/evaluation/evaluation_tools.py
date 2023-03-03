@@ -5,6 +5,7 @@ from time import gmtime, strftime
 from typing import Callable, Dict, List, Tuple
 
 import numpy as np
+import pandas as pd
 import simplemma
 from nltk.stem import PorterStemmer
 from nltk.stem.api import StemmerI
@@ -149,6 +150,9 @@ def evaluate_kp_extraction(
     res = f"{stamp}\n ------------- \n"
     res_dic = {}
 
+    results = pd.DataFrame()
+    results.index.name = "Dataset"
+
     for dataset in model_results:
         results_c = {"Precision": [], "Recall": [], "F1": []}
 
@@ -194,6 +198,19 @@ def evaluate_kp_extraction(
                 results_kp["MAP"].append(map)
                 results_kp["nDCG"].append(ndcg)
 
+        row = (
+            pd.concat(
+                [
+                    pd.DataFrame(results_c).mean(axis=0),
+                    pd.DataFrame(results_kp).mean(axis=0),
+                ]
+            )
+            .to_frame()
+            .T
+        )
+        row.index = pd.Index([dataset])
+        results = pd.concat([results, row])
+
         res += f"\nResults for Dataset {dataset}\n --- \n"
 
         res += "Candidate Extraction Evalution: \n"
@@ -219,7 +236,9 @@ def evaluate_kp_extraction(
         with open(f"{GEO_KPE_MULTIDOC_OUTPUT_PATH}/raw/{stamp} raw.txt", "a") as f:
             f.write(res.rstrip())
 
-    print(res)
+    # print(res)
+    print(results)
+    return results
 
 
 def output_top_cands(
