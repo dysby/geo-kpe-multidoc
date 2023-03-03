@@ -57,7 +57,7 @@ class EmbedRank(BaseKPModel):
         txt = remove_punctuation(txt)
         return remove_whitespaces(txt)[1:]
 
-    def pos_tag_doc(self, doc, stemming, memory, **kwargs) -> None:
+    def pos_tag_doc(self, doc: Document, stemming, memory, **kwargs) -> None:
         (
             doc.tagged_text,
             doc.doc_sentences,
@@ -210,7 +210,7 @@ class EmbedRank(BaseKPModel):
         The default value just embeds the document normally.
         """
 
-        # TODO: check why lower
+        # TODO: check why document text is mutated to lower
         doc.raw_text = doc.raw_text.lower()
         doc_embedings = self.model.embedding_model.encode(
             doc.raw_text, show_progress_bar=False, output_value=None
@@ -321,7 +321,7 @@ class EmbedRank(BaseKPModel):
         doc.candidate_set = sorted(list(doc.candidate_set), key=len, reverse=True)
 
     def embed_n_candidates(
-        self, doc, min_len, stemmer, **kwargs
+        self, doc: Document, min_len, stemmer, **kwargs
     ) -> Tuple[np.ndarray, List[str]]:
         """
         TODO: Why embed_n_candidates
@@ -331,9 +331,9 @@ class EmbedRank(BaseKPModel):
             candidate_set_embed:    np.ndarray of the embedings for each candidate.
             candicate_set:          List of candidates.
         """
-        doc_mode = ""
-        cand_mode = "global_attention" if "global_attention" in kwargs else ""
-        post_processing = [""]
+        doc_mode = kwargs.get("doc_mode", "")
+        cand_mode = kwargs.get("global_attention", "")
+        post_processing = kwargs.get("cand_post_processing", [""])
 
         t = time()
         doc.doc_embed = self.embed_doc(doc, stemmer, doc_mode, post_processing)

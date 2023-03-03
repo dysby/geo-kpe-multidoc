@@ -1,30 +1,30 @@
-import logging
-import os
-import math
 import copy
-import torch
-
+import logging
+import math
+import os
 from typing import Callable
-from transformers import LongformerSelfAttention
-from transformers import BigBirdModel, BigBirdConfig
+
+import torch
 from transformers import (
-    LongformerSelfAttention,
-    LongformerConfig,
-    LongformerModel,
-    LongformerTokenizerFast,
-)
-from transformers import (
-    XLMRobertaTokenizer,
-    XLMRobertaModel,
-    XLMRobertaConfig,
     AutoModel,
     AutoTokenizer,
+    BigBirdConfig,
+    BigBirdModel,
+    LongformerConfig,
+    LongformerModel,
+    LongformerSelfAttention,
+    LongformerTokenizerFast,
+    RobertaForMaskedLM,
+    RobertaTokenizerFast,
+    XLMRobertaConfig,
+    XLMRobertaModel,
+    XLMRobertaTokenizer,
 )
-from transformers import RobertaForMaskedLM, RobertaTokenizerFast
+
+from geo_kpe_multidoc import GEO_KPE_MULTIDOC_MODELS_PATH
 
 # from ...keybert.backend._utils import select_backend
 from .select_backend import select_backend
-from geo_kpe_multidoc import GEO_KPE_MULTIDOC_MODELS_PATH
 
 
 def create_longformer(
