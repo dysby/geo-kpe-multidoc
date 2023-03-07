@@ -137,4 +137,4 @@ class POS_tagger_spacy(POS_tagger):
             torch.cuda.empty_cache()
             logger.info(self.pos_tag_str(input_docs[i][0]))
             write_to_file(f"{output_path}{i}", self.pos_tag_str(input_docs[i][0]))
-            logger.info(f"Tagged and saved document {i}")
+            logger.info(f"Tagged and saved document {i} file")

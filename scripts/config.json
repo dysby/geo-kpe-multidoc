@@ -8,6 +8,6 @@
   "datasets": [
     "--INPUT--",
     "110-PT-BN-KP",
-    "SemEval2010"
+    "Inspec"
   ]
 }

@@ -23,8 +23,6 @@ from geo_kpe_multidoc.models.pre_processing.post_processing_utils import (
 )
 from geo_kpe_multidoc.models.pre_processing.pre_processing_utils import (
     filter_token_ids,
-    remove_punctuation,
-    remove_whitespaces,
     tokenize_hf,
 )
 from geo_kpe_multidoc.utils.IO import read_from_file
@@ -50,30 +48,9 @@ class EmbedRank(BaseKPModel):
             else self.tagger
         )
 
-    def pre_process(self, txt="", **kwargs) -> str:
-        """
-        Method that defines a pre_processing routine, removing punctuation and whitespaces
-        """
-        txt = remove_punctuation(txt)
-        return remove_whitespaces(txt)[1:]
-
-    def pos_tag_doc(self, doc: Document, stemming, memory, **kwargs) -> None:
-        (
-            doc.tagged_text,
-            doc.doc_sentences,
-            doc.doc_sentences_words,
-        ) = self.tagger.pos_tag_text_sents_words(doc.raw_text, memory, doc.id)
-
-        doc.doc_sentences = [
-            sent.text for sent in doc.doc_sentences if sent.text.strip()
-        ]
-
     def extract_mdkpe_embeds(
-        self, txt, top_n, min_len, stemmer=None, lemmer=None, **kwargs
+        self, doc: Document, top_n, min_len, stemmer=None, lemmer=None, **kwargs
     ) -> Tuple[Document, List[Tuple], List[str]]:
-        doc = Document(txt, self.counter)
-
-        # TODO: when use stemming?
         use_cache = kwargs.get("pos_tag_memory", False)
 
         self.pos_tag_doc(
@@ -92,47 +69,6 @@ class EmbedRank(BaseKPModel):
         torch.cuda.empty_cache()
 
         return (doc, cand_embeds, candidate_set)
-
-    def extract_kp_from_doc(
-        self,
-        txt: str,
-        top_n: int,
-        min_len: int,
-        stemmer: Optional[StemmerI] = None,
-        lemmer: Optional[Callable] = None,
-        **kwargs,
-    ) -> Tuple[List[Tuple], List[str]]:
-        """
-        Concrete method that extracts key-phrases from a given document, with optional arguments
-        relevant to its specific functionality
-
-        Returns:
-        --------
-            top_n: List[Tuple] - Top N cadidates and score
-            candidate_set - full list of candidates
-        """
-
-        doc = Document(txt, self.counter)
-
-        use_cache = kwargs.get("pos_tag_memory", False)
-
-        self.pos_tag_doc(
-            doc=doc,
-            stemming=None,
-            memory=use_cache,
-        )
-
-        self.extract_candidates(doc, min_len, self.grammar, lemmer)
-
-        top_n, candidate_set = self.top_n_candidates(
-            doc, top_n, min_len, stemmer, **kwargs
-        )
-
-        logger.info(f"Document #{self.counter} processed")
-        self.counter += 1
-        torch.cuda.empty_cache()
-
-        return (top_n, candidate_set)
 
     def extract_kp_from_corpus(
         self,
@@ -180,25 +116,6 @@ class EmbedRank(BaseKPModel):
         else:
             doc.doc_sents_words_embed = read_from_file(f"{memory}/{doc.id}")
 
-    def evaluate_n_candidates(
-        self, doc_embed: np.ndarray, candidate_set_embed, candidate_set
-    ) -> List[Tuple]:
-        # doc_embed = doc.doc_embed.reshape(1, -1)
-        doc_sim = np.absolute(
-            cosine_similarity(candidate_set_embed, doc_embed.reshape(1, -1))
-        )
-        candidate_score = sorted(
-            [
-                (candidate, candidate_doc_sim[0])
-                for (candidate, candidate_doc_sim) in zip(candidate_set, doc_sim)
-            ],
-            # [(candidate_set[i], doc_sim[i][0]) for i in range(len(doc_sim))],
-            reverse=True,
-            key=lambda x: x[1],
-        )
-
-        return candidate_score, [candidate[0] for candidate in candidate_score]
-
     def embed_doc(
         self,
         doc: Document,
@@ -220,9 +137,9 @@ class EmbedRank(BaseKPModel):
             doc.raw_text, show_progress_bar=False, output_value=None
         )
 
-        doc.doc_token_ids = doc_embedings["input_ids"].squeeze().tolist()
-        doc.doc_token_embeddings = doc_embedings["token_embeddings"]
-        doc.doc_attention_mask = doc_embedings["attention_mask"]
+        doc.token_ids = doc_embedings["input_ids"].squeeze().tolist()
+        doc.token_embeddings = doc_embedings["token_embeddings"]
+        doc.attention_mask = doc_embedings["attention_mask"]
 
         return doc_embedings["sentence_embedding"].detach().numpy()
 
@@ -252,16 +169,14 @@ class EmbedRank(BaseKPModel):
 
                 cand_len = len(filt_ids)
 
-                for i in range(len(doc.doc_token_ids)):
+                for i in range(len(doc.token_ids)):
                     if (
-                        filt_ids[0] == doc.doc_token_ids[i]
-                        and filt_ids == doc.doc_token_ids[i : i + cand_len]
+                        filt_ids[0] == doc.token_ids[i]
+                        and filt_ids == doc.token_ids[i : i + cand_len]
                     ):
                         candidate_embeds.append(
                             np.mean(
-                                doc.doc_token_embeddings[i : i + cand_len]
-                                .detach()
-                                .numpy(),
+                                doc.token_embeddings[i : i + cand_len].detach().numpy(),
                                 axis=0,
                             )
                         )
@@ -271,7 +186,7 @@ class EmbedRank(BaseKPModel):
                         # TODO: Use doc_attention_mask for computing a new doc embeding vector?
                         if cand_mode == "global_attention":
                             for j in range(i, i + cand_len):
-                                doc.doc_attention_mask[j] = 1
+                                doc.attention_mask[j] = 1
 
             if candidate_embeds == []:
                 doc.candidate_set_embed.append(self.model.embed(candidate))
@@ -284,6 +199,10 @@ class EmbedRank(BaseKPModel):
             doc.candidate_set_embed = z_score_normalization(
                 doc.candidate_set_embed, doc.raw_text, self.model
             )
+
+        # TODO: If global attention the document embeding should be computed again having the attention mask changed to the candidate positions.
+        if cand_mode == "global_attention":
+            doc.doc_embed = self.global_embed_doc(doc)
 
     def extract_candidates(
         self, doc, min_len: int = 5, grammar: str = "", lemmer_lang: str = None
@@ -345,7 +264,7 @@ class EmbedRank(BaseKPModel):
         """
         doc_mode = kwargs.get("doc_mode", "")
         cand_mode = kwargs.get("global_attention", "")
-        post_processing = kwargs.get("cand_post_processing", [""])
+        post_processing = kwargs.get("post_processing", [""])
 
         t = time()
         doc.doc_embed = self.embed_doc(doc, stemmer, doc_mode, post_processing)
@@ -359,6 +278,31 @@ class EmbedRank(BaseKPModel):
             doc.doc_embed = self.global_embed_doc(doc)
 
         return self.candidate_set_embed, self.candidate_set
+
+    def evaluate_n_candidates(
+        self, doc_embed: np.ndarray, candidate_set_embed, candidate_set
+    ) -> List[Tuple]:
+        """
+        This method is key for each ranking model.
+        Here the ranking heuritic is applied according to model definition.
+
+        EmbedRank selects the candidates that have more similarity to the document.
+        """
+        # doc_embed = doc.doc_embed.reshape(1, -1)
+        doc_sim = np.absolute(
+            cosine_similarity(candidate_set_embed, doc_embed.reshape(1, -1))
+        )
+        candidate_score = sorted(
+            [
+                (candidate, candidate_doc_sim[0])
+                for (candidate, candidate_doc_sim) in zip(candidate_set, doc_sim)
+            ],
+            # [(candidate_set[i], doc_sim[i][0]) for i in range(len(doc_sim))],
+            reverse=True,
+            key=lambda x: x[1],
+        )
+
+        return candidate_score, [candidate[0] for candidate in candidate_score]
 
     def top_n_candidates(
         self,

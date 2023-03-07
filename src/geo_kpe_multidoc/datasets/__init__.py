@@ -1,1 +1,1 @@
-from .dataset import TextDataset
+from .datasets import DATASETS, KPEDataset

@@ -5,8 +5,6 @@ from typing import Callable, List, Tuple
 from keybert.backend._base import BaseEmbedder
 from nltk.corpus import stopwords
 
-from geo_kpe_multidoc.models.base_KP_model import BaseKPModel
-
 from .stopwords import ENGLISH_STOP_WORDS
 
 SPECIAL_TOKEN_IDS = {0, 1, 2, 3, 250001}

@@ -15,12 +15,20 @@ class Document:
     doc_sentences: List[str] = field(default_factory=list)
     doc_sentences_words = []
     doc_sents_words_embed = []
+    tagged_text = None
+
+    # candidates
+    candidate_set = []
+    candidate_mentions = {}
 
     # Tokenized document
     token_ids = []
     token_embeddings = []
-    attention_mask = []
-    candidate_mentions = {}
+
+    # Embedings
+    attention_mask = []  # Global attention mask
+    doc_embed = None
+    candidate_set_embed = []
 
     def __init__(self, raw_text, id):
         """
@@ -52,3 +60,5 @@ class Document:
         self.token_embeddings = []
         self.attention_mask = []
         self.candidate_mentions = {}
+
+        self.candidate_set_embed = []

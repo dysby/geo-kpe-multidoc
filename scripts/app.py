@@ -9,6 +9,7 @@ from annotated_text.util import get_annotated_html
 
 from geo_kpe_multidoc import GEO_KPE_MULTIDOC_DATA_PATH
 from geo_kpe_multidoc.datasets import DATASETS, KPEDataset
+from geo_kpe_multidoc.document import Document
 from geo_kpe_multidoc.models import EmbedRank, MaskRank
 from geo_kpe_multidoc.models.pre_processing.pre_processing_utils import (
     remove_punctuation,
@@ -61,12 +62,12 @@ def extract_keyphrases():
         d_idx = ds.ids.index(st.session_state.chosen_doc_id)
         _, txt, gold_keyphrases = ds[d_idx]
 
-    txt = remove_punctuation(txt)
-    txt = remove_whitespaces(txt)[1:]
+    # txt = remove_punctuation(txt)
+    # txt = remove_whitespaces(txt)[1:]
 
     st.session_state.input_text = txt
 
-    top_n_and_scores, candicates = pipe(txt)
+    top_n_and_scores, candicates = pipe(Document(txt, st.session_state.current_run_id))
     st.session_state.keyphrases = [kp for kp, _ in top_n_and_scores]
     st.session_state.gold_keyphrases = gold_keyphrases
     st.session_state.history[generate_run_id()] = {

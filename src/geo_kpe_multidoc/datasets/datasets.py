@@ -1,13 +1,21 @@
 import io
+import itertools
+import json
 import re
 from os import path
 from typing import List, Tuple
 from zipfile import ZipFile
 
+from loguru import logger
 from torch.utils.data import Dataset
 
 # Datasets from https://github.com/LIAAD/KeywordExtractor-Datasets
 DATASETS = {
+    # zip_file: str = Path to the zip file with docs and annoations.
+    "MKDUC01": {
+        "language": "en",
+        "tagger": "en_core_web_trf",
+    },
     "110-PT-BN-KP": {
         "zip_file": "110-PT-BN-KP.zip",
         "language": "pt",
@@ -75,28 +83,39 @@ DATASETS = {
 }
 
 
-class KPEDataset(Dataset):
-    """Suported Evaluation Dataset"""
+def load_data(name, root_dir):
+    """
+    name: Supported dataset name, must exist in DATASET dict
+    root_dir: str = Data path.
+    """
 
-    def __init__(self, name, zip_file, root_dir, transform=None):
-        """
-        Parameters
-        ----------
-            name: str = Name of the Dataset
-            zip_file: str = Path to the zip file with docs and annoations.
-            root_dir: str = Data path.
-            transform: Optional[Callable]: Optional transform to be applied
-                on a sample.
+    def _extract_mdkpe(dataset_dir):
+        """Remove topic key and document id and keep only a list of items each corresponding to
+        a topic, and each item composed by a list of docs and a list of keyphrases."""
+        dataset = {}
+        with open(f"{dataset_dir}/MKDUC01/MKDUC01.json", "r") as source_f:
+            dataset = json.load(source_f)
+        logger.info(f"Load json with {len(dataset)} topics")
 
-        """
-        self.name = name
-        self.ids, self.documents, self.keys = self._read_zip(
-            path.join(root_dir, zip_file)
-        )
-        # self.root_dir = root_dir
-        self.transform = transform
+        ids = []
+        documents = []
+        keys = []
+        for topic in dataset:
+            docs_content_for_topic = [
+                doc_content
+                for _doc_name, doc_content in dataset[topic]["documents"].items()
+            ]
+            kps_for_topic = list(itertools.chain(*dataset[topic]["keyphrases"]))
 
-    def _read_zip(self, filename) -> Tuple[List[str], List, List]:
+            ids.append(topic)
+            documents.append(docs_content_for_topic)
+            keys.append(kps_for_topic)
+
+        if len(ids) == 0:
+            logger.warning(f"Extracted **zero** results")
+        return (ids, documents, keys)
+
+    def _read_zip(filename) -> Tuple[List[str], List, List]:
         """
         read documents from docsutf8 dir w/ .txt, and read keys from keys dir w/ .key
 
@@ -127,6 +146,34 @@ class KPEDataset(Dataset):
                     with zf.open(doc_file) as f:
                         documents.append(f.read().decode("utf8"))
         return ids, documents, keys
+
+    zipfile = DATASETS[name].get("zip_file", None)
+    if zipfile:
+        return KPEDataset(name, *_read_zip(path.join(root_dir, zipfile)))
+    else:
+        return KPEDataset(name, *_extract_mdkpe(root_dir))
+
+
+class KPEDataset(Dataset):
+    """Suported Evaluation Datasets"""
+
+    def __init__(self, name, ids, documents, keys, transform=None):
+        """
+        Parameters
+        ----------
+            name: str = Name of the Dataset
+            ids: Document or Topic names
+            documents: List of documents, one per id, or List of List of Documents per topic, 1 topic to many documents.
+            keys: List of keyphrases per document, or list of keyphrases per topic.
+            transform: Optional[Callable]: Optional transform to be applied
+                on a sample. NOT USED
+
+        """
+        self.name = name
+        self.ids = ids
+        self.documents = documents
+        self.keys = keys
+        self.transform = None
 
     def __len__(self):
         return len(self.documents)

@@ -43,29 +43,9 @@ class MaskRank(BaseKPModel):
             else self.tagger
         )
 
-    def pre_process(self, doc="", **kwargs) -> str:
-        """
-        Method that defines a pre_processing routine, removing punctuation and whitespaces
-        """
-        doc = remove_punctuation(doc)
-        return remove_whitespaces(doc)[1:]
-
-    def pos_tag_doc(self, doc: Document, stemming, memory, **kwargs) -> None:
-        (
-            doc.tagged_text,
-            doc.doc_sentences,
-            doc.doc_sentences_words,
-        ) = self.tagger.pos_tag_text_sents_words(doc.raw_text, memory, doc.id)
-
-        doc.doc_sentences = [
-            sent.text for sent in doc.doc_sentences if sent.text.strip()
-        ]
-
     def extract_mdkpe_embeds(
-        self, txt, top_n, min_len, stemmer=None, lemmer=None, **kwargs
+        self, doc: Document, top_n, min_len, stemmer=None, lemmer=None, **kwargs
     ) -> Tuple[Document, List[Tuple], List[str]]:
-        doc = Document(txt, self.counter)
-
         use_cache = kwargs.get("pos_tag_memory", False)
 
         self.pos_tag_doc(
@@ -84,42 +64,6 @@ class MaskRank(BaseKPModel):
         torch.cuda.empty_cache()
 
         return (doc, cand_embeds, candidate_set)
-
-    def extract_kp_from_doc(
-        self,
-        txt,
-        top_n,
-        min_len,
-        stemmer: Optional[StemmerI] = None,
-        lemmer: Optional[Callable] = None,
-        **kwargs,
-    ) -> Tuple[List[Tuple], List[str]]:
-        """
-        Concrete method that extracts key-phrases from a given document, with optional arguments
-        relevant to its specific functionality
-        """
-
-        doc = Document(txt, self.counter)
-
-        use_cache = kwargs.get("pos_tag_memory", False)
-
-        self.pos_tag_doc(
-            doc=doc,
-            stemming=None,
-            memory=use_cache,
-        )
-
-        self.extract_candidates(doc, min_len, self.grammar, lemmer)
-
-        top_n, candidate_set = self.top_n_candidates(
-            doc, top_n, min_len, stemmer, **kwargs
-        )
-
-        logger.info(f"Document #{self.counter} processed")
-        self.counter += 1
-        torch.cuda.empty_cache()
-
-        return (top_n, candidate_set)
 
     def extract_kp_from_corpus(
         self,
@@ -156,9 +100,9 @@ class MaskRank(BaseKPModel):
             doc.raw_text, show_progress_bar=False, output_value=None
         )
 
-        doc.doc_token_ids = doc_embedings["input_ids"].squeeze().tolist()
-        doc.doc_token_embeddings = doc_embedings["token_embeddings"]
-        doc.doc_attention_mask = doc_embedings["attention_mask"]
+        doc.token_ids = doc_embedings["input_ids"].squeeze().tolist()
+        doc.token_embeddings = doc_embedings["token_embeddings"]
+        doc.attention_mask = doc_embedings["attention_mask"]
 
         return doc_embedings["sentence_embedding"].detach().numpy()
 
@@ -247,7 +191,11 @@ class MaskRank(BaseKPModel):
             RuntimeError("cand_mode not set!")
 
     def extract_candidates(
-        self, doc, min_len: int = 5, grammar: str = "", lemmer: Callable = None
+        self,
+        doc: Document,
+        min_len: int = 5,
+        grammar: str = "",
+        lemmer: Callable = None,
     ):
         """
         Method that uses Regex patterns on POS tags to extract unique candidates from a tagged document and
@@ -292,11 +240,18 @@ class MaskRank(BaseKPModel):
     def evaluate_n_candidates(
         self, doc_embed: np.ndarray, candidate_set_embed, candidate_set
     ) -> List[Tuple]:
+        """
+        This method is key for each ranking model.
+        Here the ranking heuritic is applied according to model definition.
+
+        MaskRank selects the candidates that have embedings of masked document form far from emedings of the original document.
+        Looking for 1 - similarity.
+        """
+        # Why MaskRank candidate score is diferent from EmbedRank? Least similar? doc_sim is the masked document?
         # doc_embed = doc.doc_embed.reshape(1, -1)
         doc_sim = np.absolute(
             cosine_similarity(candidate_set_embed, doc_embed.reshape(1, -1))
         )
-        # TODO: Why MaskRank candidate score is diferent from EmbedRank? Least similar? doc_sim is the masked document?
         candidate_score = sorted(
             [
                 (candidate, 1.0 - candidate_doc_sim[0])
