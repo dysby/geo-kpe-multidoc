@@ -6,6 +6,7 @@ from zipfile import ZipFile
 
 from torch.utils.data import Dataset
 
+# Datasets from https://github.com/LIAAD/KeywordExtractor-Datasets
 DATASETS = {
     "110-PT-BN-KP": {
         "zip_file": "110-PT-BN-KP.zip",
@@ -86,6 +87,7 @@ class KPEDataset(Dataset):
             root_dir: str = Data path.
             transform: Optional[Callable]: Optional transform to be applied
                 on a sample.
+
         """
         self.name = name
         self.ids, self.documents, self.keys = self._read_zip(

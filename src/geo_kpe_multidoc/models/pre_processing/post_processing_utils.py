@@ -50,6 +50,9 @@ def whitening_np(embeddings: torch.tensor) -> np.array:
 
 
 def l1_l12_embed(text: str, model: BaseEmbedder) -> Tuple:
+    """
+    Consider only 1st and 12th layers for embedding
+    """
     inputs = model.embedding_model.tokenizer(
         text, return_tensors="pt", max_length=4096, return_attention_mask=True
     )
@@ -84,6 +87,9 @@ def max_pooling(token_embeddings, attention_mask):
 
 
 def embed_hf(text: str, model: BaseEmbedder) -> Tuple:
+    """
+    hugingface interface
+    """
     # Tokenize sentences
     inputs = tokenize_hf(text, model)
 
@@ -102,16 +108,18 @@ def embed_hf_global_att(text: str, model: BaseEmbedder) -> Tuple:
 
     # Tokenize sentences
     # TODO: why max_lenght is 2048 and not 4096?
+    # Here max_lenght can reduced to 2048 due to memory constrains
     inputs = model.embedding_model.tokenizer(
         text,
         padding=True,
         truncation="longest_first",
         return_tensors="pt",
-        max_length=2048,
+        max_length=4096,  # change
     )
     sequence_l = len(inputs["attention_mask"][0])
 
     global_att = torch.zeros(1, sequence_l)
+    # set attention mask at 128 random positions.
     random_sample = random.sample(range(sequence_l), 128)
     for pos in random_sample:
         global_att[0][pos] = 1

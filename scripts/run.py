@@ -6,6 +6,7 @@ from datetime import datetime
 from itertools import islice
 from os import path
 
+import simplemma
 from loguru import logger
 
 from geo_kpe_multidoc import GEO_KPE_MULTIDOC_OUTPUT_PATH
@@ -129,11 +130,12 @@ def main():
     else:
         loader = islice(data, args.doc_limit)
 
-    for _doc_id, doc, gold_kp in loader:
+    for doc_id, doc, gold_kp in loader:
+        logger.info(f"KPE for document {doc_id}")
         top_n_and_scores, candicates = kpe_model.extract_kp_from_doc(
-            kpe_model.pre_process(doc),
+            doc,  # kpe_model.pre_process(doc),
             top_n=20,
-            min_len=2,
+            min_len=5,
             lemmer=DATASETS[ds_name]["language"],
         )
         model_results[ds_name].append(
@@ -142,7 +144,18 @@ def main():
                 candicates,
             )
         )
-        true_labels[ds_name].append(gold_kp)
+
+        true_labels[ds_name].append(
+            [
+                " ".join(
+                    [
+                        simplemma.lemmatize(w, DATASETS[ds_name]["language"])
+                        for w in simplemma.simple_tokenizer(kp)
+                    ]
+                ).lower()
+                for kp in gold_kp
+            ]
+        )
 
         # model_results["dataset_name"][(doc1_top_n, doc1_candidates), (doc2...)]
     results = evaluate_kp_extraction(model_results, true_labels)

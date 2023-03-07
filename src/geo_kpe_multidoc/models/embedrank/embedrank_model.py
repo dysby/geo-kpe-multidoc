@@ -162,7 +162,8 @@ class EmbedRank(BaseKPModel):
     def embed_sents_words(self, doc, stemmer: Optional[StemmerI] = None, memory=False):
         """
         Embed each word in the sentence by it self
-        TODO: embed_sent_words NOT USED?
+        Non-conterxtualized embedding.
+        Embed_sent_words (Use only on non-contextualized candicate embeding mode, not used).
         TODO: correct cache/memory usage
         """
         if not memory:
@@ -210,7 +211,10 @@ class EmbedRank(BaseKPModel):
         The default value just embeds the document normally.
         """
 
-        # TODO: check why document text is mutated to lower
+        # Check why document text is mutated to lower:
+        # Used after POS_TAGGING,
+        # at 1st stage document POS Tagging uses normal text including capital letters,
+        # but later document handling will use only lowered text, embedings, and such.
         doc.raw_text = doc.raw_text.lower()
         doc_embedings = self.model.embedding_model.encode(
             doc.raw_text, show_progress_bar=False, output_value=None
@@ -261,8 +265,10 @@ class EmbedRank(BaseKPModel):
                                 axis=0,
                             )
                         )
-                        # TODO: What is global_attention mode?
-                        # TODO: Why change doc_attention_mask
+                        # What is global_attention mode?
+                        # Used for custom global attention mask of the longformer.
+                        # Set attention mask = 1 at all token positions where this candidate is mensioned.
+                        # TODO: Use doc_attention_mask for computing a new doc embeding vector?
                         if cand_mode == "global_attention":
                             for j in range(i, i + cand_len):
                                 doc.doc_attention_mask[j] = 1
@@ -280,11 +286,17 @@ class EmbedRank(BaseKPModel):
             )
 
     def extract_candidates(
-        self, doc, min_len: int = 5, grammar: str = "", lemmer: Callable = None
+        self, doc, min_len: int = 5, grammar: str = "", lemmer_lang: str = None
     ):
         """
         Method that uses Regex patterns on POS tags to extract unique candidates from a tagged document and
         stores the sentences each candidate occurs in
+
+        len(candidate.split(" ")) <= 5 avoid too long candidate phrases
+
+        Parameters
+        ----------
+                min_len: minimum candidate length (chars)
         """
         doc.candidate_set = set()
         doc.candidate_mentions = {}
@@ -298,20 +310,20 @@ class EmbedRank(BaseKPModel):
                 temp_cand_set.append(" ".join(word for word, tag in subtree.leaves()))
 
             for candidate in temp_cand_set:
-                # TODO: why candidate max length is 5?
+                # candidate max number of words is 5 because longer candidates may be overfitting
                 if len(candidate) > min_len and len(candidate.split(" ")) <= 5:
                     l_candidate = (
                         " ".join(
                             [
-                                simplemma.lemmatize(w, lemmer)
+                                simplemma.lemmatize(w, lemmer_lang)
                                 for w in simplemma.simple_tokenizer(candidate)
                             ]
                         ).lower()
-                        if lemmer
+                        if lemmer_lang
                         else candidate
                     )
-                    if l_candidate not in doc.candidate_set:
-                        doc.candidate_set.add(l_candidate)
+                    # if l_candidate not in doc.candidate_set:
+                    doc.candidate_set.add(l_candidate)
 
                     if l_candidate not in doc.candidate_mentions:
                         doc.candidate_mentions[l_candidate] = []
@@ -321,7 +333,7 @@ class EmbedRank(BaseKPModel):
         doc.candidate_set = sorted(list(doc.candidate_set), key=len, reverse=True)
 
     def embed_n_candidates(
-        self, doc: Document, min_len, stemmer, **kwargs
+        self, doc: Document, min_len: int, stemmer, **kwargs
     ) -> Tuple[np.ndarray, List[str]]:
         """
         TODO: Why embed_n_candidates
@@ -359,17 +371,14 @@ class EmbedRank(BaseKPModel):
         doc_mode = kwargs.get("doc_mode", "")
         cand_mode = kwargs.get("cand_mode", "")
         post_processing = kwargs.get("post_processing", [""])
+        use_cache = kwargs.get("embed_memory", False)
 
         t = time()
         doc.doc_embed = self.embed_doc(doc, stemmer, doc_mode, post_processing)
         logger.info(f"Embed Doc in {time() -  t:.2f}s")
 
         if cand_mode != "" and cand_mode != "AvgContext":
-            self.embed_sents_words(
-                doc,
-                stemmer,
-                False if "embed_memory" not in kwargs else kwargs["embed_memory"],
-            )
+            self.embed_sents_words(doc, stemmer, use_cache)
 
         t = time()
         self.embed_candidates(doc, stemmer, cand_mode, post_processing)
@@ -381,13 +390,15 @@ class EmbedRank(BaseKPModel):
                 cosine_similarity(doc.candidate_set_embed, doc.doc_embed.reshape(1, -1))
             )
         else:
-            n = len(doc.candidate_set) if len(doc.candidate_set) < top_n else top_n
+            valid_top_n = (
+                len(doc.candidate_set) if len(doc.candidate_set) < top_n else top_n
+            )
             doc_sim = mmr(
                 doc.doc_embed.reshape(1, -1),
                 doc.candidate_set_embed,
                 doc.candidate_set,
-                n,
-                kwargs["MMR"],
+                valid_top_n,
+                diversity=kwargs["MMR"],
             )
 
         candidate_score = sorted(

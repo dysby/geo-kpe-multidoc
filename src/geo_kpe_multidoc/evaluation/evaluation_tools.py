@@ -109,11 +109,11 @@ def extract_dataset_labels(
                             simplemma.lemmatize(w, lemmer)
                             for w in simplemma.simple_tokenizer(kp)
                         ]
-                    ).lower()
+                    )
                 if stemmer:
                     kp = " ".join(
                         [stemmer.stem(w) for w in simplemma.simple_tokenizer(kp)]
-                    ).lower()
+                    )
                 doc_results.append(kp.lower())
             res[dataset].append(doc_results)
     return res
@@ -121,7 +121,7 @@ def extract_dataset_labels(
 
 def evaluate_kp_extraction(
     model_results: Dict[str, List] = {},
-    true_labels: Dict[str, Tuple[List]] = {},
+    true_labels: Dict[str, List[List]] = {},
     model_name: str = "",
     save: bool = True,
     kp_eval: bool = True,
@@ -134,9 +134,8 @@ def evaluate_kp_extraction(
     ----------
         model_results:  Dict[str, List]
             Dictionary whit dataset Names as keys and Results as values
-            ***NOTE*** that each results does not have top n candidate score
-            ex: model_results["dataset_name"][(doc1_top_n, doc1_candidates), (doc2...)]
-        true_labels: Dict[str, Tuple[List]]
+            ex: model_results["dataset_name"][(doc1_top_n = (kp1, score_kp1), doc1_candidates), (doc2...)]
+        true_labels: Dict[str, List[List]]
             keys are the dataset names, and values are the list of gold keyphrases for each document
             ex: true_labels["dataset_name"][[doc1_kp1, doc1_kp2], [doc2...]]
     """
