@@ -2,6 +2,7 @@ import re
 import string
 from typing import Callable, List, Tuple
 
+import simplemma
 from keybert.backend._base import BaseEmbedder
 from nltk.corpus import stopwords
 
@@ -39,6 +40,12 @@ def remove_stopwords(text: str = "") -> str:
         if word not in stopwords.words("English"):
             res += " {}".format(word)
     return res[1:]
+
+
+def lemmatize(text: str, lang: str) -> str:
+    return " ".join(
+        [simplemma.lemmatize(w, lang) for w in simplemma.simple_tokenizer(text)]
+    ).lower()
 
 
 def filter_token_ids(input_ids: List[List[int]]) -> List[int]:

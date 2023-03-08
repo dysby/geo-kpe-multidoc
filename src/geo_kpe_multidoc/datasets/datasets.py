@@ -12,6 +12,11 @@ from torch.utils.data import Dataset
 # Datasets from https://github.com/LIAAD/KeywordExtractor-Datasets
 DATASETS = {
     # zip_file: str = Path to the zip file with docs and annoations.
+    "DUC2001": {
+        "zip_file": "DUC2001.zip",
+        "language": "en",
+        "tagger": "en_core_web_trf",
+    },
     "MKDUC01": {
         "language": "en",
         "tagger": "en_core_web_trf",

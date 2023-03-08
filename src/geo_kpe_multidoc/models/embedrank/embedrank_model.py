@@ -23,6 +23,7 @@ from geo_kpe_multidoc.models.pre_processing.post_processing_utils import (
 )
 from geo_kpe_multidoc.models.pre_processing.pre_processing_utils import (
     filter_token_ids,
+    lemmatize,
     tokenize_hf,
 )
 from geo_kpe_multidoc.utils.IO import read_from_file
@@ -189,6 +190,8 @@ class EmbedRank(BaseKPModel):
                                 doc.attention_mask[j] = 1
 
             if candidate_embeds == []:
+                # candidate is beyond max position for emdedding
+                # return a non-contextualized embedding.
                 doc.candidate_set_embed.append(self.model.embed(candidate))
 
             else:
@@ -205,7 +208,11 @@ class EmbedRank(BaseKPModel):
             doc.doc_embed = self.global_embed_doc(doc)
 
     def extract_candidates(
-        self, doc, min_len: int = 5, grammar: str = "", lemmer_lang: str = None
+        self,
+        doc: Document,
+        min_len: int = 5,
+        grammar: str = "",
+        lemmer_lang: str = None,
     ):
         """
         Method that uses Regex patterns on POS tags to extract unique candidates from a tagged document and
@@ -232,14 +239,7 @@ class EmbedRank(BaseKPModel):
                 # candidate max number of words is 5 because longer candidates may be overfitting
                 if len(candidate) > min_len and len(candidate.split(" ")) <= 5:
                     l_candidate = (
-                        " ".join(
-                            [
-                                simplemma.lemmatize(w, lemmer_lang)
-                                for w in simplemma.simple_tokenizer(candidate)
-                            ]
-                        ).lower()
-                        if lemmer_lang
-                        else candidate
+                        lemmatize(candidate, lemmer_lang) if lemmer_lang else candidate
                     )
                     # if l_candidate not in doc.candidate_set:
                     doc.candidate_set.add(l_candidate)
@@ -287,6 +287,8 @@ class EmbedRank(BaseKPModel):
         Here the ranking heuritic is applied according to model definition.
 
         EmbedRank selects the candidates that have more similarity to the document.
+
+        TODO: Rename method to rank_candidates()
         """
         # doc_embed = doc.doc_embed.reshape(1, -1)
         doc_sim = np.absolute(
