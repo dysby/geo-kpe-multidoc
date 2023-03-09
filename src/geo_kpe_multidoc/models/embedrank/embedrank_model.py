@@ -101,6 +101,7 @@ class EmbedRank(BaseKPModel):
         Embed each word in the sentence by it self
         Non-conterxtualized embedding.
         Embed_sent_words (Use only on non-contextualized candicate embeding mode, not used).
+        TODO: validate, not used, we always want contexttualized embeddings of the candidades.
         TODO: correct cache/memory usage
         """
         if not memory:
@@ -183,8 +184,8 @@ class EmbedRank(BaseKPModel):
                         )
                         # What is global_attention mode?
                         # Used for custom global attention mask of the longformer.
-                        # Set attention mask = 1 at all token positions where this candidate is mensioned.
-                        # TODO: Use doc_attention_mask for computing a new doc embeding vector?
+                        # Set attention mask = 1 at all token positions where this candidate is mentioned.
+                        # TODO: Use attention_mask for computing a new doc embeding vector?
                         if cand_mode == "global_attention":
                             for j in range(i, i + cand_len):
                                 doc.attention_mask[j] = 1
@@ -203,7 +204,8 @@ class EmbedRank(BaseKPModel):
                 doc.candidate_set_embed, doc.raw_text, self.model
             )
 
-        # TODO: If global attention the document embeding should be computed again having the attention mask changed to the candidate positions.
+        # TODO: If in global attention mode the document embeding should be computed again having the
+        # attention mask changed to the candidate positions.
         if cand_mode == "global_attention":
             doc.doc_embed = self.global_embed_doc(doc)
 
@@ -318,6 +320,8 @@ class EmbedRank(BaseKPModel):
         cand_mode = kwargs.get("cand_mode", "")
         post_processing = kwargs.get("post_processing", [""])
         use_cache = kwargs.get("embed_memory", False)
+        mmr_mode = kwargs.get("mmr", False)
+        mmr_diversity = kwargs.get("diversity", 0.8)
 
         t = time()
         doc.doc_embed = self.embed_doc(doc, stemmer, doc_mode, post_processing)
@@ -331,20 +335,24 @@ class EmbedRank(BaseKPModel):
         logger.info(f"Embed Candidates in {time() -  t:.2f}s")
 
         doc_sim = []
-        if "MMR" not in kwargs:
-            doc_sim = np.absolute(
-                cosine_similarity(doc.candidate_set_embed, doc.doc_embed.reshape(1, -1))
-            )
-        else:
-            valid_top_n = (
-                len(doc.candidate_set) if len(doc.candidate_set) < top_n else top_n
-            )
+        if mmr_mode:
+            assert mmr_diversity > 0
+            assert mmr_diversity < 1
+            valid_top_n = len(doc.candidate_set)
+            if top_n > 0:
+                valid_top_n = (
+                    len(doc.candidate_set) if len(doc.candidate_set) < top_n else top_n
+                )
             doc_sim = mmr(
                 doc.doc_embed.reshape(1, -1),
                 doc.candidate_set_embed,
                 doc.candidate_set,
                 valid_top_n,
-                diversity=kwargs["MMR"],
+                diversity=mmr_diversity,
+            )
+        else:
+            doc_sim = np.absolute(
+                cosine_similarity(doc.candidate_set_embed, doc.doc_embed.reshape(1, -1))
             )
 
         candidate_score = sorted(

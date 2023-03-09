@@ -1,23 +1,14 @@
 import argparse
+import json
 import sys
 import textwrap
 import time
 from datetime import datetime
-from itertools import islice
 from os import path
 
-import simplemma
 from loguru import logger
 from nltk.stem import PorterStemmer
-
-from geo_kpe_multidoc import GEO_KPE_MULTIDOC_OUTPUT_PATH
-from geo_kpe_multidoc.datasets.datasets import load_data
-from geo_kpe_multidoc.document import Document
-from geo_kpe_multidoc.evaluation.evaluation_tools import (
-    extract_keyphrases_docs,
-    extract_keyphrases_topics,
-)
-from geo_kpe_multidoc.models.fusion_model import EnsembleMode
+from pandas import DataFrame
 
 
 def parse_args():
@@ -104,7 +95,8 @@ def parse_args():
         type=str,
         default="weighted",
         help="Fusion model ensembling mode",
-        choices=[el.value for el in EnsembleMode],
+        # choices=[el.value for el in EnsembleMode],
+        choices=["weighted", "harmonic"],
     )
     parser.add_argument(
         "--save_pos_tags", type=bool, help="bool flag to save POS tags", default=False
@@ -122,16 +114,44 @@ def parse_args():
         default=False,
     )
     parser.add_argument(
-        "--stemming", type=bool, help="bool flag to use stemming", default=False
+        "--stemming", action="store_true", help="bool flag to use stemming"
     )
     parser.add_argument(
         "--lemmatization",
-        type=bool,
-        help="bool flag to use lemmatization",
-        default=False,
+        action="store_true",
+        help="boolean flag to use lemmatization",
+    )
+    parser.add_argument(
+        "--embedrank_mmr",
+        action="store_true",
+        help="boolean flag to use EmbedRank MMR",
+    )
+    parser.add_argument(
+        "--embedrank_diversity",
+        type=float,
+        help="EmbedRank MMR diversity parameter value.",
     )
 
     return parser.parse_args()
+
+
+def save(results: DataFrame, args):
+    from geo_kpe_multidoc import GEO_KPE_MULTIDOC_OUTPUT_PATH
+
+    t = datetime.now()
+    filename = (
+        "-".join(["results", args.experiment_name, t.strftime(r"%Y%m%d-%H%M%S")])
+        + ".csv"
+    )
+    results.to_csv(path.join(GEO_KPE_MULTIDOC_OUTPUT_PATH, filename))
+    logger.info(f"Results saved in {filename}")
+
+    filename = filename[:-3] + "txt"
+    with open(
+        path.join(GEO_KPE_MULTIDOC_OUTPUT_PATH, filename), mode="w", encoding="utf8"
+    ) as f:
+        # f.write(args.__repr__())
+        json.dump(args.__dict__, f, indent=4)
 
 
 def main():
@@ -142,8 +162,13 @@ def main():
     logger.info("Loading models")
 
     from geo_kpe_multidoc import GEO_KPE_MULTIDOC_DATA_PATH
-    from geo_kpe_multidoc.datasets.datasets import DATASETS, KPEDataset
-    from geo_kpe_multidoc.evaluation.evaluation_tools import evaluate_kp_extraction
+    from geo_kpe_multidoc.datasets.datasets import DATASETS, load_data
+    from geo_kpe_multidoc.evaluation.evaluation_tools import (
+        evaluate_kp_extraction,
+        extract_keyphrases_docs,
+        extract_keyphrases_topics,
+        output_one_top_cands,
+    )
     from geo_kpe_multidoc.evaluation.mkduc01_eval import MKDUC01_Eval
     from geo_kpe_multidoc.models import EmbedRank, FusionModel, MaskRank, MDKPERank
     from geo_kpe_multidoc.models.pre_processing.pos_tagging import POS_tagger_spacy
@@ -196,15 +221,9 @@ def main():
     # )
 
     # dataloader = DataLoader(dataset, batch_size=args.batch_size)
-    logger.info("Start Testing ...")
-    logger.info(f"KP extraction for {len(data)} examples.")
-    # update SpaCy POS tagging for dataset language
-    kpe_model.tagger = POS_tagger_spacy(DATASETS[ds_name]["tagger"])
 
-    if args.doc_limit == -1:
-        loader = data
-    else:
-        loader = islice(data, args.doc_limit)
+    # update SpaCy POS tagging for dataset language
+    # kpe_model.tagger = POS_tagger_spacy(DATASETS[ds_name]["tagger"])
 
     if isinstance(kpe_model, MDKPERank):
         extract_eval = extract_keyphrases_topics
@@ -214,24 +233,44 @@ def main():
     stemmer = PorterStemmer() if args.stemming else None
     lemmer = DATASETS[ds_name].get("language") if args.lemmatization else None
 
+    if not lemmer:
+        logger.warning("Running without lemmatization. Results will be poor.")
+
+    options = dict()
+
+    if args.embedrank_mmr:
+        options["mmr"] = True
+        if args.embedrank_diversity:
+            options["mmr_diversity"] = args.embedrank_diversity
+        else:
+            logger.warning("EmbedRank MMR selected but diversity is default 0.8")
+        if isinstance(kpe_model, MaskRank):
+            logger.warning("EmbedRank MMR selected but model is not EmbedRank")
+    # -------------------------------------------------
+    # --------------- Run Experiment ------------------
+    # -------------------------------------------------
+    logger.info(f"Args: {args}")
+    logger.info("Start Testing ...")
+    logger.info(f"KP extraction for {len(data)} examples.")
+    logger.info(f"Options: {options}")
     model_results, true_labels = extract_eval(
-        loader, kpe_model, top_n=args.top_n, min_len=5, lemmer=lemmer
+        data,
+        kpe_model,
+        top_n=args.top_n,
+        min_len=5,
+        lemmer=lemmer,
+        n_docs_limit=args.doc_limit,
+        **options,
     )
 
     # model_results["dataset_name"][(doc1_top_n, doc1_candidates), (doc2...)]
     results = evaluate_kp_extraction(model_results, true_labels)
-    # keyphrases_selection(doc_list, labels_stemed, labels, model, dataloader, log)
 
     end = time.time()
     logger.info("Processing time: {}".format(end - start))
 
-    t = datetime.now()
-    filename = (
-        "-".join(["results", args.experiment_name, t.strftime("%Y%m%d-%H%M%S")])
-        + ".csv"
-    )
-    results.to_csv(path.join(GEO_KPE_MULTIDOC_OUTPUT_PATH, filename))
-    logger.info(f"Results saved in {filename}")
+    output_one_top_cands(data.ids, model_results, true_labels)
+    save(results, args)
 
 
 if __name__ == "__main__":

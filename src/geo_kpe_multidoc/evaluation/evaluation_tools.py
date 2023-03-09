@@ -1,17 +1,24 @@
 import json
+from itertools import islice, zip_longest
 from os import write
 from pathlib import Path
 from time import gmtime, strftime
-from typing import Callable, Dict, List, Tuple
+from typing import Callable, Dict, List, Tuple, Union
 
 import numpy as np
 import pandas as pd
 import simplemma
+from loguru import logger
 from nltk.stem import PorterStemmer
 from nltk.stem.api import StemmerI
+from tabulate import tabulate
 
 from geo_kpe_multidoc import GEO_KPE_MULTIDOC_OUTPUT_PATH
+from geo_kpe_multidoc.datasets import DATASETS, KPEDataset
+from geo_kpe_multidoc.document import Document
 from geo_kpe_multidoc.evaluation.metrics import MAP, f1_score, nDCG, precision, recall
+from geo_kpe_multidoc.models import EmbedRank, MaskRank, MDKPERank
+from geo_kpe_multidoc.models.pre_processing.pre_processing_utils import lemmatize
 from geo_kpe_multidoc.utils.IO import write_to_file
 
 
@@ -125,6 +132,7 @@ def evaluate_kp_extraction(
     model_name: str = "",
     save: bool = True,
     kp_eval: bool = True,
+    k_set=[5, 10, 15],
     **kwargs,
 ) -> None:
     """
@@ -156,8 +164,6 @@ def evaluate_kp_extraction(
         results_c = {"Precision": [], "Recall": [], "F1": []}
 
         results_kp = {"MAP": [], "nDCG": []}
-
-        k_set = [5, 10, 15] if "k_set" not in kwargs else kwargs["k_set"]
 
         for k in k_set:
             results_kp[f"Precision_{k}"] = []
@@ -261,3 +267,128 @@ def output_top_cands(
                 if kp in true_label
             ]
     print(top_cand_l)
+
+    top_cand_sims = {
+        round(float(x), 2): (0 + top_cand_l.count(round(float(x), 2)))
+        for x in np.arange(0, 1.01, 0.01)
+    }
+    print(top_cand_sims)
+
+
+def output_one_top_cands(
+    doc_ids: List[str],
+    model_results: Dict[str, List] = {},
+    true_labels: Dict[str, Tuple[List]] = {},
+    top_n: int = 20,
+):
+    """
+    Print one example Top N candidate and Gold Candidate list
+
+    Parameters:
+    -----------
+        model_results: values are a list with results for each document [((doc1_top_n_candidates, doc1_top_n_scores], doc1_candidates), ...]
+    """
+    for topic in model_results.keys():
+        doc_keys = [kp for kp, _ in model_results[topic][0][0]]
+        gold_keys = true_labels[topic][0]
+        print(doc_ids[0])
+        print(
+            tabulate(
+                [
+                    [dk, gk]
+                    for dk, gk in zip_longest(
+                        doc_keys[:top_n], gold_keys, fillvalue="-"
+                    )
+                ],
+                headers=["Extracted", "Gold"],
+            )
+        )
+
+
+def extract_keyphrases_docs(
+    dataset: KPEDataset,
+    model: Union[EmbedRank, MaskRank],
+    top_n=20,
+    min_len=5,
+    lemmer=None,
+    n_docs_limit=-1,
+    **kwargs,
+):
+    """
+    Extraction and Evaluation for Single Document mode
+    """
+    model_results = {dataset.name: []}
+    true_labels = {dataset.name: []}
+
+    if n_docs_limit == -1:
+        loader = dataset
+    else:
+        loader = islice(dataset, n_docs_limit)
+
+    for doc_id, txt, gold_kp in loader:
+        logger.info(f"KPE for document {doc_id}")
+        top_n_and_scores, candicates = model.extract_kp_from_doc(
+            Document(txt, doc_id),  # kpe_model.pre_process(doc),
+            top_n=top_n,
+            min_len=min_len,
+            lemmer=lemmer,
+            **kwargs,
+        )
+        model_results[dataset.name].append(
+            (
+                top_n_and_scores,
+                candicates,
+            )
+        )
+
+        if lemmer:
+            gold_kp = lemmatize(gold_kp, lemmer)
+
+        true_labels[dataset.name].append(gold_kp)
+
+    return model_results, true_labels
+
+
+def extract_keyphrases_topics(
+    dataset: KPEDataset,
+    model: MDKPERank,
+    top_n=20,
+    min_len=5,
+    lemmer=None,
+    n_docs_limit=-1,
+    **kwargs,
+):
+    """
+    Extraction and Evaluation for Multi Document mode
+    """
+    model_results = {dataset.name: []}
+    true_labels = {dataset.name: []}
+
+    if n_docs_limit == -1:
+        # no limit
+        loader = dataset
+    else:
+        loader = islice(dataset, n_docs_limit)
+
+    for topic_id, docs, gold_kp in loader:
+        logger.info(f"KPE for topic {topic_id}")
+        top_n_and_scores, candicates = model.extract_kp_from_topic(
+            docs,  # kpe_model.pre_process(doc),
+            top_n=top_n,
+            min_len=min_len,
+            lemmer=lemmer,
+            **kwargs,
+        )
+        model_results[dataset.name].append(
+            (
+                top_n_and_scores,
+                candicates,
+            )
+        )
+
+        if lemmer:
+            gold_kp = lemmatize(gold_kp, lemmer)
+
+        true_labels[dataset.name].append(gold_kp)
+
+    return model_results, true_labels

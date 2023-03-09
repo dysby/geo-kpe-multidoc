@@ -1,6 +1,6 @@
 import re
 import string
-from typing import Callable, List, Tuple
+from typing import Callable, List, Tuple, Union
 
 import simplemma
 from keybert.backend._base import BaseEmbedder
@@ -42,7 +42,14 @@ def remove_stopwords(text: str = "") -> str:
     return res[1:]
 
 
-def lemmatize(text: str, lang: str) -> str:
+def lemmatize(text: Union[str, List], lang: str) -> Union[str, List]:
+    if isinstance(text, List):
+        return [
+            " ".join(
+                [simplemma.lemmatize(w, lang) for w in simplemma.simple_tokenizer(line)]
+            ).lower()
+            for line in text
+        ]
     return " ".join(
         [simplemma.lemmatize(w, lang) for w in simplemma.simple_tokenizer(text)]
     ).lower()
