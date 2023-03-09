@@ -77,7 +77,7 @@ class MDKPERank(BaseKPModel):
         topic_res = [
             self.extract_kp_from_doc(
                 doc=Document(doc, f"topic_doc_{i}"),
-                top_n=-1,
+                top_n=top_n,
                 min_len=min_len,
                 stemming=stemming,
                 lemmatize=lemmatize,
@@ -95,30 +95,29 @@ class MDKPERank(BaseKPModel):
         cand_embeds = [np.mean(embed, axis=0) for _cand, embed in cands.items()]
         cand_set = list(cands.keys())
 
-        res_p_doc = [
-            self.base_model_embed.evaluate_n_candidates(
-                doc.doc_embed, cand_embeds, cand_set
-            )
+        ranking_p_doc = [
+            self.base_model_embed.rank_candidates(doc.doc_embed, cand_embeds, cand_set)
             for doc, _, _ in topic_res
         ]
         scores_per_candidate = {}
 
-        for doc, _ in res_p_doc:
+        for doc, _ in ranking_p_doc:
             for cand_t in doc:
                 if cand_t[0] not in scores_per_candidate:
                     scores_per_candidate[cand_t[0]] = []
                 scores_per_candidate[cand_t[0]].append(cand_t[1])
 
+        # TODO: If a candidate is only mentioned in one doc, the overall score can be biased.
         for cand in scores_per_candidate:
             scores_per_candidate[cand] = mean(scores_per_candidate[cand])
 
-        scores: List[KPEScore] = sorted(
+        top_n_scores = sorted(
             [(cand, scores_per_candidate[cand]) for cand in scores_per_candidate],
             reverse=True,
-            key=lambda x: x[1],
+            key=lambda x: x[1],  # sort by score_per_candidate
         )
 
-        return scores
+        return top_n_scores, cand_set
 
     def extract_kp_from_corpus(
         self,

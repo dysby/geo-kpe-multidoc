@@ -14,18 +14,12 @@ from sklearn.metrics.pairwise import cosine_similarity
 from geo_kpe_multidoc.document import Document
 from geo_kpe_multidoc.models.base_KP_model import BaseKPModel
 from geo_kpe_multidoc.models.pre_processing.language_mapping import (
-    choose_lemmatizer,
-    choose_tagger,
-)
+    choose_lemmatizer, choose_tagger)
 from geo_kpe_multidoc.models.pre_processing.pos_tagging import POS_tagger_spacy
-from geo_kpe_multidoc.models.pre_processing.post_processing_utils import (
-    z_score_normalization,
-)
+from geo_kpe_multidoc.models.pre_processing.post_processing_utils import \
+    z_score_normalization
 from geo_kpe_multidoc.models.pre_processing.pre_processing_utils import (
-    filter_token_ids,
-    lemmatize,
-    tokenize_hf,
-)
+    filter_token_ids, lemmatize, tokenize_hf)
 from geo_kpe_multidoc.utils.IO import read_from_file
 
 
@@ -279,23 +273,40 @@ class EmbedRank(BaseKPModel):
         if cand_mode == "global_attention":
             doc.doc_embed = self.global_embed_doc(doc)
 
-        return self.candidate_set_embed, self.candidate_set
+        return doc.candidate_set_embed, doc.candidate_set
 
-    def evaluate_n_candidates(
-        self, doc_embed: np.ndarray, candidate_set_embed, candidate_set
+    def rank_candidates(
+        self, doc_embed: np.ndarray, candidate_set_embed, candidate_set, **kwargs
     ) -> List[Tuple]:
         """
         This method is key for each ranking model.
         Here the ranking heuritic is applied according to model definition.
 
         EmbedRank selects the candidates that have more similarity to the document.
-
-        TODO: Rename method to rank_candidates()
+        TODO: why does not have MMR? - copied mmr from top_n_candidates
         """
+        mmr_mode = kwargs.get("mmr", False)
+        mmr_diversity = kwargs.get("diversity", 0.8)
+
+        doc_sim = []
+        if mmr_mode:
+            assert mmr_diversity > 0
+            assert mmr_diversity < 1
+            doc_sim = mmr(
+                doc_embed.reshape(1, -1),
+                candidate_set_embed,
+                candidate_set,
+                diversity=mmr_diversity,
+            )
+        else:
+            doc_sim = np.absolute(
+                cosine_similarity(candidate_set_embed, doc_embed.reshape(1, -1))
+            )
+
         # doc_embed = doc.doc_embed.reshape(1, -1)
-        doc_sim = np.absolute(
-            cosine_similarity(candidate_set_embed, doc_embed.reshape(1, -1))
-        )
+        # doc_sim = np.absolute(
+        #     cosine_similarity(candidate_set_embed, doc_embed.reshape(1, -1))
+        # )
         candidate_score = sorted(
             [
                 (candidate, candidate_doc_sim[0])

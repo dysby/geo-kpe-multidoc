@@ -94,7 +94,7 @@ def load_data(name, root_dir):
     root_dir: str = Data path.
     """
 
-    def _extract_mdkpe(dataset_dir):
+    def _read_mdkpe(dataset_dir):
         """Remove topic key and document id and keep only a list of items each corresponding to
         a topic, and each item composed by a list of docs and a list of keyphrases."""
         dataset = {}
@@ -156,7 +156,7 @@ def load_data(name, root_dir):
     if zipfile:
         return KPEDataset(name, *_read_zip(path.join(root_dir, zipfile)))
     else:
-        return KPEDataset(name, *_extract_mdkpe(root_dir))
+        return KPEDataset(name, *_read_mdkpe(root_dir))
 
 
 class KPEDataset(Dataset):

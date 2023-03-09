@@ -185,8 +185,6 @@ def main():
 
     TAGGER_NAME = DATASETS[ds_name].get("tagger")
 
-    data = load_data(ds_name, GEO_KPE_MULTIDOC_DATA_PATH)
-
     match args.rank_model:
         case "EmbedRank":
             kpe_model = EmbedRank(BACKEND_MODEL_NAME, TAGGER_NAME)
@@ -210,23 +208,10 @@ def main():
             )
             sys.exit(-1)
 
-    # ori_encode_dict = tokenizer.encode_plus(
-    #     doc,  # Sentence to encode.
-    #     add_special_tokens=True,  # Add '[CLS]' and '[SEP]'
-    #     max_length=MAX_LEN,  # Pad & truncate all sentences.
-    #     padding='max_length',
-    #     return_attention_mask=True,  # Construct attn. masks.
-    #     return_tensors='pt',  # Return pytorch tensors.
-    #     truncation=True
-    # )
-
-    # dataloader = DataLoader(dataset, batch_size=args.batch_size)
-
-    # update SpaCy POS tagging for dataset language
-    # kpe_model.tagger = POS_tagger_spacy(DATASETS[ds_name]["tagger"])
-
     if isinstance(kpe_model, MDKPERank):
         extract_eval = extract_keyphrases_topics
+        if ds_name != "MKDUC01":
+            logger.critical("Not Multi Document Ranking on single document dataset!")
     else:
         extract_eval = extract_keyphrases_docs
 
@@ -246,6 +231,8 @@ def main():
             logger.warning("EmbedRank MMR selected but diversity is default 0.8")
         if isinstance(kpe_model, MaskRank):
             logger.warning("EmbedRank MMR selected but model is not EmbedRank")
+
+    data = load_data(ds_name, GEO_KPE_MULTIDOC_DATA_PATH)
     # -------------------------------------------------
     # --------------- Run Experiment ------------------
     # -------------------------------------------------
