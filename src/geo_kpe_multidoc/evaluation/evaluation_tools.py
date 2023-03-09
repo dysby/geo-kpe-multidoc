@@ -22,7 +22,7 @@ from geo_kpe_multidoc.models.pre_processing.pre_processing_utils import lemmatiz
 from geo_kpe_multidoc.utils.IO import write_to_file
 
 
-def extract_res_labels(
+def postprocess_res_labels(
     model_results: Dict, stemmer: StemmerI = None, lemmer: Callable = None
 ):
     """
@@ -36,53 +36,16 @@ def extract_res_labels(
                 res[dataset].append(
                     (
                         [
-                            " ".join(
-                                [
-                                    stemmer.stem(w)
-                                    for w in simplemma.simple_tokenizer(kp[0])
-                                ]
-                            ).lower()
-                            for kp in doc[0]
-                        ],
-                        [
-                            " ".join(
-                                [
-                                    stemmer.stem(w)
-                                    for w in simplemma.simple_tokenizer(kp)
-                                ]
-                            ).lower()
-                            for kp in doc[1]
-                        ],
-                    )
-                )
-    return res
-
-
-def extract_res_labels_x(
-    model_results, stemmer: StemmerI = None, lemmer: Callable = None
-):
-    """
-    Code snippet to correctly model results
-    """
-    res = {}
-    for dataset in model_results:
-        res[dataset] = []
-        for doc in model_results[dataset]:
-            # TODO: If not stemmer results empty?
-            if stemmer:
-                res[dataset].append(
-                    (
-                        [
                             (
                                 " ".join(
                                     [
                                         stemmer.stem(w)
-                                        for w in simplemma.simple_tokenizer(kp[0])
+                                        for w in simplemma.simple_tokenizer(kp)
                                     ]
                                 ).lower(),
-                                kp[1],
+                                score,
                             )
-                            for kp in doc[0]
+                            for kp, score in doc[0]
                         ],
                         [
                             " ".join(
@@ -98,7 +61,7 @@ def extract_res_labels_x(
     return res
 
 
-def extract_dataset_labels(
+def postprocess_dataset_labels(
     corpus_true_labels, stemmer: StemmerI = None, lemmer: Callable = None
 ):
     """
@@ -109,7 +72,7 @@ def extract_dataset_labels(
         res[dataset] = []
         for i in range(len(corpus_true_labels[dataset])):
             doc_results = []
-            for kp in corpus_true_labels[dataset][i][1]:
+            for kp in corpus_true_labels[dataset][i]:
                 if lemmer:
                     kp = " ".join(
                         [
@@ -130,7 +93,6 @@ def evaluate_kp_extraction(
     model_results: Dict[str, List] = {},
     true_labels: Dict[str, List[List]] = {},
     model_name: str = "",
-    save: bool = True,
     kp_eval: bool = True,
     k_set=[5, 10, 15],
     **kwargs,
@@ -147,15 +109,6 @@ def evaluate_kp_extraction(
             keys are the dataset names, and values are the list of gold keyphrases for each document
             ex: true_labels["dataset_name"][[doc1_kp1, doc1_kp2], [doc2...]]
     """
-
-    stamp = ""
-    if "doc_mode" in kwargs and "cand_mode" in kwargs:
-        stamp = f'{strftime("%Y_%m_%d %H_%M", gmtime())} {kwargs["doc_mode"]} {kwargs["cand_mode"]} {model_name}'
-    else:
-        stamp = f'{strftime("%Y_%m_%d %H_%M", gmtime())} {model_name}'
-
-    res = f"{stamp}\n ------------- \n"
-    res_dic = {}
 
     results = pd.DataFrame()
     results.index.name = "Dataset"
@@ -216,33 +169,7 @@ def evaluate_kp_extraction(
         row.index = pd.Index([dataset])
         results = pd.concat([results, row])
 
-        res += f"\nResults for Dataset {dataset}\n --- \n"
-
-        res += "Candidate Extraction Evalution: \n"
-        for result in results_c:
-            res += f"{result} = {np.mean(results_c[result])*100:.3f}%\n"
-
-        if kp_eval:
-            res += "\nKP Ranking Evalution: \n"
-            for result in results_kp:
-                res += f"{result} = {np.mean(results_kp[result])*100:.3f}%\n"
-
-        if save:
-            res_dic[dataset] = {}
-            for name, dic in [("candidates", results_c), ("kp", results_kp)]:
-                res_dic[name] = {}
-                for measure in dic:
-                    res_dic[name][measure] = dic[measure]
-
-    if save:
-        Path(f"{GEO_KPE_MULTIDOC_OUTPUT_PATH}/raw/{stamp} raw.txt").parent.mkdir(
-            exist_ok=True, parents=True
-        )
-        with open(f"{GEO_KPE_MULTIDOC_OUTPUT_PATH}/raw/{stamp} raw.txt", "a") as f:
-            f.write(res.rstrip())
-
-    # print(res)
-    print(results)
+    print(tabulate(results, headers="keys"))
     return results
 
 

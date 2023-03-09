@@ -168,6 +168,8 @@ def main():
         extract_keyphrases_docs,
         extract_keyphrases_topics,
         output_one_top_cands,
+        postprocess_dataset_labels,
+        postprocess_res_labels,
     )
     from geo_kpe_multidoc.evaluation.mkduc01_eval import MKDUC01_Eval
     from geo_kpe_multidoc.models import EmbedRank, FusionModel, MaskRank, MDKPERank
@@ -250,14 +252,22 @@ def main():
         **options,
     )
 
-    # model_results["dataset_name"][(doc1_top_n, doc1_candidates), (doc2...)]
-    results = evaluate_kp_extraction(model_results, true_labels)
-
     end = time.time()
     logger.info("Processing time: {}".format(end - start))
 
-    output_one_top_cands(data.ids, model_results, true_labels)
+    # model_results["dataset_name"][(doc1_top_n, doc1_candidates), (doc2...)]
+    assert stemmer != None
+    if not stemmer:
+        logger.critical("KPE Evaluation need stemmer!")
+        results = evaluate_kp_extraction(model_results, true_labels)
+    else:
+        results = evaluate_kp_extraction(
+            postprocess_res_labels(model_results, stemmer, lemmer),
+            postprocess_dataset_labels(true_labels, stemmer, lemmer),
+        )
     save(results, args)
+
+    output_one_top_cands(data.ids, model_results, true_labels)
 
 
 if __name__ == "__main__":
