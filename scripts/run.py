@@ -10,8 +10,6 @@ from loguru import logger
 from nltk.stem import PorterStemmer
 from pandas import DataFrame
 
-from geo_kpe_multidoc.evaluation.evaluation_tools import output_one_top_cands_geo
-
 
 def parse_args():
     parser = argparse.ArgumentParser(
