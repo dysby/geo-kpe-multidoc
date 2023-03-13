@@ -10,6 +10,8 @@ from loguru import logger
 from nltk.stem import PorterStemmer
 from pandas import DataFrame
 
+from geo_kpe_multidoc.evaluation.evaluation_tools import output_one_top_cands_geo
+
 
 def parse_args():
     parser = argparse.ArgumentParser(
@@ -187,28 +189,51 @@ def main():
 
     TAGGER_NAME = DATASETS[ds_name].get("tagger")
 
-    match args.rank_model:
-        case "EmbedRank":
-            kpe_model = EmbedRank(BACKEND_MODEL_NAME, TAGGER_NAME)
-        case "MaskRank":
-            kpe_model = MaskRank(BACKEND_MODEL_NAME, TAGGER_NAME)
-        case "MDKPERank":
-            kpe_model = MDKPERank(BACKEND_MODEL_NAME, TAGGER_NAME)
-        case "FusionRank":
-            kpe_model = FusionModel(
-                [
-                    EmbedRank(BACKEND_MODEL_NAME, TAGGER_NAME),
-                    MaskRank(BACKEND_MODEL_NAME, TAGGER_NAME),
-                ],
-                averaging_strategy=args.ensemble_mode,
-                # models_weights=args.weights,
-            )
-        case _:
-            # raise ValueError("Model selection must be one of [EmbedRank, MaskRank].")
-            logger.critical(
-                "Model selection must be one of [EmbedRank, MaskRank, MDKPERank]."
-            )
-            sys.exit(-1)
+    if args.rank_model == "EmbedRank":
+        kpe_model = EmbedRank(BACKEND_MODEL_NAME, TAGGER_NAME)
+    elif args.rank_model == "MaskRank":
+        kpe_model = MaskRank(BACKEND_MODEL_NAME, TAGGER_NAME)
+    elif args.rankmodel == "MDKPERank":
+        kpe_model = MDKPERank(BACKEND_MODEL_NAME, TAGGER_NAME)
+    elif args.rankmodel == "FusionRank":
+        kpe_model = FusionModel(
+            [
+                EmbedRank(BACKEND_MODEL_NAME, TAGGER_NAME),
+                MaskRank(BACKEND_MODEL_NAME, TAGGER_NAME),
+            ],
+            averaging_strategy=args.ensemble_mode,
+            # models_weights=args.weights,
+        )
+    else:
+        # raise ValueError("Model selection must be one of [EmbedRank, MaskRank].")
+        logger.critical(
+            "Model selection must be one of [EmbedRank, MaskRank, MDKPERank]."
+        )
+        sys.exit(-1)
+
+    # Only python 3.11
+    # match args.rank_model:
+    #     case "EmbedRank":
+    #         kpe_model = EmbedRank(BACKEND_MODEL_NAME, TAGGER_NAME)
+    #     case "MaskRank":
+    #         kpe_model = MaskRank(BACKEND_MODEL_NAME, TAGGER_NAME)
+    #     case "MDKPERank":
+    #         kpe_model = MDKPERank(BACKEND_MODEL_NAME, TAGGER_NAME)
+    #     case "FusionRank":
+    #         kpe_model = FusionModel(
+    #             [
+    #                 EmbedRank(BACKEND_MODEL_NAME, TAGGER_NAME),
+    #                 MaskRank(BACKEND_MODEL_NAME, TAGGER_NAME),
+    #             ],
+    #             averaging_strategy=args.ensemble_mode,
+    #             # models_weights=args.weights,
+    #         )
+    #     case _:
+    #         # raise ValueError("Model selection must be one of [EmbedRank, MaskRank].")
+    #         logger.critical(
+    #             "Model selection must be one of [EmbedRank, MaskRank, MDKPERank]."
+    #         )
+    #         sys.exit(-1)
 
     if isinstance(kpe_model, MDKPERank):
         extract_eval = extract_keyphrases_topics
@@ -235,13 +260,13 @@ def main():
             logger.warning("EmbedRank MMR selected but model is not EmbedRank")
 
     data = load_data(ds_name, GEO_KPE_MULTIDOC_DATA_PATH)
-    # -------------------------------------------------
-    # --------------- Run Experiment ------------------
-    # -------------------------------------------------
     logger.info(f"Args: {args}")
     logger.info("Start Testing ...")
     logger.info(f"KP extraction for {len(data)} examples.")
     logger.info(f"Options: {options}")
+    # -------------------------------------------------
+    # --------------- Run Experiment ------------------
+    # -------------------------------------------------
     model_results, true_labels = extract_eval(
         data,
         kpe_model,
@@ -251,23 +276,23 @@ def main():
         n_docs_limit=args.doc_limit,
         **options,
     )
-
     end = time.time()
     logger.info("Processing time: {}".format(end - start))
 
+    # output_one_top_cands_geo(data.ids, model_results, true_labels)
+    output_one_top_cands(data.ids, model_results, true_labels)
+
     # model_results["dataset_name"][(doc1_top_n, doc1_candidates), (doc2...)]
     assert stemmer != None
+    # Transform keyphrases, thru stemming, for KPE evaluation.
     if not stemmer:
-        logger.critical("KPE Evaluation need stemmer!")
-        results = evaluate_kp_extraction(model_results, true_labels)
+        logger.critical("KPE Evaluation usualy need stemmer!")
     else:
-        results = evaluate_kp_extraction(
-            postprocess_res_labels(model_results, stemmer, lemmer),
-            postprocess_dataset_labels(true_labels, stemmer, lemmer),
-        )
-    save(results, args)
+        model_results = postprocess_res_labels(model_results, stemmer, lemmer)
+        true_labels = postprocess_dataset_labels(true_labels, stemmer, lemmer)
 
-    output_one_top_cands(data.ids, model_results, true_labels)
+    results = evaluate_kp_extraction(model_results, true_labels)
+    save(results, args)
 
 
 if __name__ == "__main__":

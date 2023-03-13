@@ -1,24 +1,31 @@
 import re
+from enum import Enum
 from itertools import repeat
 from typing import Callable, List, Set, Tuple
 
 import numpy as np
-
 from keybert.backend._utils import select_backend
+
+from geo_kpe_multidoc.models.base_KP_model import BaseKPModel
+
+
+class EnsembleMode(Enum):
+    weighted = "weighted"
+    harmonic = "harmonic"
 
 
 class FusionModel:
     """
     Ensemble model to combine results from various models in a single source.
 
-    Averaging strategy = ["aritmetic", "harmonic", "weighted"]
+    Averaging mode = ["weighted", "harmonic"]
 
     """
 
     def __init__(
         self,
-        models: List[Callable] = [],
-        averaging_strategy: str = "weighted",
+        models: List[BaseKPModel] = [],
+        averaging_strategy: EnsembleMode = "weighted",
         models_weights: List[float] = [0.5, 0.5],
     ):
         self.models = models if models != [] else print("Invalid models argument given")
@@ -53,7 +60,7 @@ class FusionModel:
             model.extract_kp_from_corpus(
                 corpus, dataset, -1, min_len, stemming, **kwargs
             )
-            for model in self.model
+            for model in self.models
         ]
 
         doc_num = len(res_by_model[0])  # number of docs/topics processed by model 0.
@@ -70,7 +77,9 @@ class FusionModel:
 
         kp_score = {k: {} for k in range(doc_num)}
         for i in range(doc_num):
-            if isinstance(self.weights, list):
+            # only python 3.11
+            # match self.averaging_strategy:
+            if self.averaging_strategy == "weighted":
                 for j in range(len(self.models)):
                     res_docs[i][j][1] = res_docs[i][j][1] / np.sum(res_docs[i][j][1])
 
@@ -83,8 +92,7 @@ class FusionModel:
                             kp_score[i][res_docs[i][j][0][k]] += (
                                 self.weights[j] * res_docs[i][j][1][k]
                             )
-
-            elif self.weights == "harmonic":
+            elif self.averaging_strategy == "harmonic":
                 res_docs[i][0][1] = res_docs[i][0][1] / np.sum(res_docs[i][0][1])
                 res_docs[i][1][1] = res_docs[i][1][1] / np.sum(res_docs[i][1][1])
 
@@ -97,6 +105,7 @@ class FusionModel:
                     for k in range(len(res_docs[i][1][0]))
                 }
 
+                # TODO: 1st model extracted keyphrases can be missing in 2nd model results?
                 for kp in first_m_res:
                     if kp in second_m_res:
                         kp_score[i][kp] = (
