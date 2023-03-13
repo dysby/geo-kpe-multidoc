@@ -1,5 +1,6 @@
 import json
 from os import path
+from typing import Dict, List, Tuple
 
 from elasticsearch.exceptions import ConnectionTimeout
 from loguru import logger
@@ -24,12 +25,29 @@ def process_MKDUC01():
             try:
                 logger.info(f"Geoparsing group {doc_group}")
                 if doc_group in [
-                    "d08",
-                    "d14",
-                    "d22",
-                    "d28",
-                    "d50",
-                    "d53",
+                    "d04",
+                    "d05",
+                    "d06",
+                    "d08",  # error
+                    "d11",
+                    "d12",
+                    "d13",
+                    "d14",  # error
+                    "d15",
+                    "d19",
+                    "d22",  # error
+                    "d24",
+                    "d27",
+                    "d28",  # error
+                    "d30",
+                    "d31",
+                    "d32",
+                    "d34",  # error
+                    "d37",
+                    "d39",
+                    "d41",
+                    "d50",  # error
+                    "d53",  # error
                 ]:
                     continue
 
@@ -48,9 +66,13 @@ def process_MKDUC01():
                     mode="w",
                 ) as f:
                     json.dump(res, f, indent=4, separators=(",", ": "))
-                del res
 
-            except ConnectionTimeout as e:
+                # This is only to limit memory usage, remove to speedup processing
+                # https://github.com/openeventdata/mordecai/issues/48
+                parser.query_geonames.cache_clear()
+                parser.query_geonames_country.cache_clear()
+
+            except Exception as e:
                 logger.error(e)
                 with open(
                     path.join(
@@ -61,6 +83,15 @@ def process_MKDUC01():
                 ) as f:
                     f.write("\n")
                     f.write(doc_group)
+
+                with open(
+                    path.join(
+                        GEO_KPE_MULTIDOC_DATA_PATH,
+                        f"MKDUC01/MKDUC01-mordecai-{doc_group}-error.json",
+                    ),
+                    mode="w",
+                ) as f:
+                    json.dump(res, f, indent=4, separators=(",", ": "))
 
         # assert res_old == res
 
@@ -82,6 +113,47 @@ def process_MKDUC01():
         #     mode="w",
         # ) as f:
         #     json.dump(res_old, f, indent=4, separators=(",", ": "))
+
+
+def load_topic_geo_locations(topic_name: str) -> Dict[str, List[Tuple[float, float]]]:
+    """
+    Read json dump file of mordecai parsing object.
+    It is a dictionary of document ids and parsing strings as values.
+
+    Returns
+    -------
+        A dictionary with document id as keys and
+        a list of tuples with latitude and longitude coordenate values present
+        in each document.
+    """
+    with open(
+        path.join(
+            GEO_KPE_MULTIDOC_DATA_PATH, f"MKDUC01/MKDUC01-mordecai-{topic_name}.json"
+        )
+    ) as f:
+        logger.debug(f"loading mordecai parsing from topic {topic_name}")
+        source = json.load(f)
+
+    docs_geo_coords = {
+        doc: locations_from_mordecai_parsing(parsing)
+        for topic_docs in source.values()
+        for doc, parsing in topic_docs.items()
+    }
+    return docs_geo_coords
+
+
+def locations_from_mordecai_parsing(parsing: str) -> List:
+    """
+    read mordecai document parsing string.
+    """
+    locs = json.loads(parsing.replace("'", '"'))
+
+    geo_coords = [
+        (float(line["geo"]["lat"]), float(line["geo"]["lon"]))
+        for line in locs
+        if "geo" in line.keys()
+    ]
+    return geo_coords
 
 
 def build_map():
@@ -146,3 +218,5 @@ def build_map():
 
 # process_MKDUC01()
 # build_map()
+if __name__ == "__main__":
+    load_topic_geo_locations("d04")
