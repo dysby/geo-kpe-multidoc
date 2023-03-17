@@ -106,9 +106,10 @@ def load_data(name, root_dir):
         documents = []
         keys = []
         for topic in dataset:
+            # TODO: simplify
             docs_content_for_topic = [
-                doc_content
-                for _doc_name, doc_content in dataset[topic]["documents"].items()
+                (doc_name, doc_content)
+                for doc_name, doc_content in dataset[topic]["documents"].items()
             ]
             kps_for_topic = list(itertools.chain(*dataset[topic]["keyphrases"]))
 
@@ -172,7 +173,6 @@ class KPEDataset(Dataset):
             keys: List of keyphrases per document, or list of keyphrases per topic.
             transform: Optional[Callable]: Optional transform to be applied
                 on a sample. NOT USED
-
         """
         self.name = name
         self.ids = ids

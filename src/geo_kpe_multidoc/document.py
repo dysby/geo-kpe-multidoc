@@ -1,5 +1,5 @@
 from dataclasses import dataclass, field
-from typing import List
+from typing import List, Tuple
 
 
 @dataclass
@@ -21,7 +21,7 @@ class Document:
     candidate_set: Set of candidates in list form, according to the supplied grammar
     candidate_set_sents: Lists of sentences where candidates occur in the document
 
-    candidate_mensions: Dictionary with candidate (may be tranformed by lemmer or stemmer) as keys,
+    candidate_mentions: Dictionary with candidate (may be tranformed by lemmer or stemmer) as keys,
             and as values a list of surface forms that can be found in document text.
 
     doc_embed: Document in embedding form
@@ -29,10 +29,13 @@ class Document:
             in embedding form
     doc_sents_words_embed: Document in list form divided by sentences, each sentence
             in embedding form, word piece by word piece
+    geo_locations: List of (latitude, longitude) locations from geoparsing document text
     """
 
     raw_text: str
     id: str
+    dataset: str = ""
+    topic: str = ""
     punctuation_regex = "[!\"#\$%&'\(\)\*\+,\.\/:;<=>\?@\[\]\^_`{\|}~\-\–\—\‘\’\“\”]"
     single_word_grammar = {"PROPN", "NOUN", "ADJ"}
     doc_sentences: List[str] = field(default_factory=list)
@@ -43,16 +46,21 @@ class Document:
     # candidates
     candidate_set = []
     candidate_mentions = {}  #
-
+    candidate_scores = []
     # Tokenized document
     token_ids = []
     token_embeddings = []
 
     # Embedings
-    attention_mask = []  # Global attention mask
     doc_embed = None
+    attention_mask = []  # Global attention mask
     candidate_set_embed = []
 
-    def __init__(self, raw_text, id):
+    # GeoTags
+    # geo_locations: List[Tuple[float, float]] = []
+
+    def __init__(self, raw_text, id, dataset: str = None, topic: str = None):
         self.raw_text = raw_text
         self.id = id
+        self.dataset = dataset if dataset else ""
+        self.topic = topic if topic else ""

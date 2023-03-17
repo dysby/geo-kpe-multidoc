@@ -131,6 +131,11 @@ def parse_args():
         type=float,
         help="EmbedRank MMR diversity parameter value.",
     )
+    parser.add_argument(
+        "--cache_results",
+        action="store_true",
+        help="Save KPE Model outputs to cache directory.",
+    )
 
     return parser.parse_args()
 
@@ -191,9 +196,9 @@ def main():
         kpe_model = EmbedRank(BACKEND_MODEL_NAME, TAGGER_NAME)
     elif args.rank_model == "MaskRank":
         kpe_model = MaskRank(BACKEND_MODEL_NAME, TAGGER_NAME)
-    elif args.rankmodel == "MDKPERank":
+    elif args.rank_model == "MDKPERank":
         kpe_model = MDKPERank(BACKEND_MODEL_NAME, TAGGER_NAME)
-    elif args.rankmodel == "FusionRank":
+    elif args.rank_model == "FusionRank":
         kpe_model = FusionModel(
             [
                 EmbedRank(BACKEND_MODEL_NAME, TAGGER_NAME),
@@ -256,6 +261,9 @@ def main():
             logger.warning("EmbedRank MMR selected but diversity is default 0.8")
         if isinstance(kpe_model, MaskRank):
             logger.warning("EmbedRank MMR selected but model is not EmbedRank")
+
+    if args.cache_results:
+        options["cache_results"] = True
 
     data = load_data(ds_name, GEO_KPE_MULTIDOC_DATA_PATH)
     logger.info(f"Args: {args}")

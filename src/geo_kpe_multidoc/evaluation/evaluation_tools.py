@@ -1,10 +1,11 @@
 import json
 from itertools import islice, zip_longest
-from os import write
+from os import path, write
 from pathlib import Path
 from time import gmtime, strftime
 from typing import Callable, Dict, List, Tuple, Union
 
+import joblib
 import numpy as np
 import pandas as pd
 import simplemma
@@ -13,12 +14,15 @@ from nltk.stem import PorterStemmer
 from nltk.stem.api import StemmerI
 from tabulate import tabulate
 
-from geo_kpe_multidoc import GEO_KPE_MULTIDOC_OUTPUT_PATH
+from geo_kpe_multidoc import (GEO_KPE_MULTIDOC_CACHE_PATH,
+                              GEO_KPE_MULTIDOC_OUTPUT_PATH)
 from geo_kpe_multidoc.datasets import DATASETS, KPEDataset
 from geo_kpe_multidoc.document import Document
-from geo_kpe_multidoc.evaluation.metrics import MAP, f1_score, nDCG, precision, recall
+from geo_kpe_multidoc.evaluation.metrics import (MAP, f1_score, nDCG,
+                                                 precision, recall)
 from geo_kpe_multidoc.models import EmbedRank, MaskRank, MDKPERank
-from geo_kpe_multidoc.models.pre_processing.pre_processing_utils import lemmatize
+from geo_kpe_multidoc.models.pre_processing.pre_processing_utils import \
+    lemmatize
 from geo_kpe_multidoc.utils.IO import write_to_file
 
 
@@ -27,6 +31,15 @@ def postprocess_res_labels(
 ):
     """
     Code snippet to correctly model results
+
+    {
+        dataset_name: [
+                ( top_n_cand_and_scores: List[Tuple[str, float]] , candidates: List[str]),
+                ...
+                ],
+        ...
+    }
+
     """
     res = {}
     for dataset in model_results:
@@ -35,6 +48,7 @@ def postprocess_res_labels(
             if stemmer:
                 res[dataset].append(
                     (
+                        # each (kp, score)
                         [
                             (
                                 " ".join(
@@ -47,6 +61,7 @@ def postprocess_res_labels(
                             )
                             for kp, score in doc[0]
                         ],
+                        # each kp candidate
                         [
                             " ".join(
                                 [
@@ -66,6 +81,15 @@ def postprocess_dataset_labels(
 ):
     """
     Code snippet to correctly format dataset true labels
+
+    {
+        dataset_name: [
+                doc_labels:List[str],
+                ...
+                ],
+        ...
+    }
+
     """
     res = {}
     for dataset in corpus_true_labels:
@@ -103,7 +127,7 @@ def evaluate_kp_extraction(
     Parameters
     ----------
         model_results:  Dict[str, List]
-            Dictionary whit dataset Names as keys and Results as values
+            Dictionary with dataset Names as keys and Results as values
             ex: model_results["dataset_name"][(doc1_top_n = (kp1, score_kp1), doc1_candidates), (doc2...)]
         true_labels: Dict[str, List[List]]
             keys are the dataset names, and values are the list of gold keyphrases for each document
@@ -215,9 +239,9 @@ def output_one_top_cands(
     -----------
         model_results: values are a list with results for each document [((doc1_top_n_candidates, doc1_top_n_scores], doc1_candidates), ...]
     """
-    for topic in model_results.keys():
-        doc_keys = [kp for kp, _ in model_results[topic][0][0]]
-        gold_keys = true_labels[topic][0]
+    for dataset in model_results.keys():
+        doc_keys = [kp for kp, _ in model_results[dataset][0][0]]
+        gold_keys = true_labels[dataset][0]
         print(doc_ids[0])
         print(
             tabulate(
@@ -230,6 +254,41 @@ def output_one_top_cands(
                 headers=["Extracted", "Gold"],
             )
         )
+
+
+def output_one_top_cands_geo(
+    doc_ids: List[str],
+    model_results: Dict[str, List] = {},
+    true_labels: Dict[str, Tuple[List]] = {},
+    top_n: int = 20,
+):
+    """
+    Print one example Top N candidate and Gold Candidate list
+
+    Parameters:
+    -----------
+        model_results: values are a list with results for each document
+            [((doc1_top_n_candidates, doc1_top_n_scores], doc1_candidates), ...]
+    """
+    for dataset in model_results.keys():
+        # print only 1 document example
+        top_n_and_scores, candidates = dataset[0]
+        gold_keys = true_labels[dataset][0]
+        print(doc_ids[0])
+        for ranking_type, (candidates_scores, candidades) in top_n_and_scores.items():
+            doc_keys = [kp for kp, _ in candidates_scores]
+            print(f"Table for {ranking_type}")
+            print(
+                tabulate(
+                    [
+                        [dk, gk]
+                        for dk, gk in zip_longest(
+                            doc_keys[:top_n], gold_keys, fillvalue="-"
+                        )
+                    ],
+                    headers=["Extracted", "Gold"],
+                )
+            )
 
 
 def extract_keyphrases_docs(
@@ -290,6 +349,7 @@ def extract_keyphrases_topics(
     """
     model_results = {dataset.name: []}
     true_labels = {dataset.name: []}
+    cache_results = kwargs.get("cache_results", False)
 
     if n_docs_limit == -1:
         # no limit
@@ -298,23 +358,94 @@ def extract_keyphrases_topics(
         loader = islice(dataset, n_docs_limit)
 
     for topic_id, docs, gold_kp in loader:
+        # TODO: limit dataset mordecai error
+        if topic_id in [
+            "d04",
+            "d05",
+            "d06",
+            "d11",
+            "d12",
+            "d13",
+            "d15",
+            "d19",
+            "d24",
+            "d27",
+            "d30",
+            "d31",
+            "d32",
+            "d34",
+            "d37",
+            "d39",
+            "d41",
+            "d43",
+            "d44",
+            "d45",
+            "d54",
+            "d56",
+            "d57",
+            "d08", # errors
+            "d14",
+            "d22",
+            "d28",
+            "d34",
+            "d50",
+            "d53",
+            "d59",
+        ]:
+            logger.debug(f"Skiping {topic_id} error in mordecai geo tagging.")
+            continue
+
         logger.info(f"KPE for topic {topic_id}")
-        top_n_and_scores, candicates = model.extract_kp_from_topic(
-            docs,  # kpe_model.pre_process(doc),
+        (
+            top_n_and_scores,
+            candidates,
+            candidate_document_matrix,
+            keyphrase_coordinates,
+        ) = model.extract_kp_from_topic_geo(
+            # top_n_and_scores, candidates = model.extract_kp_from_topic(
+            # top_n_and_scores, candidates = model.extract_kp_geo(
+            # TODO: ***Warning*** this is only true for MultiDocument Dataset!
+            [
+                Document(txt, doc_name, dataset.name, topic_id)
+                for doc_name, txt in docs
+            ],  # kpe_model.pre_process(doc),
             top_n=top_n,
             min_len=min_len,
             lemmer=lemmer,
             **kwargs,
         )
+
         model_results[dataset.name].append(
             (
                 top_n_and_scores,
-                candicates,
+                candidates,
             )
         )
 
         if lemmer:
             gold_kp = lemmatize(gold_kp, lemmer)
+
+        if cache_results:
+            logger.info(f"Saving {topic_id} results in cache dir.")
+
+            filename = path.join(
+                GEO_KPE_MULTIDOC_CACHE_PATH,
+                dataset.name,
+                f"{topic_id}-mdkpe-geo.pkl",
+            )
+
+            Path(filename).parent.mkdir(exist_ok=True, parents=True)
+
+            joblib.dump(
+                (
+                    top_n_and_scores,
+                    candidates,
+                    candidate_document_matrix,
+                    keyphrase_coordinates,
+                    gold_kp,
+                ),
+                filename,
+            )
 
         true_labels[dataset.name].append(gold_kp)
 

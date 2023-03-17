@@ -1,4 +1,5 @@
 import json
+import re
 from os import path
 from typing import Dict, List, Tuple
 
@@ -53,6 +54,8 @@ def process_MKDUC01():
 
                 res = {
                     doc_group: {
+                        # TODO: store object rather than string
+                        # doc_id: parser.geoparse(text)
                         doc_id: str(parser.geoparse(text))
                         for doc_id, text in docs[doc_group]["documents"].items()
                     }
@@ -135,18 +138,21 @@ def load_topic_geo_locations(topic_name: str) -> Dict[str, List[Tuple[float, flo
         source = json.load(f)
 
     docs_geo_coords = {
-        doc: locations_from_mordecai_parsing(parsing)
+        doc: locations_from_mordecai_parsing(doc, parsing)
         for topic_docs in source.values()
         for doc, parsing in topic_docs.items()
     }
     return docs_geo_coords
 
 
-def locations_from_mordecai_parsing(parsing: str) -> List:
+def locations_from_mordecai_parsing(doc, parsing: str) -> List:
     """
     read mordecai document parsing string.
     """
-    locs = json.loads(parsing.replace("'", '"'))
+    logger.debug(f"load mordecai geo parsing for {doc}")
+    p = re.compile("(?<!\\\\)'")
+    locs = json.loads(p.sub('"', parsing))
+    # locs = json.loads(parsing.replace("'", '"'))
 
     geo_coords = [
         (float(line["geo"]["lat"]), float(line["geo"]["lon"]))
