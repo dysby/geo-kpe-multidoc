@@ -14,12 +14,18 @@ from sklearn.metrics.pairwise import cosine_similarity
 from geo_kpe_multidoc.document import Document
 from geo_kpe_multidoc.models.base_KP_model import BaseKPModel
 from geo_kpe_multidoc.models.pre_processing.language_mapping import (
-    choose_lemmatizer, choose_tagger)
+    choose_lemmatizer,
+    choose_tagger,
+)
 from geo_kpe_multidoc.models.pre_processing.pos_tagging import POS_tagger_spacy
-from geo_kpe_multidoc.models.pre_processing.post_processing_utils import \
-    z_score_normalization
+from geo_kpe_multidoc.models.pre_processing.post_processing_utils import (
+    z_score_normalization,
+)
 from geo_kpe_multidoc.models.pre_processing.pre_processing_utils import (
-    filter_token_ids, lemmatize, tokenize_hf)
+    filter_special_tokens,
+    lemmatize,
+    tokenize_hf,
+)
 from geo_kpe_multidoc.utils.IO import read_from_file
 
 
@@ -45,7 +51,7 @@ class EmbedRank(BaseKPModel):
 
     def extract_mdkpe_embeds(
         self, doc: Document, top_n, min_len, stemmer=None, lemmer=None, **kwargs
-    ) -> Tuple[Document, List[Tuple], List[str]]:
+    ) -> Tuple[Document, List[np.ndarray], List[str]]:
         use_cache = kwargs.get("pos_tag_memory", False)
 
         self.pos_tag_doc(
@@ -161,10 +167,11 @@ class EmbedRank(BaseKPModel):
 
             for mention in doc.candidate_mentions[candidate]:
                 tokenized_candidate = tokenize_hf(mention, self.model)
-                filt_ids = filter_token_ids(tokenized_candidate["input_ids"])
+                filt_ids = filter_special_tokens(tokenized_candidate["input_ids"])
 
                 cand_len = len(filt_ids)
 
+                # search all candidate forms in document text and save token embeddings (average polling).
                 for i in range(len(doc.token_ids)):
                     if (
                         filt_ids[0] == doc.token_ids[i]
@@ -184,6 +191,7 @@ class EmbedRank(BaseKPModel):
                             for j in range(i, i + cand_len):
                                 doc.attention_mask[j] = 1
 
+            # if this form is not present in token ids (remember max 4096), fallback to embeding without context.
             if candidate_embeds == []:
                 # candidate is beyond max position for emdedding
                 # return a non-contextualized embedding.
@@ -211,14 +219,19 @@ class EmbedRank(BaseKPModel):
         lemmer_lang: str = None,
     ):
         """
-        Method that uses Regex patterns on POS tags to extract unique candidates from a tagged document and
-        stores the sentences each candidate occurs in
+        Method that uses Regex patterns on POS tags to extract unique candidates from a tagged document
+        and stores the sentences each candidate occurs in.
 
         len(candidate.split(" ")) <= 5 avoid too long candidate phrases
 
         Parameters
         ----------
                 min_len: minimum candidate length (chars)
+
+        TODO: why not use aggregate candidades in stem form?
+        DONE: why not lowercase candidates? lemmatize returns lowercase candidates
+        TODO: candidate mentions should not be lemmatized, maybe lowercased (document will be embed in lowercase form),
+                otherwise mentions are not found in document.
         """
         doc.candidate_set = set()
         doc.candidate_mentions = {}
@@ -227,6 +240,7 @@ class EmbedRank(BaseKPModel):
         np_trees = list(parser.parse_sents(doc.tagged_text))
 
         for i in range(len(np_trees)):
+            # TODO: validate that candidates in correct form, meaning  " ".join is ok?
             temp_cand_set = []
             for subtree in np_trees[i].subtrees(filter=lambda t: t.label() == "NP"):
                 temp_cand_set.append(" ".join(word for word, tag in subtree.leaves()))
@@ -237,19 +251,15 @@ class EmbedRank(BaseKPModel):
                     l_candidate = (
                         lemmatize(candidate, lemmer_lang) if lemmer_lang else candidate
                     )
-                    # if l_candidate not in doc.candidate_set:
                     doc.candidate_set.add(l_candidate)
 
-                    if l_candidate not in doc.candidate_mentions:
-                        doc.candidate_mentions[l_candidate] = []
-
-                    doc.candidate_mentions[l_candidate].append(candidate)
+                    doc.candidate_mentions.setdefault(l_candidate, []).append(candidate)
 
         doc.candidate_set = sorted(list(doc.candidate_set), key=len, reverse=True)
 
     def embed_n_candidates(
         self, doc: Document, min_len: int, stemmer, **kwargs
-    ) -> Tuple[np.ndarray, List[str]]:
+    ) -> Tuple[List[np.ndarray], List[str]]:
         """
         TODO: Why embed_n_candidates
 
@@ -268,7 +278,7 @@ class EmbedRank(BaseKPModel):
 
         t = time()
         self.embed_candidates(doc, stemmer, cand_mode, post_processing)
-        print(f"Embed Candidates in {time() -  t:.2f}s")
+        logger.info(f"Embed Candidates in {time() -  t:.2f}s")
 
         if cand_mode == "global_attention":
             doc.doc_embed = self.global_embed_doc(doc)
@@ -276,8 +286,12 @@ class EmbedRank(BaseKPModel):
         return doc.candidate_set_embed, doc.candidate_set
 
     def rank_candidates(
-        self, doc_embed: np.ndarray, candidate_set_embed, candidate_set, **kwargs
-    ) -> List[Tuple]:
+        self,
+        doc_embed: np.ndarray,
+        candidate_set_embed: List[np.ndarray],
+        candidate_set: List[str],
+        **kwargs,
+    ) -> Tuple[List[Tuple[str, float]], List[str]]:
         """
         This method is key for each ranking model.
         Here the ranking heuritic is applied according to model definition.
@@ -298,18 +312,16 @@ class EmbedRank(BaseKPModel):
                 candidate_set,
                 diversity=mmr_diversity,
             )
+            # TODO: Not same format as cosine_similarity
+            logger.error("TODO: Not same format as cosine_similarity")
         else:
             doc_sim = np.absolute(
                 cosine_similarity(candidate_set_embed, doc_embed.reshape(1, -1))
             )
 
-        # doc_embed = doc.doc_embed.reshape(1, -1)
-        # doc_sim = np.absolute(
-        #     cosine_similarity(candidate_set_embed, doc_embed.reshape(1, -1))
-        # )
         candidate_score = sorted(
             [
-                (candidate, candidate_doc_sim[0])
+                (candidate, candidate_doc_sim)
                 for (candidate, candidate_doc_sim) in zip(candidate_set, doc_sim)
             ],
             # [(candidate_set[i], doc_sim[i][0]) for i in range(len(doc_sim))],

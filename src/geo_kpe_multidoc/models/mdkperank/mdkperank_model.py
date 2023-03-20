@@ -1,12 +1,15 @@
 from dataclasses import dataclass
+from itertools import chain
 from statistics import mean
-from typing import List, Set, Tuple
+from typing import Callable, Dict, Iterable, List, Set, Tuple
 
 import numpy as np
 from nltk.stem import PorterStemmer
 
 from geo_kpe_multidoc.datasets.datasets import KPEDataset
+from geo_kpe_multidoc.datasets.process_mordecai import load_topic_geo_locations
 from geo_kpe_multidoc.document import Document
+from geo_kpe_multidoc.geo.measures import GearyC, GetisOrdG, MoranI
 
 from ..base_KP_model import BaseKPModel, KPEScore
 from ..embedrank import EmbedRank
@@ -37,15 +40,15 @@ class MDKPERankOutput:
 
 
 class MDKPERank(BaseKPModel):
-    def __init__(self, model, tagger):
-        self.base_model_embed = EmbedRank(model, tagger)
+    def __init__(self, model_name: str, tagger):
+        self.base_model_embed: EmbedRank = EmbedRank(model_name, tagger)
         # TODO: what how to join MaskRank
         # self.base_model_mask = MaskRank(model, tagger)
         # super().__init__(model)
 
     def extract_kp_from_doc(
         self, doc, top_n, min_len, stemmer=None, lemmer=None, **kwargs
-    ) -> Tuple[Document, List[Tuple], List[str]]:  # Tuple[List[Tuple], List[str]]:
+    ) -> Tuple[Document, List[np.ndarray], List[str]]:  # Tuple[List[Tuple], List[str]]:
         """
         Extracts key-phrases from a given document, with optional arguments
         relevant to its specific functionality
@@ -54,9 +57,239 @@ class MDKPERank(BaseKPModel):
             doc, top_n, min_len, stemmer, lemmer, **kwargs
         )
 
+    def _get_locations(
+        self, docs_geo_coords, docs_of_candidate: List[str]
+    ) -> List[Tuple[float, float]]:
+        """
+        Get all coordenates of documents tha mention the candidate keyphrase
+        TODO: what about repeated locations?
+        """
+        locations = [docs_geo_coords[doc_id] for doc_id in docs_of_candidate]
+        return list(chain(*locations))
+
+    def extract_kp_from_topic_geo(
+        self,
+        topic_docs: List[Document],
+        top_n: int = 15,
+        min_len: int = 5,
+        stemming: bool = False,
+        lemmatize: bool = False,
+        **kwargs,
+    ) -> List[KPEScore]:
+        """
+        Extract keyphrases from list of documents.
+
+        Parameters
+        ----------
+        topic : List[Document]
+            A list of Documents for the topic.
+        top_n :
+            `TODO:` NOT USED
+        min_len : int = 5
+        stemming : bool = False
+        lemmatize : bool = False
+        **kwargs
+            These parameters will be passed to inner functions calls.
+
+        Returns
+        -------
+        List[KPEScore]
+            List of KPE extracted from the agregation of documents set, with their score(/embeding?)
+        """
+        topic_res = [
+            self.extract_kp_from_doc(
+                doc,
+                top_n=top_n,
+                min_len=min_len,
+                stemming=stemming,
+                lemmatize=lemmatize,
+                **kwargs,
+            )
+            for doc in topic_docs
+        ]
+        # Topic_res is a list for each document with (doc, candidades_embedings, candidates)
+
+        candidates = {}
+        docs_ids = []
+        # a dict with the set of docs the candidate is mentioned
+        candidate_document_matrix = {}
+        for doc, doc_cand_embeds, doc_cand_set in topic_res:
+            for candidate, embeding_in_doc in zip(doc_cand_set, doc_cand_embeds):
+                candidates.setdefault(candidate, []).append(embeding_in_doc)
+                candidate_document_matrix.setdefault(candidate, set()).add(doc.id)
+            docs_ids.append(doc.id)
+
+        # The candidate embedding is the average of each word embeding
+        # of the candidate in the documents.
+        # use sorting to assert arrays have the same index
+        candidates_embedings = [
+            np.mean(embedings_in_docs, axis=0)
+            for _candidate, embedings_in_docs in sorted(candidates.items())
+        ]
+        candidates = sorted(candidates.keys())
+
+        # compute a candidate <- document score matrix
+        ranking_p_doc: Dict[Tuple[List[Tuple[str, float]], List[str]]] = {
+            doc.id: self.base_model_embed.rank_candidates(
+                doc.doc_embed, candidates_embedings, candidates
+            )
+            for doc, _, _ in topic_res
+        }
+        # this ranking per doc have a candidate list, it can be discarded
+
+        keyphrase_semantic_score = {}
+        # n candidates by m documents
+        # candidate_document_matrix = np.zeros([len(candidates), len(docs_ids)])
+        # Score agregation from all documents
+        # TODO: If a candidate is only mentioned in one doc, the overall score can be biased?
+        for _, (candidate_score_for_doc, _) in ranking_p_doc.items():
+            for candidate, sim_score in candidate_score_for_doc:
+                keyphrase_semantic_score.setdefault(candidate, []).append(sim_score)
+                # count observation of candidate in document, TODO: COMPUTED BEFORE REMOVE
+                # candidate_document_matrix[
+                #     candidates.index(candidate), docs_ids.index(doc_id)
+                # ] += 1
+
+        keyphrase_semantic_score = {
+            cand: np.mean(scores) for cand, scores in keyphrase_semantic_score.items()
+        }
+
+        top_n_scores = self._sort_candidate_score(keyphrase_semantic_score)
+        docs_geo_coords = load_topic_geo_locations(topic_docs[0].topic)
+
+        keyphrase_coordinates = {
+            candidate: self._get_locations(
+                docs_geo_coords,
+                candidate_document_matrix[candidate],
+            )
+            for candidate in keyphrase_semantic_score.keys()
+        }
+
+        # # TODO: move spacial association measures into scorer functions
+        # moran = MoranI(keyphrase_semantic_score, keyphrase_coordinates)
+        # geary = GearyC(keyphrase_semantic_score, keyphrase_coordinates)
+        # getis = GetisOrdG(keyphrase_semantic_score, keyphrase_coordinates)
+
+        # geo_index_candidate = [key for key, _ in keyphrase_coordinates.items()]
+
+        # # each element is the number of candidate aperances in all documents.
+        # N = candidate_document_matrix.count_nonzero(axis=0)
+
+        # geo_keyphrases_scores = {
+        #     "baseline": top_n_scores,
+        #     "rankI": self._rank_by_geo(
+        #         self._score_w_geo_association_I,
+        #         keyphrase_semantic_score,
+        #         N,
+        #         candidates,
+        #         moran,
+        #         geo_index_candidate,
+        #     ),
+        #     "rankC": self._rank_by_geo(
+        #         self._score_w_geo_association_C,
+        #         keyphrase_semantic_score,
+        #         N,
+        #         candidates,
+        #         geary,
+        #         geo_index_candidate,
+        #     ),
+        #     "rankG": self._rank_by_geo(
+        #         self._score_w_geo_association_G,
+        #         keyphrase_semantic_score,
+        #         N,
+        #         candidates,
+        #         getis,
+        #         geo_index_candidate,
+        #     ),
+        # }
+
+        # return geo_keyphrases_scores, candidates
+        return (
+            top_n_scores,
+            candidates,
+            candidate_document_matrix,
+            keyphrase_coordinates,
+        )
+
+    def extract_from_topic_original(
+        self,
+        topic,
+        dataset: str = "MKDUC01",
+        top_n: int = 15,
+        min_len: int = 5,
+        stemming: bool = False,
+        lemmatize: bool = False,
+        **kwargs,
+    ) -> List[List[Tuple]]:
+        """_summary_
+
+        Parameters
+        ----------
+        topic : _type_
+            _description_
+        dataset : str, optional
+            _description_, by default "MKDUC01"
+        top_n : int, optional
+            _description_, by default 15
+        min_len : int, optional
+            _description_, by default 5
+        stemming : bool, optional
+            _description_, by default False
+        lemmatize : bool, optional
+            _description_, by default False
+
+        Returns
+        -------
+        List[List[Tuple]]
+            _description_
+        """
+        topic_res = [
+            self.extract_kp_from_doc(doc, -1, min_len, stemming, lemmatize, **kwargs)
+            for doc in topic[0]
+        ]
+        cands = {}
+        for doc in topic_res:
+            doc_abs = doc[0]
+            cand_embeds = doc[1]
+            cand_set = doc[2]
+
+            for i in range(len(cand_set)):
+                if cand_set[i] not in cands:
+                    cands[cand_set[i]] = []
+                cands[cand_set[i]].append(cand_embeds[i])
+
+        cand_embeds = []
+        cand_set = []
+        for cand in cands:
+            cand_embeds.append(np.mean(cands[cand], 0))
+            cand_set.append(cand)
+
+        res_p_doc = [
+            doc[0].evaluate_n_candidates(cand_embeds, cand_set) for doc in topic_res
+        ]
+        scores_per_candidate = {}
+
+        for doc in res_p_doc:
+            for cand_t in doc[0]:
+                if cand_t[0] not in scores_per_candidate:
+                    scores_per_candidate[cand_t[0]] = []
+                scores_per_candidate[cand_t[0]].append(cand_t[1])
+
+        for cand in scores_per_candidate:
+            scores_per_candidate[cand] = mean(scores_per_candidate[cand])
+
+        scores = sorted(
+            [(cand, scores_per_candidate[cand]) for cand in scores_per_candidate],
+            reverse=True,
+            key=lambda x: x[1],
+        )
+        cand_set = [cand[0] for cand in scores]
+
+        return scores, cand_set
+
     def extract_kp_from_topic(
         self,
-        topic_docs: List[str],
+        topic_docs: List[Document],
         top_n: int = 15,
         min_len: int = 5,
         stemming: bool = False,
@@ -76,14 +309,14 @@ class MDKPERank(BaseKPModel):
         """
         topic_res = [
             self.extract_kp_from_doc(
-                doc=Document(doc, f"topic_doc_{i}"),
+                doc,
                 top_n=top_n,
                 min_len=min_len,
                 stemming=stemming,
                 lemmatize=lemmatize,
                 **kwargs,
             )
-            for i, doc in enumerate(topic_docs)
+            for doc in topic_docs
         ]
         cands = {}
         for _doc, cand_embeds, cand_set in topic_res:
@@ -109,7 +342,7 @@ class MDKPERank(BaseKPModel):
 
         # TODO: If a candidate is only mentioned in one doc, the overall score can be biased.
         for cand in scores_per_candidate:
-            scores_per_candidate[cand] = mean(scores_per_candidate[cand])
+            scores_per_candidate[cand] = np.mean(scores_per_candidate[cand])
 
         top_n_scores = sorted(
             [(cand, scores_per_candidate[cand]) for cand in scores_per_candidate],
@@ -118,6 +351,70 @@ class MDKPERank(BaseKPModel):
         )
 
         return top_n_scores, cand_set
+
+    def _rank_by_geo(
+        self,
+        scorer: Callable,
+        candidate_scores,
+        N,
+        candidates,
+        geo_association_measure,
+        geo_association_candidate_index,
+    ) -> List[Tuple[str, float]]:
+        """
+        For each candidate compute a score based on the semantic score,
+        the number of documents the candidate apears in and the geo association measure for each candidate.
+
+        Returns
+        -------
+            A list with candidates and scores sorted by highest score
+        """
+        return (
+            self._sort_candidate_score(
+                [
+                    (
+                        candidate,
+                        scorer(
+                            S,
+                            N[candidates.index(candidate)],
+                            geo_association_measure[
+                                geo_association_candidate_index.index(candidate)
+                            ],
+                        ),
+                    )
+                    for candidate, S in candidate_scores.items()
+                ]
+            ),
+        )
+
+    def _sort_candidate_score(self, candidates_scores: Iterable):
+        """
+        Sort {candidate: score} dictionary into list[(candidate, score)]
+        in descending order of score (greather first)
+
+        Return
+        ------
+        List of tuples
+        """
+        if isinstance(candidates_scores, dict):
+            items = candidates_scores.items()
+        else:
+            items = candidates_scores
+
+        return sorted(
+            [(cand, score) for cand, score in items],
+            reverse=True,
+            key=lambda x: x[1],  # sort by score
+        )
+
+    def _score_w_geo_association_I(S, N, I, lambda_=0.5, gamma=0.5):
+        return S * lambda_ * (N - (N * gamma * I))
+
+    def _score_w_geo_association_C(S, N, C, lambda_=0.5, gamma=0.5):
+        return S * lambda_ * N / (gamma * C)
+
+    def _score_w_geo_association_G(S, N, G, lambda_=0.5, gamma=0.5):
+        return S * lambda_ * (N * gamma) * G
 
     def extract_kp_from_corpus(
         self,

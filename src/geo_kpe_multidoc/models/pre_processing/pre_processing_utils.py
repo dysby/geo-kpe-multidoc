@@ -55,7 +55,7 @@ def lemmatize(text: Union[str, List], lang: str) -> Union[str, List]:
     ).lower()
 
 
-def filter_token_ids(input_ids: List[List[int]]) -> List[int]:
+def filter_special_tokens(input_ids: List[List[int]]) -> List[int]:
     return [i for i in input_ids.squeeze().tolist() if i not in SPECIAL_TOKEN_IDS]
 
 
@@ -77,7 +77,8 @@ def tokenize_hf(text: str, model: BaseEmbedder) -> List:
 
 
 def tokenize_attention_embed(text: str, model: BaseEmbedder) -> Tuple:
-    inputs = model.embedding_model.tokenizer(text, return_tensors="pt", max_length=2048)
+    # inputs = model.embedding_model.tokenizer(text, return_tensors="pt", max_length=2048)
+    inputs = model.embedding_model.tokenizer(text, return_tensors="pt", max_length=4096)
     outputs = model.embedding_model._modules["0"]._modules["auto_model"](**inputs)
 
     tokens = inputs.input_ids.squeeze().tolist()

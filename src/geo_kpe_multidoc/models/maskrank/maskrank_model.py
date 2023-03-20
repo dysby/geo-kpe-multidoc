@@ -233,7 +233,7 @@ class MaskRank(BaseKPModel):
 
         t = time()
         self.embed_candidates(doc, stemmer, cand_mode="MaskAll")
-        print(f"Embed Candidates in {time() -  t:.2f}s")
+        logger.info(f"Embed Candidates in {time() -  t:.2f}s")
 
         return doc.candidate_set_embed, doc.candidate_set
 
