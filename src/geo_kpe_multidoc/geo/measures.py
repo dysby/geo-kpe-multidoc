@@ -7,6 +7,18 @@ import pandas as pd
 from loguru import logger
 from vincenty import vincenty
 
+r"""
+Functions
+---------
+
+
+\begin{align}
+f(x) = 1 / (a + x) \\
+f(x) = exp(- x^a)  \\
+f(x) = arccot(ax)
+\end{align}
+"""
+
 
 def inv_dist(d: np.ndarray, a=1):
     r"""$f(x) = \frac{1}{a + d}$"""
@@ -32,6 +44,20 @@ from functools import lru_cache
 
 @lru_cache(maxsize=1000)
 def cached_vincenty(c1, c2):
+    """Vincenty geo distance formula with caching.
+
+    Parameters
+    ----------
+    c1 : Tuple[lat: float, long: float]
+        Point geo coordenate
+    c2 : Tuple[lat: float, long: float]
+        Point geo coordenate
+
+    Returns
+    -------
+    float
+        Geo distance in Km.
+    """
     return vincenty(c1, c2)
 
 
@@ -105,7 +131,7 @@ def geo_associations(
 
     coordinates = {
         kp: coordinates_data[topic][kp]
-        for kp in kp_data.index.get_level_values(1).to_list()
+        for kp in kp_data.index.get_level_values(1).unique().to_list()
     }
 
     scores, w = preprocess_scores_weight_matrix(
@@ -122,23 +148,44 @@ def geo_associations(
     return (moran_i, geary_c, getis_g)
 
 
-def _score_w_geo_association_I(S, N, I, lambda_=1, gamma=1):
-    return S * lambda_ * (N - (N * gamma * I))
+def _score_w_geo_association_I(df: pd.DataFrame, S, N, I, lambda_=1, gamma=1):
+    df["score_w_geo_association_I"] = (
+        df[S] * lambda_ * (df[N] - (df[N] * gamma * df[I]))
+    )
+    return df
 
 
-def _score_w_geo_association_C(S, N, C, lambda_=1, gamma=1):
-    return S * lambda_ * N / (gamma * C)
+def _score_w_geo_association_C(df: pd.DataFrame, S, N, C, lambda_=1, gamma=1):
+    df["score_w_geo_association_C"] = df[S] * lambda_ * df[N] / (gamma * df[C])
+    return df
 
 
-def _score_w_geo_association_G(S, N, G, lambda_=0.5, gamma=0.5):
-    return S * lambda_ * (N * gamma) * G
+def _score_w_geo_association_G(df: pd.DataFrame, S, N, G, lambda_=1, gamma=1):
+    df["score_w_geo_association_G"] = df[S] * lambda_ * (df[N] * gamma) * df[G]
+    return df
 
 
 def MoranI(scores, weight_matrix):
+    """
+    Return
+    ------
+    float:
+        we follow `pysal` for special cases and `return 1` when all samples have
+        the same value regardless of spacial position.
+    """
     n = len(scores)
     mean = np.mean(scores)
 
+    if n == 1 or n == 0:
+        logger.warning("MoranI over a single observation. Returning np.NAN.")
+        return np.nan
+
     adjusted_scores = scores - mean
+
+    if all(np.isclose(adjusted_scores, 0)):
+        logger.debug("MoranI over a constant surface. Returning 1.")
+        return 1
+
     moranI = n / np.sum(adjusted_scores**2)
 
     outer_mul_scores = np.outer(adjusted_scores, adjusted_scores)
@@ -150,10 +197,30 @@ def MoranI(scores, weight_matrix):
 
 
 def GearyC(scores, weight_matrix):
+    """The value of Geary's C lies between 0 and some unspecified value greater than 1.
+    Values significantly lower than 1 demonstrate increasing positive spatial autocorrelation,
+    whilst values significantly higher than 1 illustrate increasing negative spatial autocorrelation.
+    [wikipedia]
+
+    Return
+    ------
+    float:
+        we follow `pysal` for special cases and `return 0` when all samples have
+        the same value regardless of spacial position.
+    """
+
     n = len(scores)
     mean = np.mean(scores)
+
+    if n == 1 or n == 0:
+        logger.warning("GearyC over a single observation. Returning np.NAN.")
+        return np.nan
     # sum_adjusted_scores = np.sum([(score - mean) ** 2 for score in scores])
     sum_adjusted_scores = np.sum((scores - mean) ** 2)
+
+    if np.isclose(sum_adjusted_scores, 0):
+        logger.debug("GearyC over a constant surface. Returning 0.")
+        return 0
 
     outer_difference_scores = np.subtract.outer(scores, scores)
     outer_difference_scores = outer_difference_scores**2
@@ -169,6 +236,10 @@ def GearyC(scores, weight_matrix):
 
 def GetisOrdG(scores, weight_matrix):
     n = len(scores)
+
+    if n == 1 or n == 0:
+        logger.warning("GetisOrdG over a single value. Returning np.NAN.")
+        return np.nan
 
     outer_mul_scores = np.outer(np.asarray(scores), np.asarray(scores))
 

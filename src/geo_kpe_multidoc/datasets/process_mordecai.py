@@ -159,7 +159,7 @@ def locations_from_mordecai_parsing(doc, parsing: str) -> List:
         for line in locs
         if "geo" in line.keys()
     ]
-    return geo_coords
+    return list(set(geo_coords))
 
 
 def build_map():
