@@ -1,11 +1,17 @@
+import itertools
 import math
+import os
 import time
+from datetime import datetime
 from typing import Callable, Dict
 
 import numpy as np
 import pandas as pd
 from loguru import logger
 from vincenty import vincenty
+
+from geo_kpe_multidoc import GEO_KPE_MULTIDOC_CACHE_PATH
+from geo_kpe_multidoc.datasets.process_mordecai import load_topic_geo_locations
 
 r"""
 Functions
@@ -62,13 +68,15 @@ def cached_vincenty(c1, c2):
 
 
 def preprocess_scores_weight_matrix(
-    keyphrase_scores, keyphrase_coordinates, weighting_func
+    keyphrase_scores, docs_locations, weighting_func: Callable = inv_dist
 ):
     """Build observation scores array (n) and compute similatity matrix (n, n) with weigthed based distance metric.
 
     n = C (total candidates) * sum of # Coordenates connected with each candidate
 
     Candidade -(M:N)- Document -(K:L)- GeoCoordinate
+
+    The weight matrix is row standatized.
 
     Parameters
     ----------
@@ -87,10 +95,14 @@ def preprocess_scores_weight_matrix(
     """
     scores = []
     coordinates = []
-    for key, value_list in keyphrase_coordinates.items():
-        for value in value_list:
-            scores.append(keyphrase_scores[key])
-            coordinates.append(value)
+    for doc, keyphrase_score_in_doc in keyphrase_scores.items():
+        scores.extend(
+            itertools.repeat(keyphrase_score_in_doc, len(docs_locations[doc]))
+        )
+        coordinates.extend(docs_locations[doc])
+
+    assert len(scores) == len(coordinates)
+
     n = len(scores)
     scores = np.array(scores)
 
@@ -112,32 +124,86 @@ def preprocess_scores_weight_matrix(
         ]
     )
     end = time.time()
-    logger.debug("vincenty dist time n={}: {:.1f}".format(n, end - start))
+    logger.debug(
+        "vincenty distance for n={} points processing time: {:.1f}s".format(
+            n, end - start
+        )
+    )
 
-    # transforme distance matrix to similatity measure
+    # transform distance matrix to similatity measure
     weight_matrix = weighting_func(weight_matrix)
+    # row standartize
+    weight_matrix = weight_matrix / weight_matrix.sum(axis=0)
 
     end = time.time()
-    logger.debug("vincenty dist stage 2 time n={}: {:.1f}".format(n, end - start))
+    logger.debug(
+        "vincenty distance 2nd stage processing time: {:.1f}s".format(end - start)
+    )
 
     return scores, weight_matrix
+
+
+def process_geo_associations_for_topics(
+    data: pd.DataFrame, docs_data: pd.DataFrame, w_function: Callable = inv_dist
+) -> pd.DataFrame:
+    """Process MDKPERank KPE extraction candidates, scores by document, and document geo locations (coordinates).
+
+    Compute Geo Association Measures for each candidate, based on observation pairs $(x_i, c_i)$ where $x_i$ is a
+    Keyphrase semantic score regarding a document and $c_i$ is a geo location present in that document.
+
+    Parameters
+    ----------
+    data : pd.DataFrame
+        _description_
+    docs_data : pd.DataFrame
+        _description_
+    w_function : Callable, optional
+        distance weighting function, by default inv_dist
+
+    Returns
+    -------
+    pd.DataFrame
+        Updated `data` DataFrame with geo association measures computed for each (topic, candidate) pair.
+    """
+    t = datetime.now()
+    filename = (
+        "-".join(["results", "inv_dist", t.strftime(r"%Y%m%d-%H%M%S")]) + ".parquet"
+    )
+
+    for topic in data.index.get_level_values(0).unique():
+        logger.info(f"Computing geo associations for candidates of the topic {topic}.")
+
+        docs_coordinates = load_topic_geo_locations(topic)
+
+        for keyphrase in data.loc[topic].index:
+            logger.debug(f"Geo associations for {keyphrase}.")
+            kp_scores = docs_data.loc[(topic, slice(None), keyphrase), :].droplevel(2)
+            # kp_scores have the semantic scores of the keyphrase in each of the documents it appears.
+            moran_i, geary_c, getis_g = geo_associations(
+                kp_scores, docs_coordinates, w_function
+            )
+            data.loc[(topic, keyphrase), ["moran_i", "geary_c", "getis_g"]] = (
+                moran_i,
+                geary_c,
+                getis_g,
+            )
+
+        # save data in cache at each loop over topics
+        data.to_parquet(os.path.join(GEO_KPE_MULTIDOC_CACHE_PATH, "MKDUC01", filename))
+
+    return data
 
 
 def geo_associations(
     kp_data: pd.DataFrame, coordinates_data: Dict, w_function: Callable
 ):
     # topic is level 0 multiindex of the dataframe
-    topic = list(kp_data.index.get_level_values(0))[0]
-
-    coordinates = {
-        kp: coordinates_data[topic][kp]
-        for kp in kp_data.index.get_level_values(1).unique().to_list()
-    }
+    # topic = list(kp_data.index.get_level_values(0))[0]
 
     scores, w = preprocess_scores_weight_matrix(
         # drop topic from index level
         kp_data["semantic_score"].droplevel(0).to_dict(),
-        coordinates,
+        coordinates_data,
         w_function,
     )
 
@@ -174,12 +240,12 @@ def MoranI(scores, weight_matrix):
         the same value regardless of spacial position.
     """
     n = len(scores)
-    mean = np.mean(scores)
 
     if n == 1 or n == 0:
         logger.warning("MoranI over a single observation. Returning np.NAN.")
         return np.nan
 
+    mean = np.mean(scores)
     adjusted_scores = scores - mean
 
     if all(np.isclose(adjusted_scores, 0)):
@@ -210,11 +276,12 @@ def GearyC(scores, weight_matrix):
     """
 
     n = len(scores)
-    mean = np.mean(scores)
 
     if n == 1 or n == 0:
         logger.warning("GearyC over a single observation. Returning np.NAN.")
         return np.nan
+
+    mean = np.mean(scores)
     # sum_adjusted_scores = np.sum([(score - mean) ** 2 for score in scores])
     sum_adjusted_scores = np.sum((scores - mean) ** 2)
 

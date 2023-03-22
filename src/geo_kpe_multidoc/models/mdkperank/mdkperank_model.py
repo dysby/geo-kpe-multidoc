@@ -165,50 +165,21 @@ class MDKPERank(BaseKPModel):
             for candidate in keyphrase_semantic_score.keys()
         }
 
-        # # TODO: move spacial association measures into scorer functions
-        # moran = MoranI(keyphrase_semantic_score, keyphrase_coordinates)
-        # geary = GearyC(keyphrase_semantic_score, keyphrase_coordinates)
-        # getis = GetisOrdG(keyphrase_semantic_score, keyphrase_coordinates)
+        # Semantic score of per document extracted keyphrases for each document
+        # d Documents times k_d Keyphrases, each document can have a different set of extracted keyphrases.
+        ranking_p_doc: Dict[Tuple[List[Tuple[str, float]], List[str]]] = {
+            doc.id: self.base_model_embed.rank_candidates(
+                doc.doc_embed, doc_cand_embeds, doc_cand_set
+            )
+            for doc, doc_cand_embeds, doc_cand_set in topic_res
+        }
 
-        # geo_index_candidate = [key for key, _ in keyphrase_coordinates.items()]
-
-        # # each element is the number of candidate aperances in all documents.
-        # N = candidate_document_matrix.count_nonzero(axis=0)
-
-        # geo_keyphrases_scores = {
-        #     "baseline": top_n_scores,
-        #     "rankI": self._rank_by_geo(
-        #         self._score_w_geo_association_I,
-        #         keyphrase_semantic_score,
-        #         N,
-        #         candidates,
-        #         moran,
-        #         geo_index_candidate,
-        #     ),
-        #     "rankC": self._rank_by_geo(
-        #         self._score_w_geo_association_C,
-        #         keyphrase_semantic_score,
-        #         N,
-        #         candidates,
-        #         geary,
-        #         geo_index_candidate,
-        #     ),
-        #     "rankG": self._rank_by_geo(
-        #         self._score_w_geo_association_G,
-        #         keyphrase_semantic_score,
-        #         N,
-        #         candidates,
-        #         getis,
-        #         geo_index_candidate,
-        #     ),
-        # }
-
-        # return geo_keyphrases_scores, candidates
         return (
             top_n_scores,
             candidates,
             candidate_document_matrix,
             keyphrase_coordinates,
+            ranking_p_doc,
         )
 
     def extract_from_topic_original(

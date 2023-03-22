@@ -14,15 +14,12 @@ from nltk.stem import PorterStemmer
 from nltk.stem.api import StemmerI
 from tabulate import tabulate
 
-from geo_kpe_multidoc import (GEO_KPE_MULTIDOC_CACHE_PATH,
-                              GEO_KPE_MULTIDOC_OUTPUT_PATH)
+from geo_kpe_multidoc import GEO_KPE_MULTIDOC_CACHE_PATH, GEO_KPE_MULTIDOC_OUTPUT_PATH
 from geo_kpe_multidoc.datasets import DATASETS, KPEDataset
 from geo_kpe_multidoc.document import Document
-from geo_kpe_multidoc.evaluation.metrics import (MAP, f1_score, nDCG,
-                                                 precision, recall)
+from geo_kpe_multidoc.evaluation.metrics import MAP, f1_score, nDCG, precision, recall
 from geo_kpe_multidoc.models import EmbedRank, MaskRank, MDKPERank
-from geo_kpe_multidoc.models.pre_processing.pre_processing_utils import \
-    lemmatize
+from geo_kpe_multidoc.models.pre_processing.pre_processing_utils import lemmatize
 from geo_kpe_multidoc.utils.IO import write_to_file
 
 
@@ -360,30 +357,30 @@ def extract_keyphrases_topics(
     for topic_id, docs, gold_kp in loader:
         # TODO: limit dataset mordecai error
         if topic_id in [
-            "d04",
-            "d05",
-            "d06",
-            "d11",
-            "d12",
-            "d13",
-            "d15",
-            "d19",
-            "d24",
-            "d27",
-            "d30",
-            "d31",
-            "d32",
-            "d34",
-            "d37",
-            "d39",
-            "d41",
-            "d43",
-            "d44",
-            "d45",
-            "d54",
-            "d56",
-            "d57",
-            "d08", # errors
+            # "d04",
+            # "d05",
+            # "d06",
+            # "d11",
+            # "d12",
+            # "d13",
+            # "d15",
+            # "d19",
+            # "d24",
+            # "d27",
+            # "d30",
+            # "d31",
+            # "d32",
+            # "d34",
+            # "d37",
+            # "d39",
+            # "d41",
+            # "d43",
+            # "d44",
+            # "d45",
+            # "d54",
+            # "d56",
+            # "d57",
+            "d08",  # errors
             "d14",
             "d22",
             "d28",
@@ -401,6 +398,7 @@ def extract_keyphrases_topics(
             candidates,
             candidate_document_matrix,
             keyphrase_coordinates,
+            ranking_per_doc,
         ) = model.extract_kp_from_topic_geo(
             # top_n_and_scores, candidates = model.extract_kp_from_topic(
             # top_n_and_scores, candidates = model.extract_kp_geo(
@@ -442,6 +440,7 @@ def extract_keyphrases_topics(
                     candidates,
                     candidate_document_matrix,
                     keyphrase_coordinates,
+                    ranking_per_doc,
                     gold_kp,
                 ),
                 filename,
