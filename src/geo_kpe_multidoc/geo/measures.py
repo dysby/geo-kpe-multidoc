@@ -68,7 +68,10 @@ def cached_vincenty(c1, c2):
 
 
 def preprocess_scores_weight_matrix(
-    keyphrase_scores, docs_locations, weighting_func: Callable = inv_dist
+    keyphrase_scores,
+    docs_locations,
+    weighting_func: Callable = inv_dist,
+    weighting_func_param=1,
 ):
     """Build observation scores array (n) and compute similatity matrix (n, n) with weigthed based distance metric.
 
@@ -107,7 +110,7 @@ def preprocess_scores_weight_matrix(
     scores = np.array(scores)
 
     start = time.time()
-    logger.info(f"vincenty dist start n={n}")
+    logger.debug(f"vincenty dist start n={n}")
     weight_matrix = np.asarray(
         [
             [
@@ -131,7 +134,7 @@ def preprocess_scores_weight_matrix(
     )
 
     # transform distance matrix to similatity measure
-    weight_matrix = weighting_func(weight_matrix)
+    weight_matrix = weighting_func(weight_matrix, weighting_func_param)
     # row standartize
     weight_matrix = weight_matrix / weight_matrix.sum(axis=0)
 
@@ -144,12 +147,17 @@ def preprocess_scores_weight_matrix(
 
 
 def process_geo_associations_for_topics(
-    data: pd.DataFrame, docs_data: pd.DataFrame, w_function: Callable = inv_dist
+    data: pd.DataFrame,
+    docs_data: pd.DataFrame,
+    w_function: Callable = inv_dist,
+    w_function_param=1,
 ) -> pd.DataFrame:
     """Process MDKPERank KPE extraction candidates, scores by document, and document geo locations (coordinates).
 
     Compute Geo Association Measures for each candidate, based on observation pairs $(x_i, c_i)$ where $x_i$ is a
     Keyphrase semantic score regarding a document and $c_i$ is a geo location present in that document.
+
+    Result dataframe is saved in cache.
 
     Parameters
     ----------
@@ -167,7 +175,19 @@ def process_geo_associations_for_topics(
     """
     t = datetime.now()
     filename = (
-        "-".join(["results", "inv_dist", t.strftime(r"%Y%m%d-%H%M%S")]) + ".parquet"
+        "-".join(
+            [
+                "geo_measures",
+                w_function.__name__,
+                w_function_param,
+                t.strftime(r"%Y%m%d-%H%M%S"),
+            ]
+        )
+        + ".parquet"
+    )
+
+    logger.info(
+        f"Computing geo associations with distance function:{w_function.__name__} and a={w_function_param}"
     )
 
     for topic in data.index.get_level_values(0).unique():
@@ -180,7 +200,7 @@ def process_geo_associations_for_topics(
             kp_scores = docs_data.loc[(topic, slice(None), keyphrase), :].droplevel(2)
             # kp_scores have the semantic scores of the keyphrase in each of the documents it appears.
             moran_i, geary_c, getis_g = geo_associations(
-                kp_scores, docs_coordinates, w_function
+                kp_scores, docs_coordinates, w_function, w_function_param
             )
             data.loc[(topic, keyphrase), ["moran_i", "geary_c", "getis_g"]] = (
                 moran_i,
@@ -195,7 +215,10 @@ def process_geo_associations_for_topics(
 
 
 def geo_associations(
-    kp_data: pd.DataFrame, coordinates_data: Dict, w_function: Callable
+    kp_data: pd.DataFrame,
+    coordinates_data: Dict,
+    w_function: Callable,
+    w_function_param=1,
 ):
     # topic is level 0 multiindex of the dataframe
     # topic = list(kp_data.index.get_level_values(0))[0]
@@ -205,6 +228,7 @@ def geo_associations(
         kp_data["semantic_score"].droplevel(0).to_dict(),
         coordinates_data,
         w_function,
+        w_function_param,
     )
 
     moran_i = MoranI(scores, w)
@@ -337,66 +361,73 @@ def GetisOrdG(scores, weight_matrix):
 # """
 
 
-# def MoranI(keyphrase_scores, keyphrase_coordinates):
-#     scores = []
-#     coordinates = []
-#     for key, value_list in keyphrase_coordinates.items():
-#         for value in value_list:
-#             scores.append(keyphrase_scores[key])
-#             coordinates.append(value)
-#     n = len(scores)
-#     scores = np.array(scores)
-#     mean = np.mean(scores)
-#     adjusted_scores = [(score - mean) ** 2 for score in scores]
-#     moranI = n / np.sum(adjusted_scores)
-#     sum1 = 0.0
-#     sum2 = 0.0
-#     for i in range(n):
-#         for j in range(n):
-#             distance = 1.0 / (np.e ** vincenty(coordinates[i], coordinates[j]))
-#             sum1 += distance * (scores[i] - mean) * (scores[j] - mean)
-#             sum2 += distance
-#     moranI = moranI * (sum1 / sum2)
-#     return moranI
+def MoranI_alt(keyphrase_scores, keyphrase_coordinates):
+    """
+    TODO: to test the loop must be for keyphrase scores (one per document),
+        and the keyphrase_coordinates are in fact doc_coordinates.
+    """
+    scores = []
+    coordinates = []
+    for key, value_list in keyphrase_coordinates.items():
+        for value in value_list:
+            scores.append(keyphrase_scores[key])
+            coordinates.append(value)
+    n = len(scores)
+    scores = np.array(scores)
+    mean = np.mean(scores)
+    adjusted_scores = [(score - mean) ** 2 for score in scores]
+    moranI = n / np.sum(adjusted_scores)
+    sum1 = 0.0
+    sum2 = 0.0
+    for i in range(n):
+        for j in range(n):
+            # distance = 1.0 / (np.e ** vincenty(coordinates[i], coordinates[j]))
+            distance = 1.0 / (1 + vincenty(coordinates[i], coordinates[j]))
+            sum1 += distance * (scores[i] - mean) * (scores[j] - mean)
+            sum2 += distance
+    moranI = moranI * (sum1 / sum2)
+    return moranI
 
 
-# def GearyC(keyphrase_scores, keyphrase_coordinates):
-#     scores = []
-#     coordinates = []
-#     for key, value_list in keyphrase_coordinates.items():
-#         for value in value_list:
-#             scores.append(keyphrase_scores[key])
-#             coordinates.append(value)
-#     n = len(scores)
-#     scores = np.array(scores)
-#     mean = np.mean(scores)
-#     sum_adjusted_scores = np.sum([(score - mean) ** 2 for score in scores])
-#     sum1 = 0.0
-#     sum2 = 0.0
-#     for i in range(n):
-#         for j in range(n):
-#             distance = 1.0 / (np.e ** vincenty(coordinates[i], coordinates[j]))
-#             sum1 += distance * ((scores[i] - scores[j]) ** 2)
-#             sum2 += distance
-#     gearyC = ((n - 1.0) * sum1) / (2.0 * sum2 * sum_adjusted_scores)
-#     return gearyC
+def GearyC_alt(keyphrase_scores, keyphrase_coordinates):
+    scores = []
+    coordinates = []
+    for key, value_list in keyphrase_coordinates.items():
+        for value in value_list:
+            scores.append(keyphrase_scores[key])
+            coordinates.append(value)
+    n = len(scores)
+    scores = np.array(scores)
+    mean = np.mean(scores)
+    sum_adjusted_scores = np.sum([(score - mean) ** 2 for score in scores])
+    sum1 = 0.0
+    sum2 = 0.0
+    for i in range(n):
+        for j in range(n):
+            # distance = 1.0 / (np.e ** vincenty(coordinates[i], coordinates[j]))
+            distance = 1.0 / (1 + vincenty(coordinates[i], coordinates[j]))
+            sum1 += distance * ((scores[i] - scores[j]) ** 2)
+            sum2 += distance
+    gearyC = ((n - 1.0) * sum1) / (2.0 * sum2 * sum_adjusted_scores)
+    return gearyC
 
 
-# def GetisOrdG(keyphrase_scores, keyphrase_coordinates):
-#     scores = []
-#     coordinates = []
-#     for key, value_list in keyphrase_coordinates.items():
-#         for value in value_list:
-#             scores.append(keyphrase_scores[key])
-#             coordinates.append(value)
-#     n = len(scores)
-#     scores = np.array(scores)
-#     sum1 = 0.0
-#     sum2 = 0.0
-#     for i in range(n):
-#         for j in range(n):
-#             distance = 1.0 / (np.e ** vincenty(coordinates[i], coordinates[j]))
-#             sum1 += distance * scores[i] * scores[j]
-#             sum2 += scores[i] * scores[j]
-#     getisOrdG = sum1 / sum2
-#     return getisOrdG
+def GetisOrdG_alt(keyphrase_scores, keyphrase_coordinates):
+    scores = []
+    coordinates = []
+    for key, value_list in keyphrase_coordinates.items():
+        for value in value_list:
+            scores.append(keyphrase_scores[key])
+            coordinates.append(value)
+    n = len(scores)
+    scores = np.array(scores)
+    sum1 = 0.0
+    sum2 = 0.0
+    for i in range(n):
+        for j in range(n):
+            # distance = 1.0 / (np.e ** vincenty(coordinates[i], coordinates[j]))
+            distance = 1.0 / (1 + vincenty(coordinates[i], coordinates[j]))
+            sum1 += distance * scores[i] * scores[j]
+            sum2 += scores[i] * scores[j]
+    getisOrdG = sum1 / sum2
+    return getisOrdG
