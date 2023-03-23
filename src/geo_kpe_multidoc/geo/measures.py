@@ -177,9 +177,9 @@ def process_geo_associations_for_topics(
     filename = (
         "-".join(
             [
-                "geo_measures",
+                "geo-measures",
                 w_function.__name__,
-                w_function_param,
+                str(w_function_param),
                 t.strftime(r"%Y%m%d-%H%M%S"),
             ]
         )
