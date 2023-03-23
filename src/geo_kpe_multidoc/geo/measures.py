@@ -37,11 +37,12 @@ def exp_dist(d: np.ndarray, a=1):
 
 
 def arc_dist(d: np.ndarray, a=1):
-    r"""$f(x) = arccot(a x) = arctan(1 / (a x))$
+    r"""$f(x) = arccot(a x) = arccot(z) = arctan(1 / z)
     Abramowitz, M. and Stegun, I. A., Handbook of Mathematical Functions, 10th printing, New York: Dover, 1964, pp. 79.
     https://personal.math.ubc.ca/~cbm/aands/page_79.htm
+
     """
-    return np.arctan(1 / (a * d))
+    return math.atan(1 / (a * d))
 
 
 def orig_dist(d: np.ndarray):
