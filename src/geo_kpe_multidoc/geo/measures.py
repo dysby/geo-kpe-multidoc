@@ -42,7 +42,7 @@ def arc_dist(d: np.ndarray, a=1):
     https://personal.math.ubc.ca/~cbm/aands/page_79.htm
 
     """
-    return math.atan(1 / (a * d))
+    return np.arctan(1 / (a * d))
 
 
 def orig_dist(d: np.ndarray):
