@@ -5,6 +5,9 @@ import os
 from typing import Callable
 
 import torch
+from keybert.backend._sentencetransformers import SentenceTransformerBackend
+from loguru import logger
+from sentence_transformers import SentenceTransformer
 from transformers import (
     AutoModel,
     AutoTokenizer,
@@ -319,29 +322,38 @@ def load_longmodel(embedding_model: str = "") -> Callable:
     if not os.path.exists(model_path):
         supported_models[sliced_t](sliced_m, model_path, attention_window, max_pos)
 
-    callable_model = select_backend(sliced_m)
+    # TODO: Hack for local Sentence Transformer Longformer
     if sliced_t == "longformer":
-        callable_model.embedding_model._modules["0"]._modules[
-            "auto_model"
-        ] = XLMRobertaModel.from_pretrained(
-            model_path,
-            output_loading_info=False,
-            output_hidden_states=True,
-            output_attentions=True,
+        logger.info(
+            f"Loading Longformer from Sentence Transformer model {sliced_t}-{sliced_m}."
         )
-        callable_model.embedding_model.tokenizer = XLMRobertaTokenizer.from_pretrained(
-            model_path,
-            output_loading_info=False,
-            output_hidden_states=True,
-            output_attentions=True,
-        )
-        callable_model.embedding_model.tokenizer.save_pretrained(model_path)
-        callable_model.embedding_model._modules["0"]._modules[
-            "auto_model"
-        ].config = XLMRobertaConfig.from_pretrained(
-            model_path,
-            output_loading_info=False,
-            output_hidden_states=True,
-            output_attentions=True,
-        )
+        embedding_model = SentenceTransformer(model_path)
+        callable_model = SentenceTransformerBackend(embedding_model)
+    else:
+        logger.info(f"Loading base model {sliced_m}.")
+        callable_model = select_backend(sliced_m)
+    # if sliced_t == "longformer":
+    #     callable_model.embedding_model._modules["0"]._modules[
+    #         "auto_model"
+    #     ] = XLMRobertaModel.from_pretrained(
+    #         model_path,
+    #         output_loading_info=False,
+    #         output_hidden_states=True,
+    #         output_attentions=True,
+    #     )
+    #     callable_model.embedding_model.tokenizer = XLMRobertaTokenizer.from_pretrained(
+    #         model_path,
+    #         output_loading_info=False,
+    #         output_hidden_states=True,
+    #         output_attentions=True,
+    #     )
+    #     callable_model.embedding_model.tokenizer.save_pretrained(model_path)
+    #     callable_model.embedding_model._modules["0"]._modules[
+    #         "auto_model"
+    #     ].config = XLMRobertaConfig.from_pretrained(
+    #         model_path,
+    #         output_loading_info=False,
+    #         output_hidden_states=True,
+    #         output_attentions=True,
+    #     )
     return callable_model
