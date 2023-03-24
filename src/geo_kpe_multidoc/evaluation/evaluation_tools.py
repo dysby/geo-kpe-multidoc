@@ -1,3 +1,4 @@
+import gc
 import json
 from itertools import islice, zip_longest
 from os import path, write
@@ -380,14 +381,14 @@ def extract_keyphrases_topics(
             # "d54",
             # "d56",
             # "d57",
-            "d08",  # errors
-            "d14",
-            "d22",
-            "d28",
-            "d34",
-            "d50",
-            "d53",
-            "d59",
+            # "d08",  # errors
+            # "d14",
+            # "d22",
+            # "d28",
+            # "d34",
+            # "d50",
+            # "d53",
+            # "d59",
         ]:
             logger.debug(f"Skiping {topic_id} error in mordecai geo tagging.")
             continue
@@ -397,7 +398,7 @@ def extract_keyphrases_topics(
             top_n_and_scores,
             candidates,
             candidate_document_matrix,
-            keyphrase_coordinates,
+            # keyphrase_coordinates,
             ranking_per_doc,
         ) = model.extract_kp_from_topic_geo(
             # top_n_and_scores, candidates = model.extract_kp_from_topic(
@@ -439,7 +440,7 @@ def extract_keyphrases_topics(
                     top_n_and_scores,
                     candidates,
                     candidate_document_matrix,
-                    keyphrase_coordinates,
+                    # keyphrase_coordinates,
                     ranking_per_doc,
                     gold_kp,
                 ),
@@ -447,5 +448,5 @@ def extract_keyphrases_topics(
             )
 
         true_labels[dataset.name].append(gold_kp)
-
+        gc.collect()
     return model_results, true_labels
