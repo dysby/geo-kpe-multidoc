@@ -3,11 +3,7 @@ import re
 from os import path
 from typing import Dict, List, Tuple
 
-from elasticsearch.exceptions import ConnectionTimeout
 from loguru import logger
-
-# import plotly.express as px
-from mordecai import Geoparser
 
 from geo_kpe_multidoc import (
     GEO_KPE_MULTIDOC_DATA_PATH,
@@ -17,6 +13,8 @@ from geo_kpe_multidoc import (
 
 
 def process_MKDUC01():
+    from mordecai import Geoparser
+
     parser = Geoparser(es_hosts=GEO_KPE_MULTIDOC_MORDECAI_ES_URL, progress=False)
 
     with open(path.join(GEO_KPE_MULTIDOC_DATA_PATH, "MKDUC01/MKDUC01.json")) as s_json:
@@ -220,9 +218,3 @@ def build_map():
         )
         # fig.data[0].marker = dict(size = 5, color="red")
         fig.show()
-
-
-# process_MKDUC01()
-# build_map()
-if __name__ == "__main__":
-    load_topic_geo_locations("d04")
