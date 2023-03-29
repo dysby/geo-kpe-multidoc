@@ -60,17 +60,17 @@ def process_geo_associations_for_topics(
         + ".parquet"
     )
 
-    logger.info(
-        f"Computing geo associations with distance function:{w_function.__name__} and a={w_function_param}"
-    )
+    # logger.info(
+    #     f"Computing geo associations with distance function:{w_function.__name__} and a={w_function_param}"
+    # )
 
     for topic in data.index.get_level_values(0).unique():
-        logger.info(f"Computing geo associations for candidates of the topic {topic}.")
+        # logger.info(f"Computing geo associations for candidates of the topic {topic}.")
 
         docs_coordinates = load_topic_geo_locations(topic)
 
         for keyphrase in data.loc[topic].index:
-            logger.debug(f"Geo associations for {keyphrase}.")
+            # logger.debug(f"Geo associations for {keyphrase}.")
             kp_scores = docs_data.loc[(topic, slice(None), keyphrase), :].droplevel(2)
             # kp_scores have the semantic scores of the keyphrase in each of the documents it appears.
             moran_i, geary_c, getis_g = geo_associations(
@@ -190,7 +190,7 @@ def scores_weight_matrix(
     scores = np.array(scores)
 
     start = time()
-    logger.debug(f"vincenty dist start n={n}")
+    # logger.debug(f"vincenty dist start n={n}")
     weight_matrix = np.asarray(
         [
             [
@@ -207,11 +207,11 @@ def scores_weight_matrix(
         ]
     )
     end = time()
-    logger.debug(
-        "vincenty distance for n={} points processing time: {:.1f}s".format(
-            n, end - start
-        )
-    )
+    # logger.debug(
+    #     "vincenty distance for n={} points processing time: {:.1f}s".format(
+    #         n, end - start
+    #     )
+    # )
 
     # transform distance matrix to similatity measure
     weight_matrix = weighting_func(weight_matrix, weighting_func_param)
