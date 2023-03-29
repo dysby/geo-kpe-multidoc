@@ -76,14 +76,14 @@ def MoranI(scores, weight_matrix):
     n = len(scores)
 
     if n == 1 or n == 0:
-        logger.warning("MoranI over a single observation. Returning np.NAN.")
+        # logger.warning("MoranI over a single observation. Returning np.NAN.")
         return np.nan
 
     mean = np.mean(scores)
     adjusted_scores = scores - mean
 
     if all(np.isclose(adjusted_scores, 0)):
-        logger.debug("MoranI over a constant surface. Returning 1.")
+        # logger.debug("MoranI over a constant surface. Returning 1.")
         return 1
 
     moranI = n / np.sum(adjusted_scores**2)
@@ -112,7 +112,7 @@ def GearyC(scores, weight_matrix):
     n = len(scores)
 
     if n == 1 or n == 0:
-        logger.warning("GearyC over a single observation. Returning np.NAN.")
+        # logger.warning("GearyC over a single observation. Returning np.NAN.")
         return np.nan
 
     mean = np.mean(scores)
@@ -120,7 +120,7 @@ def GearyC(scores, weight_matrix):
     sum_adjusted_scores = np.sum((scores - mean) ** 2)
 
     if np.isclose(sum_adjusted_scores, 0):
-        logger.debug("GearyC over a constant surface. Returning 0.")
+        # logger.debug("GearyC over a constant surface. Returning 0.")
         return 0
 
     outer_difference_scores = np.subtract.outer(scores, scores)
@@ -139,7 +139,7 @@ def GetisOrdG(scores, weight_matrix):
     n = len(scores)
 
     if n == 1 or n == 0:
-        logger.warning("GetisOrdG over a single value. Returning np.NAN.")
+        # logger.warning("GetisOrdG over a single value. Returning np.NAN.")
         return np.nan
 
     outer_mul_scores = np.outer(np.asarray(scores), np.asarray(scores))
