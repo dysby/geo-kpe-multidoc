@@ -219,8 +219,8 @@ def scores_weight_matrix(
     weight_matrix = weight_matrix / weight_matrix.sum(axis=0)
 
     end = time()
-    logger.debug(
-        "vincenty distance 2nd stage processing time: {:.1f}s".format(end - start)
-    )
+    # logger.debug(
+    #     "vincenty distance 2nd stage processing time: {:.1f}s".format(end - start)
+    # )
 
     return scores, weight_matrix
