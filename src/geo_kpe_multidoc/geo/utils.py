@@ -79,8 +79,9 @@ def process_geo_associations_for_topics(
                 .to_dict()
             )
             # convert list of np.array to list of tuples
+            # need hack because DataFrame can have a [None] list, and we need to keep all documents as keys.
             docs_coordinates = {
-                k: [tuple(arr) for arr in values]
+                k: [tuple(arr) for arr in values] if values != [None] else []
                 for k, values in docs_coordinates.items()
             }
 
