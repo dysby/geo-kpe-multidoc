@@ -22,6 +22,7 @@ from geo_kpe_multidoc.geo.measures import (
 def process_geo_associations_for_topics(
     data: pd.DataFrame,
     docs_data: pd.DataFrame,
+    doc_coordinate_data: pd.DataFrame = None,
     w_function: Callable = inv_dist,
     w_function_param=1,
     save_cache=True,
@@ -67,7 +68,16 @@ def process_geo_associations_for_topics(
     for topic in data.index.get_level_values(0).unique():
         # logger.info(f"Computing geo associations for candidates of the topic {topic}.")
 
-        docs_coordinates = load_topic_geo_locations(topic)
+        if doc_coordinate_data:
+            # pandas series to dict with repeated indices make dict with list values
+            docs_coordinates = (
+                doc_coordinate_data.loc[topic]["lat_long"]
+                .groupby(level=0)
+                .agg(list)
+                .to_dict()
+            )
+        else:
+            docs_coordinates = load_topic_geo_locations(topic)
 
         for keyphrase in data.loc[topic].index:
             # logger.debug(f"Geo associations for {keyphrase}.")
