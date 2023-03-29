@@ -170,7 +170,7 @@ def preprocess_scores_weight_matrix(
     n = len(scores)
     scores = np.array(scores)
 
-    start = time.time()
+    start = time()
     logger.debug(f"vincenty dist start n={n}")
     weight_matrix = np.asarray(
         [
@@ -187,7 +187,7 @@ def preprocess_scores_weight_matrix(
             for j in range(n)
         ]
     )
-    end = time.time()
+    end = time()
     logger.debug(
         "vincenty distance for n={} points processing time: {:.1f}s".format(
             n, end - start
@@ -199,7 +199,7 @@ def preprocess_scores_weight_matrix(
     # row standartize
     weight_matrix = weight_matrix / weight_matrix.sum(axis=0)
 
-    end = time.time()
+    end = time()
     logger.debug(
         "vincenty distance 2nd stage processing time: {:.1f}s".format(end - start)
     )

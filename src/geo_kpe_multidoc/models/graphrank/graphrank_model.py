@@ -1,7 +1,7 @@
 import math
 import re
-import time
 from functools import reduce
+from time import time
 from typing import Callable, List, Set, Tuple
 
 import numpy as np

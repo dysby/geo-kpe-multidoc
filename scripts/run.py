@@ -2,9 +2,9 @@ import argparse
 import json
 import sys
 import textwrap
-import time
 from datetime import datetime
 from os import path
+from time import time
 
 from loguru import logger
 from nltk.stem import PorterStemmer
@@ -162,7 +162,7 @@ def save(results: DataFrame, args):
 def main():
     args = parse_args()
 
-    start = time.time()
+    start = time()
     logger.info("Warmup")
     logger.info("Loading models")
 
@@ -282,7 +282,7 @@ def main():
         n_docs_limit=args.doc_limit,
         **options,
     )
-    end = time.time()
+    end = time()
     logger.info("Processing time: {}".format(end - start))
 
     # output_one_top_cands_geo(data.ids, model_results, true_labels)
