@@ -78,6 +78,11 @@ def process_geo_associations_for_topics(
                 .agg(list)
                 .to_dict()
             )
+            # convert list of np.array to list of tuples
+            docs_coordinates = {
+                k: [tuple(arr) for arr in values]
+                for k, values in docs_coordinates.items()
+            }
 
         for keyphrase in data.loc[topic].index:
             # logger.debug(f"Geo associations for {keyphrase}.")
