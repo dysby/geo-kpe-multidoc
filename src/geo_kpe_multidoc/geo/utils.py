@@ -68,7 +68,9 @@ def process_geo_associations_for_topics(
     for topic in data.index.get_level_values(0).unique():
         # logger.info(f"Computing geo associations for candidates of the topic {topic}.")
 
-        if doc_coordinate_data:
+        if doc_coordinate_data is None:
+            docs_coordinates = load_topic_geo_locations(topic)
+        else:
             # pandas series to dict with repeated indices make dict with list values
             docs_coordinates = (
                 doc_coordinate_data.loc[topic]["lat_long"]
@@ -76,8 +78,6 @@ def process_geo_associations_for_topics(
                 .agg(list)
                 .to_dict()
             )
-        else:
-            docs_coordinates = load_topic_geo_locations(topic)
 
         for keyphrase in data.loc[topic].index:
             # logger.debug(f"Geo associations for {keyphrase}.")
