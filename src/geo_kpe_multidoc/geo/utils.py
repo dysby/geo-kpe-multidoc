@@ -24,6 +24,7 @@ def process_geo_associations_for_topics(
     docs_data: pd.DataFrame,
     w_function: Callable = inv_dist,
     w_function_param=1,
+    save_cache=True,
 ) -> pd.DataFrame:
     """Process MDKPERank KPE extraction candidates, scores by document, and document geo locations (coordinates).
 
@@ -82,7 +83,13 @@ def process_geo_associations_for_topics(
             )
 
         # save data in cache at each loop over topics
-        data.to_parquet(os.path.join(GEO_KPE_MULTIDOC_CACHE_PATH, "MKDUC01", filename))
+        if save_cache:
+            data.to_parquet(
+                os.path.join(GEO_KPE_MULTIDOC_CACHE_PATH, "MKDUC01", filename)
+            )
+
+    if save_cache:
+        logger.debug(f"Geo association measures saved in cache dir: {filename}.")
 
     return data
 
@@ -93,10 +100,22 @@ def geo_associations(
     w_function: Callable,
     w_function_param=1,
 ):
+    """Compute 3 measures of geospacial association for one keyphrase
+
+    Parameters
+    ----------
+    kp_data : pd.DataFrame
+        kp_data have the observation `semantic_score` of each keyphrase for each document it appears.
+
+    Returns
+    -------
+    Tuple[float, float, float]:
+        Moran I, Geary C, Getis Ord G
+    """
     # topic is level 0 multiindex of the dataframe
     # topic = list(kp_data.index.get_level_values(0))[0]
 
-    scores, w = preprocess_scores_weight_matrix(
+    scores, w = scores_weight_matrix(
         # drop topic from index level
         kp_data["semantic_score"].droplevel(0).to_dict(),
         coordinates_data,
@@ -128,7 +147,7 @@ def _score_w_geo_association_G(df: pd.DataFrame, S, N, G, lambda_=1, gamma=1):
     return df
 
 
-def preprocess_scores_weight_matrix(
+def scores_weight_matrix(
     keyphrase_scores,
     docs_locations,
     weighting_func: Callable = inv_dist,
