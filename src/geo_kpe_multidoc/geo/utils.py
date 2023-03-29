@@ -81,7 +81,9 @@ def process_geo_associations_for_topics(
             # convert list of np.array to list of tuples
             # need hack because DataFrame can have a [None] list, and we need to keep all documents as keys.
             docs_coordinates = {
-                k: [tuple(arr) for arr in values] if values != [None] else []
+                k: [tuple(arr) for arr in values]
+                if not _is_list_with_none(values)
+                else []
                 for k, values in docs_coordinates.items()
             }
 
@@ -108,6 +110,16 @@ def process_geo_associations_for_topics(
         logger.debug(f"Geo association measures saved in cache dir: {filename}.")
 
     return data
+
+
+def _is_list_with_none(values):
+    if len(values) == 1:
+        # Hack The truth value of an array with more than one element is ambiguous.
+        if isinstance(values[0], np.ndarray):
+            return False
+        elif values == [None]:
+            return True
+    return False
 
 
 def geo_associations(
