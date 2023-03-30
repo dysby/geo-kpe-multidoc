@@ -1,4 +1,6 @@
+import os
 import pickle
+import re
 from pathlib import Path
 
 
@@ -21,3 +23,25 @@ def read_from_file(filename: str = ""):
         content = pickle.load(read_f)
 
     return content
+
+
+def get_mdkpe_files(path: str):
+    """Generate a list of files in dir that follow the pattern `dnn-mdkpe-geo.pkl`.
+    The files where saved from MDKPERank model outputs.
+
+    Parameters
+    ----------
+    path : str
+        Directory to search
+
+    Yields
+    ------
+    str
+        file name
+    """
+    geo_file_name_pattern = re.compile(r"d\d{2}-mdkpe-geo\.pkl")
+    for file in os.listdir(path):
+        if os.path.isfile(os.path.join(path, file)) and geo_file_name_pattern.match(
+            file
+        ):
+            yield file
