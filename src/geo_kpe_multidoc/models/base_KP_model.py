@@ -1,4 +1,5 @@
 import re
+from enum import Enum, auto
 from typing import Callable, List, Optional, Set, Tuple
 
 import torch
@@ -8,12 +9,21 @@ from nltk.stem.api import StemmerI
 from geo_kpe_multidoc.datasets.datasets import KPEDataset
 from geo_kpe_multidoc.document import Document
 from geo_kpe_multidoc.models.backend.select_backend import select_backend
+from geo_kpe_multidoc.models.pre_processing.pos_tagging import POS_tagger
 from geo_kpe_multidoc.models.pre_processing.pre_processing_utils import (
     remove_punctuation,
     remove_whitespaces,
 )
 
 KPEScore = Tuple[str, float]
+
+
+class DocMode(Enum):
+    GLOBAL_ATTENTION = auto()
+
+
+class CandidateMode(Enum):
+    GLOBAL_ATTENTION = auto()
 
 
 class BaseKPModel:
@@ -30,6 +40,7 @@ class BaseKPModel:
 
         self.grammar = ""
         self.counter = 0
+        self.tagger: POS_tagger = None
 
     def pre_process(self, txt: str = "", **kwargs) -> str:
         """
@@ -38,12 +49,12 @@ class BaseKPModel:
         txt = remove_punctuation(txt)
         return remove_whitespaces(txt)[1:]
 
-    def pos_tag_doc(self, doc: Document, stemming, memory, **kwargs) -> None:
+    def pos_tag_doc(self, doc: Document, stemming, use_cache, **kwargs) -> None:
         (
             doc.tagged_text,
             doc.doc_sentences,
             doc.doc_sentences_words,
-        ) = self.tagger.pos_tag_text_sents_words(doc.raw_text, memory, doc.id)
+        ) = self.tagger.pos_tag_text_sents_words(doc.raw_text, use_cache, doc.id)
 
         doc.doc_sentences = [
             sent.text for sent in doc.doc_sentences if sent.text.strip()
@@ -81,7 +92,7 @@ class BaseKPModel:
         self.pos_tag_doc(
             doc=doc,
             stemming=None,
-            memory=use_cache,
+            use_cache=use_cache,
         )
 
         self.extract_candidates(doc, min_len, self.grammar, lemmer)

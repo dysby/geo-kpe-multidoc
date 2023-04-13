@@ -51,12 +51,13 @@ def whitening_np(embeddings: torch.tensor) -> np.array:
 
 def l1_l12_embed(text: str, model: BaseEmbedder) -> Tuple:
     """
-    Consider only 1st and 12th layers for embedding
+    Consider only 1st and 12th(last) layers for embedding
     """
     inputs = model.embedding_model.tokenizer(
         text, return_tensors="pt", max_length=4096, return_attention_mask=True
     )
     outputs = model.embedding_model._modules["0"]._modules["auto_model"](**inputs)
+    # mean polling for hidden states at 1st, and last, layers
     result = (outputs.hidden_states[1] + outputs.hidden_states[-1]) / 2.0
 
     mean_pooled = result.sum(axis=1) / inputs.attention_mask.sum(axis=-1).unsqueeze(-1)
@@ -86,13 +87,12 @@ def max_pooling(token_embeddings, attention_mask):
     return torch.max(token_embeddings, 1)[0]
 
 
-def embed_hf(text: str, model: BaseEmbedder) -> Tuple:
+def embed_hf(inputs, model: BaseEmbedder) -> Tuple:
     """
     hugingface interface
-    """
-    # Tokenize sentences
+    # Tokenize sentences before
     inputs = tokenize_hf(text, model)
-
+    """
     with torch.no_grad():
         # Compute token embeddings
         outputs = model.embedding_model._modules["0"]._modules["auto_model"](**inputs)
@@ -102,31 +102,34 @@ def embed_hf(text: str, model: BaseEmbedder) -> Tuple:
     return embed.detach().numpy()
 
 
-def embed_hf_global_att(text: str, model: BaseEmbedder) -> Tuple:
-    text = text.strip()
-    text = text.lower()
+def embed_hf_global_att(
+    inputs, model: BaseEmbedder, global_attention_mask: torch.tensor
+) -> Tuple:
+    # text = text.strip()
+    # text = text.lower()
 
     # Tokenize sentences
     # TODO: why max_lenght is 2048 and not 4096?
-    # Here max_lenght can reduced to 2048 due to memory constrains
-    inputs = model.embedding_model.tokenizer(
-        text,
-        padding=True,
-        truncation="longest_first",
-        return_tensors="pt",
-        max_length=4096,  # change
-    )
+    # Here max_lenght was reduced to 2048 due to memory constrains
+    # inputs = model.embedding_model.tokenizer(
+    #     text,
+    #     padding=True,
+    #     truncation="longest_first",
+    #     return_tensors="pt",
+    #     max_length=4096,  # change
+    # )
     sequence_l = len(inputs["attention_mask"][0])
 
-    global_att = torch.zeros(1, sequence_l)
-    # set attention mask at 128 random positions.
-    random_sample = random.sample(range(sequence_l), 128)
-    for pos in random_sample:
-        global_att[0][pos] = 1
+    if global_attention_mask == None:
+        global_attention_mask = torch.zeros(1, sequence_l)
+        # set attention mask at 128 random positions.
+        random_sample = random.sample(range(sequence_l), 128)
+        for pos in random_sample:
+            global_attention_mask[0][pos] = 1
 
     # Compute token embeddings
     outputs = model.embedding_model._modules["0"]._modules["auto_model"](
-        **inputs, global_attention_mask=global_att
+        **inputs, global_attention_mask=global_attention_mask
     )
 
     # Perform pooling. In this case, max pooling.

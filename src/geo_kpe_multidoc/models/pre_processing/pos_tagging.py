@@ -1,11 +1,14 @@
-import os
 from abc import ABC, abstractmethod
+from os import path
 from typing import List, Tuple
 
+import joblib
 import spacy
 import torch
 from loguru import logger
 
+from geo_kpe_multidoc import GEO_KPE_MULTIDOC_CACHE_PATH
+from geo_kpe_multidoc.document import Document
 from geo_kpe_multidoc.utils.IO import read_from_file, write_to_file
 
 
@@ -40,20 +43,11 @@ class POS_tagger(ABC):
 
     @abstractmethod
     def pos_tag_text_sents_words(
-        self, text: str = "", memory: bool = False, id: int = 0
+        self, text: str = "", use_cache: bool = False, id: int = 0
     ) -> Tuple[List[List[Tuple[str, str]]], List[str], List[List[str]]]:
         """
         POS tag a document and return it's result in Tuple form, with the first element being a List of sentences with each
         word as a Tuple (text, token.pos_), the second a list of document sentences and the third a list of words in each sentence.
-        """
-        ...
-
-    @abstractmethod
-    def pos_tag_to_file(
-        self, input_docs: List[str], output_path: str = "", index: int = 0
-    ) -> None:
-        """
-        POS tag a list of documents and save it to a file
         """
         ...
 
@@ -90,10 +84,22 @@ class POS_tagger_spacy(POS_tagger):
         )
 
     def pos_tag_text_sents_words(
-        self, text: str = "", memory: bool = False, id: int = 0
+        self, text: str = "", use_cache: bool = False, id: str = ""
     ) -> Tuple[List[List[Tuple[str, str]]], List[str], List[List[str]]]:
-        logger.debug(f"Cache:{memory} Id:{id}")
-        doc = self.tagger(text) if not memory else read_from_file(f"{memory}{id}")
+        logger.debug(f"Cache:{use_cache} Id:{id}")
+
+        # only bypass spacy PoS tagging, other transformations are not skipped (e.g. joining NOUN HYP NOUN).
+        if use_cache:
+            if path.exists(path.join(GEO_KPE_MULTIDOC_CACHE_PATH, f"{id}-PoS.cache")):
+                doc = read_from_file(
+                    path.join(GEO_KPE_MULTIDOC_CACHE_PATH, f"{id}-PoS.cache")
+                )
+            else:
+                doc = self.tagger(text)
+                self.save_on_cache(doc, id)
+        else:
+            doc = self.tagger(text)
+
         tagged_text = []
         doc_word_sents = []
 
@@ -102,16 +108,30 @@ class POS_tagger_spacy(POS_tagger):
                 tagged_text_s = []
                 doc_word_sents_s = []
 
+                # HACK: DEBUG {'Non - Marine Association'}
+                # if "Marine" in text:
+                #     pass
+                if "Mr." in sent.text:
+                    pass
+
                 for token in sent:
                     tagged_text_s.append((token.text, token.pos_))
                     doc_word_sents_s.append(token.text)
 
+                # TODO: join NOUN -(NOUN) NOUN
+                #       to deal with `re-election` and `post-tax`.
+                # TODO: and `mr. smith`?
                 for i in range(1, len(doc_word_sents_s) - 1):
                     if i + 1 < len(doc_word_sents_s):
-                        if doc_word_sents_s[i] == "-":
+                        if doc_word_sents_s[i] == "-" and tagged_text_s[i][1] in [
+                            "NOUN",
+                            "ADJ",
+                            "PROPN",
+                        ]:
+                            # keep original tag given to `-` (NOUN or ADJ)
                             tagged_text_s[i] = (
                                 f"{doc_word_sents_s[i-1]}-{doc_word_sents_s[i+1]}",
-                                "NOUN",
+                                tagged_text_s[i][1],
                             )
                             del tagged_text_s[i + 1]
                             del tagged_text_s[i - 1]
@@ -122,19 +142,28 @@ class POS_tagger_spacy(POS_tagger):
                             del doc_word_sents_s[i + 1]
                             del doc_word_sents_s[i - 1]
 
+                        elif doc_word_sents_s[i] == "." and tagged_text_s[i][1] in [
+                            "NOUN",
+                            "ADJ",
+                            "PROPN",
+                        ]:
+                            # join `.` with last token and keep the same tag.
+                            tagged_text_s[i] = (
+                                f"{doc_word_sents_s[i-1]}.",
+                                tagged_text_s[i][1],
+                            )
+                            del tagged_text_s[i - 1]
+
+                            doc_word_sents_s[i] = f"{doc_word_sents_s[i-1]}."
+                            del doc_word_sents_s[i - 1]
+
                 tagged_text.append(tagged_text_s)
                 doc_word_sents.append(doc_word_sents_s)
 
         return (tagged_text, list(doc.sents), doc_word_sents)
 
-    def pos_tag_to_file(
-        self, input_docs: List[str], output_path: str = "", index: int = 0
-    ) -> None:
-        if not os.path.isdir(output_path):
-            os.mkdir(output_path)
-
-        for i in range(index, len(input_docs)):
-            torch.cuda.empty_cache()
-            logger.info(self.pos_tag_str(input_docs[i][0]))
-            write_to_file(f"{output_path}{i}", self.pos_tag_str(input_docs[i][0]))
-            logger.info(f"Tagged and saved document {i} file")
+    def save_on_cache(self, tagged_text, doc_id: str = "") -> None:
+        logger.info(f"Caching PoS Tags for Document {doc_id}")
+        joblib.dump(
+            tagged_text, path.join(GEO_KPE_MULTIDOC_CACHE_PATH, f"{id}-PoS.cache")
+        )

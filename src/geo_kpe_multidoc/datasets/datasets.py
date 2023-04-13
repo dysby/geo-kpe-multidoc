@@ -88,7 +88,41 @@ DATASETS = {
 }
 
 
-def load_data(name, root_dir):
+class KPEDataset(Dataset):
+    """Suported Evaluation Datasets"""
+
+    def __init__(self, name, ids, documents, keys, transform=None):
+        """
+        Parameters
+        ----------
+            name: str = Name of the Dataset
+            ids: Document or Topic names
+            documents: List of documents, one per id, or List of List of Documents per topic, 1 topic to many documents.
+            keys: List of keyphrases per document, or list of keyphrases per topic.
+            transform: Optional[Callable]: Optional transform to be applied
+                on a sample. NOT USED
+        """
+        self.name = name
+        self.ids = ids
+        self.documents = documents
+        self.keys = keys
+        self.transform = None
+
+    def __len__(self):
+        return len(self.documents)
+
+    def __getitem__(self, idx):
+        """
+        Returns:
+        --------
+            name: id of the document
+            document: txt content
+            keys: gold keyphrases for document
+        """
+        return self.ids[idx], self.documents[idx], self.keys[idx]
+
+
+def load_data(name, root_dir) -> KPEDataset:
     """
     name: Supported dataset name, must exist in DATASET dict
     root_dir: str = Data path.
@@ -158,37 +192,3 @@ def load_data(name, root_dir):
         return KPEDataset(name, *_read_zip(path.join(root_dir, zipfile)))
     else:
         return KPEDataset(name, *_read_mdkpe(root_dir))
-
-
-class KPEDataset(Dataset):
-    """Suported Evaluation Datasets"""
-
-    def __init__(self, name, ids, documents, keys, transform=None):
-        """
-        Parameters
-        ----------
-            name: str = Name of the Dataset
-            ids: Document or Topic names
-            documents: List of documents, one per id, or List of List of Documents per topic, 1 topic to many documents.
-            keys: List of keyphrases per document, or list of keyphrases per topic.
-            transform: Optional[Callable]: Optional transform to be applied
-                on a sample. NOT USED
-        """
-        self.name = name
-        self.ids = ids
-        self.documents = documents
-        self.keys = keys
-        self.transform = None
-
-    def __len__(self):
-        return len(self.documents)
-
-    def __getitem__(self, idx):
-        """
-        Returns:
-        --------
-            name: id of the document
-            document: txt content
-            keys: gold keyphrases for document
-        """
-        return self.ids[idx], self.documents[idx], self.keys[idx]

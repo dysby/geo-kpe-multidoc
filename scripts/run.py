@@ -10,6 +10,11 @@ from loguru import logger
 from nltk.stem import PorterStemmer
 from pandas import DataFrame
 
+from geo_kpe_multidoc import GEO_KPE_MULTIDOC_CACHE_PATH
+from geo_kpe_multidoc.models.embedrank.embedrank_longformer_manual import (
+    EmbedRankManual,
+)
+
 
 def parse_args():
     parser = argparse.ArgumentParser(
@@ -27,7 +32,6 @@ def parse_args():
 
     parser.add_argument(
         "--dataset_name",
-        default=None,
         type=str,
         required=True,
         help="The input dataset name",
@@ -63,8 +67,8 @@ def parse_args():
         "--rank_model",
         default="EmbedRank",
         type=str,
-        help="The Ranking Model [EmbedRank, MaskRank, and FusionRank], MDKPERank",
-        choices=["EmbedRank", "MaskRank", "FusionRank", "MDKPERank"],
+        help="The Ranking Model [EmbedRank, EmbedRankManual, MaskRank, and FusionRank], MDKPERank",
+        choices=["EmbedRank", "EmbedRankManual", "MaskRank", "FusionRank", "MDKPERank"],
     )
     parser.add_argument(
         "--doc_limit",
@@ -99,32 +103,24 @@ def parse_args():
         choices=["weighted", "harmonic"],
     )
     parser.add_argument(
-        "--save_pos_tags", type=bool, help="bool flag to save POS tags", default=False
+        "--save_pos_tags", action="store_true", help="bool flag to save POS tags"
     )
     parser.add_argument(
-        "--save_embeds",
-        type=bool,
-        help="bool flag to save generated embeds",
-        default=False,
+        "--save_embeds", action="store_true", help="bool flag to save generated embeds"
     )
     parser.add_argument(
         "--use_cache",
-        type=bool,
+        action="store_true",
         help="bool flag to use pos tags and embeds from cache",
-        default=False,
     )
     parser.add_argument(
         "--stemming", action="store_true", help="bool flag to use stemming"
     )
     parser.add_argument(
-        "--lemmatization",
-        action="store_true",
-        help="boolean flag to use lemmatization",
+        "--lemmatization", action="store_true", help="boolean flag to use lemmatization"
     )
     parser.add_argument(
-        "--embedrank_mmr",
-        action="store_true",
-        help="boolean flag to use EmbedRank MMR",
+        "--embedrank_mmr", action="store_true", help="boolean flag to use EmbedRank MMR"
     )
     parser.add_argument(
         "--embedrank_diversity",
@@ -194,6 +190,8 @@ def main():
 
     if args.rank_model == "EmbedRank":
         kpe_model = EmbedRank(BACKEND_MODEL_NAME, TAGGER_NAME)
+    elif args.rank_model == "EmbedRankManual":
+        kpe_model = EmbedRankManual(BACKEND_MODEL_NAME, TAGGER_NAME)
     elif args.rank_model == "MaskRank":
         kpe_model = MaskRank(BACKEND_MODEL_NAME, TAGGER_NAME)
     elif args.rank_model == "MDKPERank":
@@ -270,6 +268,8 @@ def main():
     logger.info("Start Testing ...")
     logger.info(f"KP extraction for {len(data)} examples.")
     logger.info(f"Options: {options}")
+
+    options["experiment"] = args.experiment_name
     # -------------------------------------------------
     # --------------- Run Experiment ------------------
     # -------------------------------------------------
@@ -296,6 +296,12 @@ def main():
     else:
         model_results = postprocess_res_labels(model_results, stemmer, lemmer)
         true_labels = postprocess_dataset_labels(true_labels, stemmer, lemmer)
+        import joblib
+
+        joblib.dump(
+            (model_results, true_labels),
+            path.join(GEO_KPE_MULTIDOC_CACHE_PATH, "debug-predict-gold.pkl"),
+        )
 
     results = evaluate_kp_extraction(model_results, true_labels)
     save(results, args)
