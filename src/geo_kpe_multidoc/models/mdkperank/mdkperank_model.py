@@ -1,3 +1,4 @@
+import re
 from dataclasses import dataclass
 from itertools import chain
 from statistics import mean
@@ -44,7 +45,9 @@ class MDKPERank(BaseKPModel):
         self.base_model_embed: EmbedRank = EmbedRank(model_name, tagger)
         # TODO: what how to join MaskRank
         # self.base_model_mask = MaskRank(model, tagger)
-        # super().__init__(model)
+        self.name = "{}_{}".format(
+            str(self.__str__).split()[3], re.sub("-", "_", model_name)
+        )
 
     def extract_kp_from_doc(
         self, doc, top_n, min_len, stemmer=None, lemmer=None, **kwargs
@@ -155,15 +158,17 @@ class MDKPERank(BaseKPModel):
         }
 
         top_n_scores = self._sort_candidate_score(keyphrase_semantic_score)
-        docs_geo_coords = load_topic_geo_locations(topic_docs[0].topic)
 
-        keyphrase_coordinates = {
-            candidate: self._get_locations(
-                docs_geo_coords,
-                candidate_document_matrix[candidate],
-            )
-            for candidate in keyphrase_semantic_score.keys()
-        }
+        # TODO: Get Geo Coordinates?
+        # docs_geo_coords = load_topic_geo_locations(topic_docs[0].topic)
+
+        # keyphrase_coordinates = {
+        #     candidate: self._get_locations(
+        #         docs_geo_coords,
+        #         candidate_document_matrix[candidate],
+        #     )
+        #     for candidate in keyphrase_semantic_score.keys()
+        # }
 
         # Semantic score of per document extracted keyphrases for each document
         # d Documents times k_d Keyphrases, each document can have a different set of extracted keyphrases.
@@ -178,7 +183,7 @@ class MDKPERank(BaseKPModel):
             top_n_scores,
             candidates,
             candidate_document_matrix,
-            keyphrase_coordinates,
+            # keyphrase_coordinates,
             ranking_p_doc,
         )
 

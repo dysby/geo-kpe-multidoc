@@ -51,7 +51,7 @@ class MaskRank(BaseKPModel):
         self.pos_tag_doc(
             doc=doc,
             stemming=None,
-            memory=use_cache,
+            use_cache=use_cache,
         )
         self.extract_candidates(doc, min_len, self.grammar, lemmer)
 

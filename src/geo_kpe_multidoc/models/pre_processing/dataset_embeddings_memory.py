@@ -1,14 +1,14 @@
+import os
+from typing import List, Set, Tuple
+
 import numpy as np
 import torch
-import os
-
 from nltk.stem import PorterStemmer
-from typing import List, Tuple, Set
 
 from geo_kpe_multidoc.utils.IO import read_from_file, write_to_file
 
 
-class EmbeddingsMemory:
+class EmbeddingsCache:
     """
     Class to calculate and store embeddings in memory
     """
@@ -17,7 +17,7 @@ class EmbeddingsMemory:
         self.corpus = corpus
         self.stemmer = PorterStemmer()
 
-    def write_embeds(self, model, save_dir, doc_sents_words, stemming=False):
+    def _write_to_cache(self, model, save_dir, doc_sents_words, stemming=False):
         doc_sents_words_embed = []
 
         for i in range(len(doc_sents_words)):
@@ -57,5 +57,5 @@ class EmbeddingsMemory:
                         doc_sents_words.append([token.text for token in sent])
 
                 torch.cuda.empty_cache()
-                self.write_embeds(model, result_dir, doc_sents_words)
+                self._write_to_cache(model, result_dir, doc_sents_words)
                 print(f"Doc {i} stored")
