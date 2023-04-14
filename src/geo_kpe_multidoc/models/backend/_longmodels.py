@@ -8,17 +8,27 @@ import torch
 from keybert.backend._sentencetransformers import SentenceTransformerBackend
 from loguru import logger
 from sentence_transformers import SentenceTransformer
-from transformers import (AutoModel, AutoTokenizer, BigBirdConfig,
-                          BigBirdModel, LongformerConfig, LongformerModel,
-                          LongformerSelfAttention, LongformerTokenizerFast,
-                          RobertaForMaskedLM, RobertaTokenizerFast,
-                          XLMRobertaConfig, XLMRobertaModel,
-                          XLMRobertaTokenizer, XLMRobertaTokenizerFast)
+from transformers import (
+    AutoModel,
+    AutoTokenizer,
+    BigBirdConfig,
+    BigBirdModel,
+    LongformerConfig,
+    LongformerModel,
+    LongformerSelfAttention,
+    LongformerTokenizerFast,
+    RobertaForMaskedLM,
+    RobertaTokenizerFast,
+    XLMRobertaConfig,
+    XLMRobertaModel,
+    XLMRobertaTokenizer,
+    XLMRobertaTokenizerFast,
+)
 
 from geo_kpe_multidoc import GEO_KPE_MULTIDOC_MODELS_PATH
 
-from .roberta2longformer.roberta2longformer import \
-    convert_roberta_to_longformer
+from .roberta2longformer.roberta2longformer import convert_roberta_to_longformer
+
 # from ...keybert.backend._utils import select_backend
 from .select_backend import select_backend
 
@@ -394,13 +404,13 @@ def load_longmodel(embedding_model: str = "") -> Callable:
 
         elif sliced_m == "generate-transformers-3":
             tmp_path = os.path.join(GEO_KPE_MULTIDOC_MODELS_PATH, embedding_model)
-            
-            tokenizer = XLMRobertaTokenizerFast.from_pretrained(
-                "/home/helder/doc/mecd/thesis/models/longformer-paraphrase-multilingual-mpnet-base-v2"
-            )
-            model = XLMRobertaLongModel.from_pretrained(
-                "/home/helder/doc/mecd/thesis/models/longformer-paraphrase-multilingual-mpnet-base-v2"
-            )
+            raise NotImplemented
+            # tokenizer = XLMRobertaTokenizerFast.from_pretrained(
+            #     "/home/helder/doc/mecd/thesis/models/longformer-paraphrase-multilingual-mpnet-base-v2"
+            # )
+            # model = XLMRobertaLongModel.from_pretrained(
+            #     "/home/helder/doc/mecd/thesis/models/longformer-paraphrase-multilingual-mpnet-base-v2"
+            # )
 
         else:
             logger.info(

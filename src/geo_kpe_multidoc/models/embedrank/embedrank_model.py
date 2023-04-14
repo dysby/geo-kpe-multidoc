@@ -57,13 +57,11 @@ class EmbedRank(BaseKPModel):
         self.pos_tag_doc(
             doc=doc,
             stemming=None,
-            memory=use_cache,
+            use_cache=use_cache,
         )
         self.extract_candidates(doc, min_len, self.grammar, lemmer)
 
-        cand_embeds, candidate_set = self.embed_n_candidates(
-            doc, min_len, stemmer, **kwargs
-        )
+        cand_embeds, candidate_set = self.embed_n_candidates(doc, stemmer, **kwargs)
 
         logger.info(f"Document #{self.counter} processed")
         self.counter += 1
@@ -134,7 +132,7 @@ class EmbedRank(BaseKPModel):
         # Used after POS_TAGGING,
         # at 1st stage document POS Tagging uses normal text including capital letters,
         # but later document handling will use only lowered text, embedings, and such.
-        doc.raw_text = doc.raw_text.lower()
+        # doc.raw_text = doc.raw_text.lower()
         doc_embedings = self.model.embedding_model.encode(
             doc.raw_text, show_progress_bar=False, output_value=None
         )
@@ -166,7 +164,20 @@ class EmbedRank(BaseKPModel):
             candidate_embeds = []
 
             for mention in doc.candidate_mentions[candidate]:
+                # HACK: DEBUG
+                # if mention in [
+                #     "cane crops",
+                #     "mile band",
+                #     "casualty",
+                #     "Pounds",
+                #     "Non - Marine Association",
+                #     "Texas border",
+                #     "Roberts",
+                # ]:
+                #     pass
+
                 tokenized_candidate = tokenize_hf(mention, self.model)
+
                 filt_ids = filter_special_tokens(tokenized_candidate["input_ids"])
 
                 cand_len = len(filt_ids)
@@ -196,7 +207,10 @@ class EmbedRank(BaseKPModel):
                 # candidate is beyond max position for emdedding
                 # return a non-contextualized embedding.
                 doc.candidate_set_embed.append(self.model.embed(candidate))
-
+                # TODO: problem with original 'andrew - would' vs PoS extracted 'andrew-would'
+                logger.debug(
+                    f"Candidate {candidate} - mentions not found: {doc.candidate_mentions[candidate]}"
+                )
             else:
                 doc.candidate_set_embed.append(np.mean(candidate_embeds, axis=0))
 
@@ -230,8 +244,10 @@ class EmbedRank(BaseKPModel):
 
         TODO: why not use aggregate candidades in stem form?
         DONE: why not lowercase candidates? lemmatize returns lowercase candidates
-        TODO: candidate mentions should not be lemmatized, maybe lowercased (document will be embed in lowercase form),
-                otherwise mentions are not found in document.
+        DONE: candidate mentions should not be lemmatized, maybe lowercased (document will be embed in lowercase form),
+                otherwise mentions are not found in document. Do not change original mention form.
+                Model tokenizer is responsible for case handling.
+        TODO: new grammar (({.*}{HYPH}{.*}){NOUN}*)|(({VBG}|{VBN})?{ADJ}*{NOUN}+)
         """
         doc.candidate_set = set()
         doc.candidate_mentions = {}
@@ -245,23 +261,49 @@ class EmbedRank(BaseKPModel):
             for subtree in np_trees[i].subtrees(filter=lambda t: t.label() == "NP"):
                 temp_cand_set.append(" ".join(word for word, tag in subtree.leaves()))
 
+            # TODO: how to deal with `re-election campain`? join in line above will result in `re - election campain`.
+            #       Then the model will nevel find this candidate mentions because the original form is lost.
+            #       This is a hack, to handle `-` and `.` in the middle of a candidate.
+            #       Check from `pos_tag_text_sents_words` where `-` are joined rto surrounding nouns.
+
             for candidate in temp_cand_set:
                 # candidate max number of words is 5 because longer candidates may be overfitting
+                # HACK: DEBUG
+                # if candidate in [
+                #     "cane crops",
+                #     "mile band",
+                #     "casualty",
+                #     "Pounds",
+                #     "Non - Marine Association",
+                #     "Texas border",
+                #     "Roberts",
+                # ]:
+                #     pass
+
                 if len(candidate) > min_len and len(candidate.split(" ")) <= 5:
+                    # TODO: 'we insurer':{'US INSURERS'} but 'eastern us': {'eastern US'} ...
                     l_candidate = (
                         lemmatize(candidate, lemmer_lang) if lemmer_lang else candidate
                     )
                     doc.candidate_set.add(l_candidate)
 
-                    doc.candidate_mentions.setdefault(l_candidate, []).append(candidate)
+                    # Candidate mentions was a list of candidate forms,
+                    # it should be a set (no repetitions), when embedding candidate the mentions
+                    # will be searched and all occorrences will count.
+                    # DONE: keep candidate mentions in lower form. Document is embedded in lower case.
+                    # DONE: candidate forms are kept in original form. The tokenizer of the model is
+                    # responsible handling text case.
+                    doc.candidate_mentions.setdefault(l_candidate, set()).add(
+                        candidate  # candidate.lower()
+                    )
 
         doc.candidate_set = sorted(list(doc.candidate_set), key=len, reverse=True)
 
     def embed_n_candidates(
-        self, doc: Document, min_len: int, stemmer, **kwargs
+        self, doc: Document, stemmer, **kwargs
     ) -> Tuple[List[np.ndarray], List[str]]:
         """
-        TODO: Why embed_n_candidates
+        TODO: Why embed_(n)_candidates?
 
         Return
         ------
@@ -272,16 +314,23 @@ class EmbedRank(BaseKPModel):
         cand_mode = kwargs.get("global_attention", "")
         post_processing = kwargs.get("post_processing", [""])
 
-        t = time()
-        doc.doc_embed = self.embed_doc(doc, stemmer, doc_mode, post_processing)
-        logger.info(f"Embed Doc in {time() -  t:.2f}s")
+        use_cache = kwargs.get("cache_embeddings", False)
 
-        t = time()
-        self.embed_candidates(doc, stemmer, cand_mode, post_processing)
-        logger.info(f"Embed Candidates in {time() -  t:.2f}s")
+        if use_cache:
+            # TODO: implement caching? is usefull only in future analysis
+            _file_name = self.name[self.name.index("_") + 1 :]
+            raise NotImplemented
+        else:
+            t = time()
+            doc.doc_embed = self.embed_doc(doc, stemmer, doc_mode, post_processing)
+            logger.info(f"Embed Doc in {time() -  t:.2f}s")
 
-        if cand_mode == "global_attention":
-            doc.doc_embed = self.global_embed_doc(doc)
+            t = time()
+            self.embed_candidates(doc, stemmer, cand_mode, post_processing)
+            logger.info(f"Embed Candidates in {time() -  t:.2f}s")
+
+            if cand_mode == "global_attention":
+                doc.doc_embed = self.global_embed_doc(doc)
 
         return doc.candidate_set_embed, doc.candidate_set
 

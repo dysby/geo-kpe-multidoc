@@ -10,6 +10,8 @@ from loguru import logger
 from nltk.stem import PorterStemmer
 from pandas import DataFrame
 
+from geo_kpe_multidoc import GEO_KPE_MULTIDOC_CACHE_PATH
+
 
 def parse_args():
     parser = argparse.ArgumentParser(
@@ -27,7 +29,6 @@ def parse_args():
 
     parser.add_argument(
         "--dataset_name",
-        default=None,
         type=str,
         required=True,
         help="The input dataset name",
@@ -99,32 +100,24 @@ def parse_args():
         choices=["weighted", "harmonic"],
     )
     parser.add_argument(
-        "--save_pos_tags", type=bool, help="bool flag to save POS tags", default=False
+        "--save_pos_tags", action="store_true", help="bool flag to save POS tags"
     )
     parser.add_argument(
-        "--save_embeds",
-        type=bool,
-        help="bool flag to save generated embeds",
-        default=False,
+        "--save_embeds", action="store_true", help="bool flag to save generated embeds"
     )
     parser.add_argument(
         "--use_cache",
-        type=bool,
+        action="store_true",
         help="bool flag to use pos tags and embeds from cache",
-        default=False,
     )
     parser.add_argument(
         "--stemming", action="store_true", help="bool flag to use stemming"
     )
     parser.add_argument(
-        "--lemmatization",
-        action="store_true",
-        help="boolean flag to use lemmatization",
+        "--lemmatization", action="store_true", help="boolean flag to use lemmatization"
     )
     parser.add_argument(
-        "--embedrank_mmr",
-        action="store_true",
-        help="boolean flag to use EmbedRank MMR",
+        "--embedrank_mmr", action="store_true", help="boolean flag to use EmbedRank MMR"
     )
     parser.add_argument(
         "--embedrank_diversity",
@@ -136,7 +129,11 @@ def parse_args():
         action="store_true",
         help="Save KPE Model outputs to cache directory.",
     )
-
+    parser.add_argument(
+        "--sbert_max_length",
+        type=int,
+        help="base SentenceTransformer max lenth (Transformer SerfAttention O(N^2))",
+    )
     return parser.parse_args()
 
 
@@ -265,11 +262,18 @@ def main():
     if args.cache_results:
         options["cache_results"] = True
 
+    if args.sbert_max_length != 128:
+        kpe_model.base_model_embed.model.embedding_model.max_seq_length = (
+            args.sbert_max_length
+        )
+
     data = load_data(ds_name, GEO_KPE_MULTIDOC_DATA_PATH)
     logger.info(f"Args: {args}")
     logger.info("Start Testing ...")
     logger.info(f"KP extraction for {len(data)} examples.")
     logger.info(f"Options: {options}")
+
+    options["experiment"] = args.experiment_name
     # -------------------------------------------------
     # --------------- Run Experiment ------------------
     # -------------------------------------------------
@@ -296,6 +300,12 @@ def main():
     else:
         model_results = postprocess_res_labels(model_results, stemmer, lemmer)
         true_labels = postprocess_dataset_labels(true_labels, stemmer, lemmer)
+        import joblib
+
+        joblib.dump(
+            (model_results, true_labels),
+            path.join(GEO_KPE_MULTIDOC_CACHE_PATH, "debug-predict-gold.pkl"),
+        )
 
     results = evaluate_kp_extraction(model_results, true_labels)
     save(results, args)

@@ -1,5 +1,6 @@
 import gc
 import json
+import os
 from itertools import islice, zip_longest
 from os import path, write
 from pathlib import Path
@@ -38,6 +39,8 @@ def postprocess_res_labels(
         ...
     }
 
+    Usually candidates are already lemmatized.
+
     """
     res = {}
     for dataset in model_results:
@@ -75,7 +78,7 @@ def postprocess_res_labels(
 
 
 def postprocess_dataset_labels(
-    corpus_true_labels, stemmer: StemmerI = None, lemmer: Callable = None
+    corpus_true_labels, stemmer: StemmerI = None, lemmer: str = None
 ):
     """
     Code snippet to correctly format dataset true labels
@@ -96,12 +99,7 @@ def postprocess_dataset_labels(
             doc_results = []
             for kp in corpus_true_labels[dataset][i]:
                 if lemmer:
-                    kp = " ".join(
-                        [
-                            simplemma.lemmatize(w, lemmer)
-                            for w in simplemma.simple_tokenizer(kp)
-                        ]
-                    )
+                    kp = lemmatize(kp, lemmer)
                 if stemmer:
                     kp = " ".join(
                         [stemmer.stem(w) for w in simplemma.simple_tokenizer(kp)]
@@ -303,6 +301,7 @@ def extract_keyphrases_docs(
     """
     model_results = {dataset.name: []}
     true_labels = {dataset.name: []}
+    experiment = kwargs.get("experiment", "debug")
 
     if n_docs_limit == -1:
         loader = dataset
@@ -329,6 +328,21 @@ def extract_keyphrases_docs(
             gold_kp = lemmatize(gold_kp, lemmer)
 
         true_labels[dataset.name].append(gold_kp)
+
+        # save results
+        os.makedirs(path.join(GEO_KPE_MULTIDOC_CACHE_PATH, experiment), exist_ok=True)
+        joblib.dump(
+            {
+                "dataset": dataset.name,
+                "topic": doc_id,
+                "doc": doc_id,
+                "top_n_scores": top_n_and_scores,
+                "gold": gold_kp,
+            },
+            path.join(
+                GEO_KPE_MULTIDOC_CACHE_PATH, experiment, f"{doc_id}-top_n_scores.pkl"
+            ),
+        )
 
     return model_results, true_labels
 

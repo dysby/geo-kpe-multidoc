@@ -5,6 +5,7 @@ from typing import Callable, List, Tuple, Union
 import simplemma
 from keybert.backend._base import BaseEmbedder
 from nltk.corpus import stopwords
+from simplemma import text_lemmatizer
 
 from .stopwords import ENGLISH_STOP_WORDS
 
@@ -43,16 +44,19 @@ def remove_stopwords(text: str = "") -> str:
 
 
 def lemmatize(text: Union[str, List], lang: str) -> Union[str, List]:
+    """Lemmatize text but remove isolated `.` from output.
+    This is important because we do not want `Mr. Smith` to be lemmatized to `Mr . Smith`.
+    In case of decimals it does not take effect eg. `10.5` og `10.5g` are correctly
+    lemmatized keeping the `.` in the right place.
+
+    Using text_lemmatizer also lemmatize `inter-national community` correctly to `inter-national community`
+    """
     if isinstance(text, List):
         return [
-            " ".join(
-                [simplemma.lemmatize(w, lang) for w in simplemma.simple_tokenizer(line)]
-            ).lower()
+            " ".join([w for w in text_lemmatizer(line, lang) if w != "."]).lower()
             for line in text
         ]
-    return " ".join(
-        [simplemma.lemmatize(w, lang) for w in simplemma.simple_tokenizer(text)]
-    ).lower()
+    return " ".join([w for w in text_lemmatizer(text, lang) if w != "."]).lower()
 
 
 def filter_special_tokens(input_ids: List[List[int]]) -> List[int]:
