@@ -1,0 +1,26 @@
+name: transformers3
+channels:
+  - conda-forge
+  - defaults
+dependencies:
+  - python=3.7
+  - transformers=3.5.1
+  - nltk
+  - sentence-transformers
+  - pip
+  - pip:
+    - spacy
+    - simplemma==0.6.0
+    - mordecai
+    - vincenty
+    - bs4
+    - tabulate
+    - toolz
+    - loguru
+variables:
+  GEO_KPE_MULTIDOC_MAPBOX_TOKEN: 
+  GEO_KPE_MULTIDOC_DATA_PATH: 
+  GEO_KPE_MULTIDOC_MODELS_PATH: 
+  GEO_KPE_MULTIDOC_OUTPUT_PATH: 
+  GEO_KPE_MULTIDOC_CACHE_PATH: 
+  GEO_KPE_MULTIDOC_MORDECAI_ES_URL: 

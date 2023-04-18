@@ -18,14 +18,6 @@ from geo_kpe_multidoc.models.pre_processing.pre_processing_utils import (
 KPEScore = Tuple[str, float]
 
 
-class DocMode(Enum):
-    GLOBAL_ATTENTION = auto()
-
-
-class CandidateMode(Enum):
-    GLOBAL_ATTENTION = auto()
-
-
 class BaseKPModel:
     """
     Simple abstract class to encapsulate all KP models
