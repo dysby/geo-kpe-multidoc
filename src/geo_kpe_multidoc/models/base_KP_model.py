@@ -1,5 +1,6 @@
 import re
 from enum import Enum, auto
+from itertools import chain
 from typing import Callable, List, Optional, Set, Tuple
 
 import torch
@@ -24,6 +25,26 @@ class DocMode(Enum):
 
 class CandidateMode(Enum):
     GLOBAL_ATTENTION = auto()
+
+
+def find_occurrences(a: List[int], b: List[int]) -> List[List[int]]:
+    occurrences = []
+    # TODO: escape search in right padding indexes
+    for i in range(len(b) - len(a) + 1):
+        if b[i : i + len(a)] == a:
+            occurrences.append(list(range(i, i + len(a))))
+    return occurrences
+
+
+def cand_mean_embedding(
+    # TODO: simplify candidate embedding computation
+    candidate: List[int],
+    doc_input_ids: List[int],
+    doc_token_embeddings: torch.Tensor,
+):
+    candidate_occurrences = find_occurrences(candidate, doc_input_ids)
+    candidate_occurrences = list(chain(*candidate_occurrences))
+    return torch.mean(doc_token_embeddings[:, candidate_occurrences, :], dim=1)
 
 
 class BaseKPModel:

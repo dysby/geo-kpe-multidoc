@@ -191,19 +191,19 @@ def main():
 
     if args.rank_model == "EmbedRank":
         kpe_model = EmbedRank(BACKEND_MODEL_NAME, TAGGER_NAME)
-        if args.sbert_max_length != 128:
-            kpe_model.model.embedding_model.max_seq_length = (
-                args.sbert_max_length
-            )
+        # if args.sbert_max_length != 128:
+        #     kpe_model.model.embedding_model.max_seq_length = (
+        #         args.sbert_max_length
+        #     )
     elif args.rank_model == "MaskRank":
         kpe_model = MaskRank(BACKEND_MODEL_NAME, TAGGER_NAME)
     elif args.rank_model == "MDKPERank":
         kpe_model = MDKPERank(BACKEND_MODEL_NAME, TAGGER_NAME)
-        # TODO: refactor duplicate
-        if args.sbert_max_length != 128:
-            kpe_model.base_model_embed.model.embedding_model.max_seq_length = (
-                args.sbert_max_length
-            )
+        # # TODO: refactor duplicate
+        # if args.sbert_max_length != 128:
+        #     kpe_model.base_model_embed.model.embedding_model.max_seq_length = (
+        #         args.sbert_max_length
+        #     )
 
     elif args.rank_model == "FusionRank":
         kpe_model = FusionModel(
@@ -271,8 +271,10 @@ def main():
 
     if args.cache_results:
         options["cache_results"] = True
-
-    
+    # if args.sbert_max_length != 128:
+    #     kpe_model.base_model_embed.model.embedding_model.max_seq_length = (
+    #         args.sbert_max_length
+    #     )
     data = load_data(ds_name, GEO_KPE_MULTIDOC_DATA_PATH)
     logger.info(f"Args: {args}")
     logger.info("Start Testing ...")

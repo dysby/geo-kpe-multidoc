@@ -9,6 +9,16 @@ from simplemma import text_lemmatizer
 
 from .stopwords import ENGLISH_STOP_WORDS
 
+# TODO: consider special tokens from AutoTokenizer.
+# tokenizer.bos_token_id
+# tokenizer.eos_token_id
+# tokenizer.unk_token_id
+# tokenizer.sep_token_id
+# tokenizer.pad_token_id
+# tokenizer.cls_token_id
+# tokenizer.mask_token_id
+# tokenizer.additional_special_tokens_ids
+
 SPECIAL_TOKEN_IDS = {0, 1, 2, 3, 250001}
 
 
@@ -47,10 +57,33 @@ def lemmatize(text: Union[str, List], lang: str) -> Union[str, List]:
     """Lemmatize text but remove isolated `.` from output.
     This is important because we do not want `Mr. Smith` to be lemmatized to `Mr . Smith`.
     In case of decimals it does not take effect eg. `10.5` og `10.5g` are correctly
-    lemmatized keeping the `.` in the right place.
+    lemmatized, keeping the `.` in place.
 
     Using text_lemmatizer also lemmatize `inter-national community` correctly to `inter-national community`
     """
+    # # old simplemma 0.6.0
+    # # simplemma.load_data(lemmatizers[dataset])
+    # # simplemma.lemmatize(w, lemmer)
+
+    # from simplemma import __version__
+
+    # if __version__ == "0.6.0":
+    #     lemmer = simplemma.load_data(lang)
+    #     if isinstance(text, List):
+    #         return [
+    #             " ".join([w for w in text_lemmatizer(line, lemmer) if w != "."]).lower()
+    #             for line in text
+    #         ]
+    #     return " ".join([w for w in text_lemmatizer(text, lemmer) if w != "."]).lower()
+    #     # simplemma.lemmatize(w, lemmer)
+
+    # else:
+    #     if isinstance(text, List):
+    #         return [
+    #             " ".join([w for w in text_lemmatizer(line, lang) if w != "."]).lower()
+    #             for line in text
+    #         ]
+    #     return " ".join([w for w in text_lemmatizer(text, lang) if w != "."]).lower()
     if isinstance(text, List):
         return [
             " ".join([w for w in text_lemmatizer(line, lang) if w != "."]).lower()

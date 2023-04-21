@@ -7,6 +7,9 @@ def select_backend(embedding_model) -> BaseEmbedder:
     if isinstance(embedding_model, BaseEmbedder):
         return embedding_model
     # Longmodels model
+    if isinstance(embedding_model, str):
+        if embedding_model == "allenai/longformer-base-4096":
+            return keybert_select_backend(embedding_model)
     if "longformer" in str(embedding_model) or "bigbird" in str(embedding_model):
         from geo_kpe_multidoc.models.backend._longmodels import load_longmodel
 

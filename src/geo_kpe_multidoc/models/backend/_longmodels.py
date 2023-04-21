@@ -8,21 +8,15 @@ import torch
 from keybert.backend._sentencetransformers import SentenceTransformerBackend
 from loguru import logger
 from sentence_transformers import SentenceTransformer
-from transformers import (
-    AutoModel,
-    AutoTokenizer,
-    BigBirdConfig,
-    BigBirdModel,
+from transformers import AutoTokenizer  # XLMRobertaTokenizerFast,
+from transformers import (  # RobertaForMaskedLM,; RobertaTokenizerFast,; AutoModel,
     LongformerConfig,
     LongformerModel,
     LongformerSelfAttention,
     LongformerTokenizerFast,
-    RobertaForMaskedLM,
-    RobertaTokenizerFast,
     XLMRobertaConfig,
     XLMRobertaModel,
     XLMRobertaTokenizer,
-    XLMRobertaTokenizerFast,
 )
 
 from geo_kpe_multidoc import GEO_KPE_MULTIDOC_MODELS_PATH
@@ -34,7 +28,46 @@ from .select_backend import select_backend
 
 
 class XLMRobertaLongSelfAttention(LongformerSelfAttention):
-    """from https://github.com/allenai/longformer/issues/215"""
+    """
+    from https://github.com/allenai/longformer/issues/215
+    For transformers=4.12.5
+    For transformers=4.26
+
+    From XLMRobertaSelfAttention
+
+    def forward(
+        self,
+        hidden_states: torch.Tensor,
+        attention_mask: Optional[torch.FloatTensor] = None,
+        head_mask: Optional[torch.FloatTensor] = None,
+        encoder_hidden_states: Optional[torch.FloatTensor] = None,
+        encoder_attention_mask: Optional[torch.FloatTensor] = None,
+        past_key_value: Optional[Tuple[Tuple[torch.FloatTensor]]] = None,
+        output_attentions: Optional[bool] = False,
+
+    to
+
+    LongformerSelfAttention
+
+    def forward(
+        self,
+        hidden_states,
+        attention_mask=None,
+        layer_head_mask=None,
+        is_index_masked=None,
+        is_index_global_attn=None,
+        is_global_attn=None,
+        output_attentions=False,
+    ):
+        [`LongformerSelfAttention`] expects *len(hidden_states)* to be multiple of *attention_window*. Padding to
+        *attention_window* happens in [`LongformerModel.forward`] to avoid redoing the padding on each layer.
+
+        The *attention_mask* is changed in [`LongformerModel.forward`] from 0, 1, 2 to:
+
+            - -10000: no attention
+            - 0: local attention
+            - +10000: global attention
+    """
 
     def forward(
         self,
@@ -49,7 +82,8 @@ class XLMRobertaLongSelfAttention(LongformerSelfAttention):
         attention_mask = attention_mask.squeeze(dim=2).squeeze(dim=1)
         is_index_masked = attention_mask < 0
         is_index_global_attn = attention_mask > 0
-        is_global_attn = any(is_index_global_attn.flatten())
+        # is_global_attn = any(is_index_global_attn.flatten()) PR #5811
+        is_global_attn = is_index_global_attn.flatten().any().item()
         return super().forward(
             hidden_states,
             is_index_masked=is_index_masked,
@@ -67,8 +101,152 @@ class XLMRobertaLongModel(XLMRobertaModel):
             layer.attention.self = XLMRobertaLongSelfAttention(config, layer_id=i)
 
 
-def to_longformer(base_model, max_pos=4096, attention_window=512):
-    """Transform a `base_model` (RoBERTa) into a Longformer with sparce attention."""
+class RobertaLongSelfAttention(LongformerSelfAttention):
+    """For transformers 3.0.2"""
+
+    def forward(
+        self,
+        hidden_states,
+        attention_mask=None,
+        head_mask=None,
+        encoder_hidden_states=None,
+        encoder_attention_mask=None,
+        output_attentions=False,
+    ):
+        return super().forward(
+            hidden_states,
+            attention_mask=attention_mask,
+            output_attentions=output_attentions,
+        )
+
+
+class T3_RobertaLongModel(XLMRobertaModel):
+    def __init__(self, config):
+        super().__init__(config)
+        for i, layer in enumerate(self.roberta.encoder.layer):
+            # replace the `modeling_bert.BertSelfAttention` object with `LongformerSelfAttention`
+            layer.attention.self = RobertaLongSelfAttention(config, layer_id=i)
+
+
+def to_longformer_ashtonomy_grather_3_4(
+    save_model_to, model, tokenizer, attention_window, model_max_length
+):
+    config = model.config
+    position_embeddings = model.roberta.embeddings.position_embeddings
+
+    tokenizer.model_max_length = model_max_length
+    tokenizer.init_kwargs["model_max_length"] = model_max_length
+    current_model_max_length, embed_size = position_embeddings.weight.shape
+
+    # NOTE: RoBERTa has positions 0,1 reserved
+    # embedding size is max position + 2
+    model_max_length += 2
+    config.max_position_embeddings = model_max_length
+    assert (
+        model_max_length > current_model_max_length
+    ), "New model max_length must be longer than current max_length"
+
+    # BUG for XLM: Need to make all zeros sice too large base model
+    new_pos_embed = position_embeddings.weight.new_zeros(model_max_length, embed_size)
+
+    k = 2
+    step = current_model_max_length - 2
+    while k < model_max_length - 1:
+        new_pos_embed[k : (k + step)] = position_embeddings.weight[2:]
+        k += step
+
+    # HACK for Huggingface transformers >=3.4.0 and < 4.0
+    # https://github.com/huggingface/transformers/issues/6465#issuecomment-719042969
+    position_embeddings.weight.data = new_pos_embed
+    model.roberta.embeddings.position_embeddings.num_embeddings = len(
+        new_pos_embed.data
+    )
+    num_model_embeddings = position_embeddings.num_embeddings
+    model.roberta.embeddings.position_ids = torch.arange(0, num_model_embeddings)[None]
+
+    # replace the `modeling_bert.BertSelfAttention` object with `LongformerSelfAttention`
+    config.attention_window = [attention_window] * config.num_hidden_layers
+    for i, layer in enumerate(model.roberta.encoder.layer):
+        longformer_self_attn = LongformerSelfAttention(config, layer_id=i)
+        longformer_self_attn.query = layer.attention.self.query
+        longformer_self_attn.key = layer.attention.self.key
+        longformer_self_attn.value = layer.attention.self.value
+
+        longformer_self_attn.query_global = layer.attention.self.query
+        longformer_self_attn.key_global = layer.attention.self.key
+        longformer_self_attn.value_global = layer.attention.self.value
+
+        layer.attention.self = longformer_self_attn
+
+    logger.info(f"saving model to {save_model_to}")
+    model.save_pretrained(save_model_to)
+    tokenizer.save_pretrained(save_model_to)
+    return model, tokenizer
+
+
+def to_longformer_t_v4(
+    base_model: SentenceTransformer, max_pos=4096, attention_window=512
+):
+    logger.info("Transform SentenceTransformer to longformer using Transformers v 4.26")
+    model = base_model._modules["0"]._modules["auto_model"]
+    config = model.config
+    tokenizer = base_model.tokenizer
+
+    # extend position embeddings
+    tokenizer.model_max_length = max_pos
+    tokenizer.init_kwargs["model_max_length"] = max_pos
+    (
+        current_max_pos,
+        embed_size,
+    ) = model.embeddings.position_embeddings.weight.shape
+
+    # add this to keep shape compability with sentence_transformer
+    tokenizer.padding = "max_lenght"
+
+    max_pos += 2  # NOTE: RoBERTa has positions 0,1 reserved, so embedding size is max position + 2
+    config.max_position_embeddings = max_pos
+    assert max_pos > current_max_pos
+    # allocate a larger position embedding matrix
+    new_pos_embed = model.embeddings.position_embeddings.weight.new_empty(
+        max_pos, embed_size
+    )
+    # copy position embeddings over and over to initialize the new position embeddings
+    k = 2
+    step = current_max_pos - 2
+    while k < max_pos - 1:
+        new_pos_embed[k : (k + step)] = model.embeddings.position_embeddings.weight[2:]
+        k += step
+    model.embeddings.position_embeddings.weight.data = new_pos_embed
+    model.embeddings.position_ids.data = torch.tensor(
+        [i for i in range(max_pos)]
+    ).reshape(1, max_pos)
+
+    # replace the `modeling_bert.BertSelfAttention` object with `LongformerSelfAttention`
+    config.attention_window = [attention_window] * config.num_hidden_layers
+    for i, layer in enumerate(model.encoder.layer):
+        longformer_self_attn = XLMRobertaLongSelfAttention(config, layer_id=i)
+        longformer_self_attn.query = layer.attention.self.query
+        longformer_self_attn.key = layer.attention.self.key
+        longformer_self_attn.value = layer.attention.self.value
+
+        longformer_self_attn.query_global = copy.deepcopy(layer.attention.self.query)
+        longformer_self_attn.key_global = copy.deepcopy(layer.attention.self.key)
+        longformer_self_attn.value_global = copy.deepcopy(layer.attention.self.value)
+
+        layer.attention.self = longformer_self_attn
+
+    # TODO: check base model is good
+    base_model.max_seq_length = tokenizer.model_max_length
+    return model, tokenizer
+
+
+def to_longformer_t_v3(
+    base_model: SentenceTransformer, max_pos=4096, attention_window=512
+):
+    """Transform a `base_model` (RoBERTa) into a Longformer with sparce attention.
+
+    For transformers 3.0.2
+    """
 
     logger.info("Transform to longformer")
     model = base_model._modules["0"]._modules["auto_model"]
@@ -106,7 +284,9 @@ def to_longformer(base_model, max_pos=4096, attention_window=512):
     config.attention_window = [attention_window] * config.num_hidden_layers
 
     for i, layer in enumerate(model.encoder.layer):
-        longformer_self_attn = LongformerSelfAttention(config, layer_id=i)
+        # longformer_self_attn = LongformerSelfAttention(config, layer_id=i)
+        # copy from
+        longformer_self_attn = RobertaLongSelfAttention(config, layer_id=i)
         longformer_self_attn.query = layer.attention.self.query
         longformer_self_attn.key = layer.attention.self.key
         longformer_self_attn.value = layer.attention.self.value
@@ -221,7 +401,7 @@ def load_longformer(embedding_model: str = "") -> Callable:
     return create_long_model(embedding_model, model_path, attention_window, max_pos)
 
 
-def create_long_model(embedding_model, save_model_to, attention_window, max_pos):
+def create_long_model(embedding_model: str, save_model_to, attention_window, max_pos):
     callable_model = select_backend(embedding_model[11:])
     model = callable_model.embedding_model._modules["0"]._modules["auto_model"]
     tokenizer = callable_model.embedding_model.tokenizer
@@ -242,18 +422,6 @@ def create_long_model(embedding_model, save_model_to, attention_window, max_pos)
     while k < max_pos - 1:
         new_pos_embed[k : k + step] = model.embeddings.position_embeddings.weight[2:]
         k += step
-
-    # From uncompile6
-    # if not max_pos > current_max_pos:
-    #     raise AssertionError
-    # else:
-    #     new_pos_embed = model.embeddings.position_embeddings.weight.new_empty(max_pos, embed_size)
-    #     k = 2
-    #     step = current_max_pos - 2
-    #     while True:
-    #         if k < max_pos - 1:
-    #             new_pos_embed[k:k + step] = model.embeddings.position_embeddings.weight[2:]
-    #             k += step
 
     model.embeddings.position_embeddings.weight.data = new_pos_embed
     model.embeddings.position_ids.data = torch.tensor(
@@ -280,66 +448,8 @@ def create_long_model(embedding_model, save_model_to, attention_window, max_pos)
     return callable_model
 
 
-def create_bigbird(
-    model: str, save_model_to: str, attention_window: int, max_pos: int
-) -> Callable:
-    callable_model = select_backend(model)
-
-    model = callable_model.embedding_model._modules["0"]._modules["auto_model"]
-    tokenizer = callable_model.embedding_model.tokenizer
-    config = model.config
-
-    # TODO: Check this
-    tokenizer.model_max_length = max_pos
-    tokenizer.init_kwargs["model_max_length"] = max_pos
-    tokenizer._tokenizer.truncation["max_length"] = attention_window
-
-    current_max_pos, embed_size = model.embeddings.position_embeddings.weight.shape
-    max_pos += 2  # NOTE: RoBERTa has positions 0,1 reserved, so embedding size is max position + 2
-    config.max_position_embeddings = max_pos
-
-    assert max_pos > current_max_pos
-    # allocate a larger position embedding matrix
-    new_pos_embed = model.embeddings.position_embeddings.weight.new_empty(
-        max_pos, embed_size
-    )
-    # copy position embeddings over and over to initialize the new position embeddings
-
-    k = 2
-    step = current_max_pos - 2
-    while k < max_pos - 1:
-        new_pos_embed[k : (k + step)] = model.embeddings.position_embeddings.weight[2:]
-        k += step
-
-    model.embeddings.position_embeddings.weight.data = new_pos_embed
-    model.embeddings.position_ids.data = torch.tensor(
-        [i for i in range(max_pos)]
-    ).reshape(1, max_pos)
-
-    config.attention_window = [attention_window] * config.num_hidden_layers
-    roberta_layers = [layer for _, layer in enumerate(model.encoder.layer)]
-
-    big_bird_config = BigBirdConfig()
-    big_bird_config.update(config.to_dict())
-    big_bird_model = BigBirdModel(big_bird_config)
-    big_bird_layers = [layer for _, layer in enumerate(big_bird_model.encoder.layer)]
-
-    for layer, big_bird_layer in zip(roberta_layers, big_bird_layers):
-        big_bird_layer.attention.self.query = layer.attention.self.query
-        big_bird_layer.attention.self.key = layer.attention.self.key
-        big_bird_layer.attention.self.value = layer.attention.self.value
-        layer.attention.self = big_bird_layer.attention.self
-
-    if not os.path.exists(save_model_to):
-        os.makedirs(save_model_to)
-
-    model.save_pretrained(save_model_to)
-    tokenizer.save_pretrained(save_model_to)
-    return callable_model
-
-
 def load_longmodel(embedding_model: str = "") -> Callable:
-    supported_models = {"longformer": create_longformer, "bigbird": create_bigbird}
+    supported_models = {"longformer": create_longformer}  # , "bigbird": create_bigbird}
     # longmodel_path = f"{os.getcwd()}\\keybert\\backend\\long_models\\"
     longmodel_path = GEO_KPE_MULTIDOC_MODELS_PATH
     # get model variant
@@ -372,7 +482,7 @@ def load_longmodel(embedding_model: str = "") -> Callable:
 
     # if model does not exist, create new.
     # HACK: bypass with generate
-    if not os.path.exists(model_path) and sliced_m != "generate":
+    if not os.path.exists(model_path) and "generate" not in sliced_m:
         return supported_models[sliced_t](
             sliced_m, model_path, attention_window, max_pos
         )
@@ -388,10 +498,13 @@ def load_longmodel(embedding_model: str = "") -> Callable:
         True
     """
     if sliced_t == "longformer":
-        if sliced_m == "generate":
+        if sliced_m == "generate-roberta2longformer":
+            logger.info(
+                f"Convert to Longformer by roberta2longformer from Sentence Transformer model"
+            )
             sbert = SentenceTransformer("paraphrase-multilingual-mpnet-base-v2")
 
-            # convertion
+            # convertion by roberta2longformer
             lmodel, lmodel_tokenizer = convert_roberta_to_longformer(
                 roberta_model=sbert._modules["0"]._modules["auto_model"],
                 roberta_tokenizer=sbert._modules["0"].tokenizer,
@@ -402,37 +515,31 @@ def load_longmodel(embedding_model: str = "") -> Callable:
 
             callable_model = SentenceTransformerBackend(sbert)
 
-        elif sliced_m == "generate-transformers-3":
-            tmp_path = os.path.join(GEO_KPE_MULTIDOC_MODELS_PATH, embedding_model)
-            raise NotImplemented
-            # tokenizer = XLMRobertaTokenizerFast.from_pretrained(
-            #     "/home/helder/doc/mecd/thesis/models/longformer-paraphrase-multilingual-mpnet-base-v2"
-            # )
-            # model = XLMRobertaLongModel.from_pretrained(
-            #     "/home/helder/doc/mecd/thesis/models/longformer-paraphrase-multilingual-mpnet-base-v2"
-            # )
+        elif sliced_m == "generate-original":
+            """To test in RAM transformation transformer v4 (NOT working transformers 3.0.2)"""
+            sbert = SentenceTransformer("paraphrase-multilingual-mpnet-base-v2")
+            logger.info(
+                f"Convert to Longformer by original script from Sentence Transformer model"
+            )
+            long_model, tokenizer = to_longformer_t_v4(sbert)
 
+            sbert.max_seq_length = 4096
+            sbert._modules["0"].auto_model = long_model
+
+            # token_type_ids need to be removed (when in model in RAM to longformer)
+            del sbert._modules["0"].auto_model.embeddings.token_type_ids
+
+            sbert.tokenizer = tokenizer
+
+            callable_model = SentenceTransformerBackend(sbert)
+            return callable_model
         else:
             logger.info(
                 f"Loading Longformer from Sentence Transformer model {sliced_t}-{sliced_m}."
             )
-            # 3rd
-            # return supported_models[sliced_t](
-            #     sliced_m, model_path, attention_window, max_pos
-            # )
-            # 2nd
             # callable_model = select_backend(sliced_m)
             # to_longformer(callable_model.embedding_model)
-
-            # logger.debug(callable_model.embedding_model._modules["0"])
-            # 1st
             embedding_model = SentenceTransformer(model_path)
-            # DONE: changed config.json architecture XLMRobertaModel to LonformerModel
-            #       changed model_type xlm-roberta to longformer
-            #       now 3 lines below are not needed.
-            # embedding_model._modules["0"]._modules[
-            #     "auto_model"
-            # ] = LongformerModel.from_pretrained(model_path)
             callable_model = SentenceTransformerBackend(embedding_model)
     else:
         logger.info(f"Loading base model {sliced_m}.")
