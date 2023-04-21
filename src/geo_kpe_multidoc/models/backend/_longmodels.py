@@ -26,6 +26,8 @@ from .roberta2longformer.roberta2longformer import convert_roberta_to_longformer
 # from ...keybert.backend._utils import select_backend
 from .select_backend import select_backend
 
+# from transformers.modeling_longformer import LongformerSelfAttention # v3.0.2
+
 
 class XLMRobertaLongSelfAttention(LongformerSelfAttention):
     """
@@ -220,6 +222,9 @@ def to_longformer_t_v4(
     model.embeddings.position_ids.data = torch.tensor(
         [i for i in range(max_pos)]
     ).reshape(1, max_pos)
+
+    # model.roberta.embeddings.position_ids.data = torch.tensor([i for i in range(max_pos)]).reshape(1, max_pos) # v4.2.0
+    # model.roberta.embeddings.position_ids = torch.tensor([i for i in range(max_pos)]).reshape(1, max_pos) # v3.0.2
 
     # replace the `modeling_bert.BertSelfAttention` object with `LongformerSelfAttention`
     config.attention_window = [attention_window] * config.num_hidden_layers
