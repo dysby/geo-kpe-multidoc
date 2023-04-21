@@ -11,6 +11,9 @@ from nltk.stem import PorterStemmer
 from pandas import DataFrame
 
 from geo_kpe_multidoc import GEO_KPE_MULTIDOC_CACHE_PATH
+from geo_kpe_multidoc.models.embedrank.embedrank_longformer_manual import (
+    EmbedRankManual,
+)
 
 
 def parse_args():
@@ -64,8 +67,8 @@ def parse_args():
         "--rank_model",
         default="EmbedRank",
         type=str,
-        help="The Ranking Model [EmbedRank, MaskRank, and FusionRank], MDKPERank",
-        choices=["EmbedRank", "MaskRank", "FusionRank", "MDKPERank"],
+        help="The Ranking Model [EmbedRank, EmbedRankManual, MaskRank, and FusionRank], MDKPERank",
+        choices=["EmbedRank", "EmbedRankManual", "MaskRank", "FusionRank", "MDKPERank"],
     )
     parser.add_argument(
         "--doc_limit",
@@ -129,11 +132,6 @@ def parse_args():
         action="store_true",
         help="Save KPE Model outputs to cache directory.",
     )
-    parser.add_argument(
-        "--sbert_max_length",
-        type=int,
-        help="base SentenceTransformer max lenth (Transformer SerfAttention O(N^2))",
-    )
     return parser.parse_args()
 
 
@@ -191,20 +189,12 @@ def main():
 
     if args.rank_model == "EmbedRank":
         kpe_model = EmbedRank(BACKEND_MODEL_NAME, TAGGER_NAME)
-        # if args.sbert_max_length != 128:
-        #     kpe_model.model.embedding_model.max_seq_length = (
-        #         args.sbert_max_length
-        #     )
+    elif args.rank_model == "EmbedRankManual":
+        kpe_model = EmbedRankManual(BACKEND_MODEL_NAME, TAGGER_NAME)
     elif args.rank_model == "MaskRank":
         kpe_model = MaskRank(BACKEND_MODEL_NAME, TAGGER_NAME)
     elif args.rank_model == "MDKPERank":
         kpe_model = MDKPERank(BACKEND_MODEL_NAME, TAGGER_NAME)
-        # # TODO: refactor duplicate
-        # if args.sbert_max_length != 128:
-        #     kpe_model.base_model_embed.model.embedding_model.max_seq_length = (
-        #         args.sbert_max_length
-        #     )
-
     elif args.rank_model == "FusionRank":
         kpe_model = FusionModel(
             [
@@ -271,10 +261,6 @@ def main():
 
     if args.cache_results:
         options["cache_results"] = True
-    # if args.sbert_max_length != 128:
-    #     kpe_model.base_model_embed.model.embedding_model.max_seq_length = (
-    #         args.sbert_max_length
-    #     )
     data = load_data(ds_name, GEO_KPE_MULTIDOC_DATA_PATH)
     logger.info(f"Args: {args}")
     logger.info("Start Testing ...")
