@@ -9,8 +9,21 @@ from time import time
 from loguru import logger
 from nltk.stem import PorterStemmer
 from pandas import DataFrame
+from sentence_transformers import SentenceTransformer
 
-from geo_kpe_multidoc import GEO_KPE_MULTIDOC_CACHE_PATH
+from geo_kpe_multidoc import GEO_KPE_MULTIDOC_CACHE_PATH, GEO_KPE_MULTIDOC_DATA_PATH
+from geo_kpe_multidoc.datasets.datasets import DATASETS, load_data
+from geo_kpe_multidoc.evaluation.evaluation_tools import (
+    evaluate_kp_extraction,
+    extract_keyphrases_docs,
+    extract_keyphrases_topics,
+    output_one_top_cands,
+    postprocess_dataset_labels,
+    postprocess_res_labels,
+)
+from geo_kpe_multidoc.evaluation.mkduc01_eval import MKDUC01_Eval
+from geo_kpe_multidoc.models import EmbedRank, FusionModel, MaskRank, MDKPERank
+from geo_kpe_multidoc.models.backend._longmodels import to_longformer_t_v4
 from geo_kpe_multidoc.models.embedrank.embedrank_longformer_manual import (
     EmbedRankManual,
 )
@@ -21,11 +34,11 @@ def parse_args():
         formatter_class=argparse.RawDescriptionHelpFormatter,
         description=textwrap.dedent(
             """\
-        Please do not mess up this text!
+        Key-phrase extraction
         --------------------------------
-            I have indented it
-            exactly the way
-            I want it
+            Multi language
+            Multi document
+            Geospatial association measures
         """
         ),
     )
@@ -161,20 +174,6 @@ def main():
     logger.info("Warmup")
     logger.info("Loading models")
 
-    from geo_kpe_multidoc import GEO_KPE_MULTIDOC_DATA_PATH
-    from geo_kpe_multidoc.datasets.datasets import DATASETS, load_data
-    from geo_kpe_multidoc.evaluation.evaluation_tools import (
-        evaluate_kp_extraction,
-        extract_keyphrases_docs,
-        extract_keyphrases_topics,
-        output_one_top_cands,
-        postprocess_dataset_labels,
-        postprocess_res_labels,
-    )
-    from geo_kpe_multidoc.evaluation.mkduc01_eval import MKDUC01_Eval
-    from geo_kpe_multidoc.models import EmbedRank, FusionModel, MaskRank, MDKPERank
-    from geo_kpe_multidoc.models.pre_processing.pos_tagging import POS_tagger_spacy
-
     # "longformer-paraphrase-multilingual-mpnet-base-v2"
     BACKEND_MODEL_NAME = args.embed_model
 
@@ -190,7 +189,10 @@ def main():
     if args.rank_model == "EmbedRank":
         kpe_model = EmbedRank(BACKEND_MODEL_NAME, TAGGER_NAME)
     elif args.rank_model == "EmbedRankManual":
-        kpe_model = EmbedRankManual(BACKEND_MODEL_NAME, TAGGER_NAME)
+        model, tokenizer = to_longformer_t_v4(SentenceTransformer(BACKEND_MODEL_NAME))
+        # in RAM convertion to longformer needs this.
+        del model.embeddings.token_type_ids
+        kpe_model = EmbedRankManual(model, tokenizer, TAGGER_NAME)
     elif args.rank_model == "MaskRank":
         kpe_model = MaskRank(BACKEND_MODEL_NAME, TAGGER_NAME)
     elif args.rank_model == "MDKPERank":

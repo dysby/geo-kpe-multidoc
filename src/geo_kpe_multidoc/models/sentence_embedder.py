@@ -24,6 +24,15 @@ class SentenceEmbedder:
         self.max_length = 4096
         self.attention_window = 512
 
+    def tokenize(self, sentence):
+        return self.tokenizer(
+            sentence,
+            padding=False,
+            truncation=True,
+            max_length=self.max_length,
+            return_tensors="pt",
+        )
+
     def encode(self, sentence, global_attention_mask=None):
         # Tokenize sentences
         encoded_input = self.tokenizer(
@@ -48,7 +57,8 @@ class SentenceEmbedder:
         sentence_embedding = mean_pooling(model_output, encoded_input["attention_mask"])
         output = OrderedDict(
             {
-                "token_embeddings": model_output[0],
+                # TODO: remove batch dimension?
+                "token_embeddings": model_output[0].squeeze(),
                 "input_ids": encoded_input["input_ids"],
                 "attention_mask": encoded_input["attention_mask"],
                 "sentence_embedding": sentence_embedding.squeeze(),

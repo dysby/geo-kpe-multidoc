@@ -36,12 +36,12 @@ class EmbedRankManual(BaseKPModel):
     the KeyBert backend to retrieve models
     """
 
-    def __init__(self, model, tagger):
+    def __init__(self, model, tokenizer, tagger):
         self.tagger = POS_tagger_spacy(tagger)
         self.grammar = """  NP: 
         {<PROPN|NOUN|ADJ>*<PROPN|NOUN>+<ADJ>*}"""
         self.counter = 0
-        self.model = SentenceEmbedder()
+        self.model = SentenceEmbedder(model, tokenizer)
 
     def update_tagger(self, dataset: str = "") -> None:
         self.tagger = (
@@ -201,7 +201,9 @@ class EmbedRankManual(BaseKPModel):
                             for j in range(i, i + cand_len):
                                 doc.attention_mask[j] = 1
 
-            # if this form is not present in token ids (remember max 4096), fallback to embeding without context.
+            # If this form is not present in token ids (remember max 4096), fallback to embeding without context.
+            # Can happen that tokenization gives different input_ids and the candidate form is not found in document
+            # input_ids.
             if candidate_embeds == []:
                 # candidate is beyond max position for emdedding
                 # return a non-contextualized embedding.

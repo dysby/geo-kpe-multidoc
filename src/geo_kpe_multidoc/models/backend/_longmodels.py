@@ -260,7 +260,8 @@ def to_longformer_t_v3(
 
     tokenizer.model_max_length = max_pos
     tokenizer.init_kwargs["model_max_length"] = max_pos
-    tokenizer.padding = "max_lenght"
+    # TODO: check this padding, not in original
+    # tokenizer.padding = "max_lenght"
     # tokenizer._tokenizer.truncation["max_length"] = attention_window
 
     current_max_pos, embed_size = model.embeddings.position_embeddings.weight.shape
@@ -284,6 +285,9 @@ def to_longformer_t_v3(
     model.embeddings.position_ids.data = torch.tensor(
         [i for i in range(max_pos)]
     ).reshape(1, max_pos)
+
+    # model.roberta.embeddings.position_ids.data = torch.tensor([i for i in range(max_pos)]).reshape(1, max_pos) # v4.2.0
+    # model.roberta.embeddings.position_ids = torch.tensor([i for i in range(max_pos)]).reshape(1, max_pos) # v3.0.2
 
     # replace the `modeling_bert.BertSelfAttention` object with `LongformerSelfAttention`
     config.attention_window = [attention_window] * config.num_hidden_layers
