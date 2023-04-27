@@ -20,8 +20,9 @@ from transformers import (  # RobertaForMaskedLM,; RobertaTokenizerFast,; AutoMo
 )
 
 from geo_kpe_multidoc import GEO_KPE_MULTIDOC_MODELS_PATH
-
-from .roberta2longformer.roberta2longformer import convert_roberta_to_longformer
+from geo_kpe_multidoc.models.backend.roberta2longformer.roberta2longformer import (
+    convert_roberta_to_longformer,
+)
 
 # from ...keybert.backend._utils import select_backend
 from .select_backend import select_backend
