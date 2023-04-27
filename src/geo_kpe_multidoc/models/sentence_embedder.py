@@ -36,7 +36,7 @@ class SentenceEmbedder:
             return_tensors="pt",
         )
 
-    def encode(self, sentence, global_attention_mask=None):
+    def encode(self, sentence, global_attention_mask=None, device=None):
         # Tokenize sentences
         encoded_input = self.tokenizer(
             sentence,
@@ -51,6 +51,9 @@ class SentenceEmbedder:
 
         if global_attention_mask:
             raise NotImplemented
+
+        if device:
+            encoded_input = batch_to_device(encoded_input, device)
 
         # Compute token embeddings
         with torch.no_grad():
@@ -69,3 +72,14 @@ class SentenceEmbedder:
         )
 
         return output
+
+
+def batch_to_device(batch, target_device: torch.device):
+    """
+    copy from sentence_transformers
+    send a pytorch batch to a device (CPU/GPU)
+    """
+    for key in batch:
+        if isinstance(batch[key], torch.Tensor):
+            batch[key] = batch[key].to(target_device)
+    return batch

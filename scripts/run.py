@@ -6,6 +6,7 @@ from datetime import datetime
 from os import path
 from time import time
 
+import torch
 from loguru import logger
 from nltk.stem import PorterStemmer
 from pandas import DataFrame
@@ -228,7 +229,12 @@ def main():
         )
         # in RAM convertion to longformer needs this.
         del model.embeddings.token_type_ids
-        kpe_model = EmbedRankManual(model, tokenizer, TAGGER_NAME, name=model_name)
+
+        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+        kpe_model = EmbedRankManual(
+            model, tokenizer, TAGGER_NAME, device=device, name=model_name
+        )
     elif args.rank_model == "MaskRank":
         kpe_model = MaskRank(BACKEND_MODEL_NAME, TAGGER_NAME)
     elif args.rank_model == "MDKPERank":

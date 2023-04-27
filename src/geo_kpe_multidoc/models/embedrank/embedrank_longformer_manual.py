@@ -37,11 +37,19 @@ class EmbedRankManual(BaseKPModel):
     the KeyBert backend to retrieve models
     """
 
-    def __init__(self, model, tokenizer, tagger, name=""):
+    def __init__(self, model, tokenizer, tagger, device=None, name=""):
         self.tagger = POS_tagger_spacy(tagger)
         self.grammar = """  NP: 
         {<PROPN|NOUN|ADJ>*<PROPN|NOUN>+<ADJ>*}"""
         self.counter = 0
+
+        if device is None:
+            device = "cuda" if torch.cuda.is_available() else "cpu"
+            logger.info("EmbedRankManual use pytorch device: {}".format(device))
+        model.to(device)
+
+        self.device = device
+
         self.model = SentenceEmbedder(model, tokenizer)
         self.name = f"EmbedRankManual_{name}"
 
@@ -136,7 +144,7 @@ class EmbedRankManual(BaseKPModel):
         # at 1st stage document POS Tagging uses normal text including capital letters,
         # but later document handling will use only lowered text, embedings, and such.
         # doc.raw_text = doc.raw_text.lower()
-        doc_embedings = self.model.encode(doc.raw_text)
+        doc_embedings = self.model.encode(doc.raw_text, device=self.device)
 
         doc.token_ids = doc_embedings["input_ids"].squeeze().tolist()
         doc.token_embeddings = doc_embedings["token_embeddings"]
@@ -181,7 +189,11 @@ class EmbedRankManual(BaseKPModel):
                 # candidate is beyond max position for emdedding
                 # return a non-contextualized embedding.
                 doc.candidate_set_embed.append(
-                    self.model.encode(candidate)["sentence_embedding"].detach().numpy()
+                    self.model.encode(candidate, device=self.device)[
+                        "sentence_embedding"
+                    ]
+                    .detach()
+                    .numpy()
                 )
                 # TODO: problem with original 'andrew - would' vs PoS extracted 'andrew-would'
                 logger.debug(
