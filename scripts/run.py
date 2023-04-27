@@ -145,6 +145,23 @@ def parse_args():
         action="store_true",
         help="Save KPE Model outputs to cache directory.",
     )
+    parser.add_argument(
+        "--longformer_attention_window",
+        type=int,
+        default=512,
+        help="Longformer: sliding chunk Attention Window size",
+    )
+    parser.add_argument(
+        "--longformer_only_copy_to_max_position",
+        type=int,
+        help="Longformer: only copy first positions of Pretrained Model position embedding weights",
+    )
+    parser.add_argument(
+        "--longformer_max_length",
+        type=int,
+        default=4096,
+        help="Longformer: max length of the new model",
+    )
     return parser.parse_args()
 
 
@@ -189,17 +206,29 @@ def main():
     if args.rank_model == "EmbedRank":
         kpe_model = EmbedRank(BACKEND_MODEL_NAME, TAGGER_NAME)
     elif args.rank_model == "EmbedRankManual":
+        new_max_pos = args.longformer_max_length
+        attention_window = args.longformer_attention_window
+        copy_from_position = (
+            args.longformer_only_copy_to_max_position
+            if args.longformer_only_copy_to_max_position
+            else None
+        )
+
+        model_name = (
+            f"longformer_paraphrase_mnet_max{new_max_pos}_attw{attention_window}"
+        )
+        if copy_from_position:
+            model_name += f"cpmaxpos{copy_from_position}"
+
         model, tokenizer = to_longformer_t_v4(
             SentenceTransformer(BACKEND_MODEL_NAME),
-            # max_pos=512,
-            # attention_window=128,
-            # copy_from_position=130,
+            max_pos=new_max_pos,
+            attention_window=attention_window,
+            copy_from_position=copy_from_position,
         )
         # in RAM convertion to longformer needs this.
         del model.embeddings.token_type_ids
-        kpe_model = EmbedRankManual(
-            model, tokenizer, TAGGER_NAME, "longformer_paraphrase_mnet_max4096_attw512"
-        )
+        kpe_model = EmbedRankManual(model, tokenizer, TAGGER_NAME, name=model_name)
     elif args.rank_model == "MaskRank":
         kpe_model = MaskRank(BACKEND_MODEL_NAME, TAGGER_NAME)
     elif args.rank_model == "MDKPERank":
