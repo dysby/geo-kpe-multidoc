@@ -147,10 +147,10 @@ class EmbedRankManual(BaseKPModel):
         doc_embedings = self.model.encode(doc.raw_text, device=self.device)
 
         doc.token_ids = doc_embedings["input_ids"].squeeze().tolist()
-        doc.token_embeddings = doc_embedings["token_embeddings"]
-        doc.attention_mask = doc_embedings["attention_mask"]
+        doc.token_embeddings = doc_embedings["token_embeddings"].detach().cpu()
+        doc.attention_mask = doc_embedings["attention_mask"].detach().cpu()
 
-        return doc_embedings["sentence_embedding"].detach().numpy()
+        return doc_embedings["sentence_embedding"].detach().cpu().numpy()
 
     def global_embed_doc(self, doc):
         raise NotImplemented
@@ -193,6 +193,7 @@ class EmbedRankManual(BaseKPModel):
                         "sentence_embedding"
                     ]
                     .detach()
+                    .cpu()
                     .numpy()
                 )
                 # TODO: problem with original 'andrew - would' vs PoS extracted 'andrew-would'
@@ -205,9 +206,7 @@ class EmbedRankManual(BaseKPModel):
                 for i, occurrence in enumerate(mentions):
                     embds[i] = torch.mean(doc.token_embeddings[occurrence, :], dim=0)
 
-                doc.candidate_set_embed.append(
-                    torch.mean(embds, dim=0).detach().numpy()
-                )
+                doc.candidate_set_embed.append(torch.mean(embds, dim=0).numpy())
 
                 # TODO: Set Global Attention Mask on every candidate position.
                 if cand_mode == "global_attention":
