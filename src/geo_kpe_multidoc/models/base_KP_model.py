@@ -1,12 +1,16 @@
 import re
 from enum import Enum, auto
 from itertools import chain
+from os import path
+from pathlib import Path
 from typing import Callable, List, Optional, Set, Tuple
 
+import joblib
 import torch
 from loguru import logger
 from nltk.stem.api import StemmerI
 
+from geo_kpe_multidoc import GEO_KPE_MULTIDOC_CACHE_PATH
 from geo_kpe_multidoc.datasets.datasets import KPEDataset
 from geo_kpe_multidoc.document import Document
 from geo_kpe_multidoc.models.backend.select_backend import select_backend
@@ -36,15 +40,23 @@ def find_occurrences(a: List[int], b: List[int]) -> List[List[int]]:
     return occurrences
 
 
-def cand_mean_embedding(
+def candidate_embedding_from_tokens(
     # TODO: simplify candidate embedding computation
     candidate: List[int],
     doc_input_ids: List[int],
     doc_token_embeddings: torch.Tensor,
-):
+) -> torch.Tensor:
+    n_tokens, embed_dim = doc_token_embeddings.size()
+
     candidate_occurrences = find_occurrences(candidate, doc_input_ids)
-    candidate_occurrences = list(chain(*candidate_occurrences))
-    return torch.mean(doc_token_embeddings[:, candidate_occurrences, :], dim=1)
+    if len(candidate_occurrences) != 0:
+        embds = torch.empty(size=(len(candidate_occurrences), embed_dim))
+        for i, occurrence in enumerate(candidate_occurrences):
+            embds[i] = torch.mean(doc_token_embeddings[occurrence, :], dim=0)
+        return torch.mean(embds, dim=0)
+    else:
+        logger.warning(f"Did not find candidate occurrences: {candidate}")
+        return torch.mean(doc_token_embeddings[[], :], dim=0)
 
 
 class BaseKPModel:
@@ -125,6 +137,29 @@ class BaseKPModel:
         logger.info(f"Document #{self.counter} processed")
         self.counter += 1
         torch.cuda.empty_cache()
+
+        cache_results = kwargs.get("cache_results", False)
+        if cache_results:
+            logger.info(f"Saving {doc.id} embeddings in cache dir.")
+
+            filename = path.join(
+                GEO_KPE_MULTIDOC_CACHE_PATH,
+                f"{self.name}",
+                f"{doc.id}-embeddings.pkl",
+            )
+
+            Path(filename).parent.mkdir(exist_ok=True, parents=True)
+            joblib.dump(
+                {
+                    "dataset": doc.dataset,
+                    "topic": doc.topic,
+                    "doc": doc.id,
+                    "doc_embedding": doc.doc_embed,
+                    "candidate_embeddings": doc.candidate_set_embed,
+                    "candidates": doc.candidate_set,
+                },
+                filename,
+            )
 
         return (top_n, candidate_set)
 

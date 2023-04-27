@@ -1,3 +1,4 @@
+from itertools import chain
 from time import time
 from typing import Callable, List, Optional, Set, Tuple, Union
 
@@ -12,7 +13,7 @@ from nltk.stem.api import StemmerI
 from sklearn.metrics.pairwise import cosine_similarity
 
 from geo_kpe_multidoc.document import Document
-from geo_kpe_multidoc.models.base_KP_model import BaseKPModel
+from geo_kpe_multidoc.models.base_KP_model import BaseKPModel, find_occurrences
 from geo_kpe_multidoc.models.pre_processing.language_mapping import (
     choose_lemmatizer,
     choose_tagger,
@@ -36,12 +37,13 @@ class EmbedRankManual(BaseKPModel):
     the KeyBert backend to retrieve models
     """
 
-    def __init__(self, model, tokenizer, tagger):
+    def __init__(self, model, tokenizer, tagger, name=""):
         self.tagger = POS_tagger_spacy(tagger)
         self.grammar = """  NP: 
         {<PROPN|NOUN|ADJ>*<PROPN|NOUN>+<ADJ>*}"""
         self.counter = 0
         self.model = SentenceEmbedder(model, tokenizer)
+        self.name = f"EmbedRankManual_{name}"
 
     def update_tagger(self, dataset: str = "") -> None:
         self.tagger = (
@@ -162,49 +164,20 @@ class EmbedRankManual(BaseKPModel):
         for candidate in doc.candidate_set:
             candidate_embeds = []
 
+            mentions = []
             for mention in doc.candidate_mentions[candidate]:
-                # HACK: DEBUG
-                # if mention in [
-                #     "cane crops",
-                #     "mile band",
-                #     "casualty",
-                #     "Pounds",
-                #     "Non - Marine Association",
-                #     "Texas border",
-                #     "Roberts",
-                # ]:
-                #     pass
-
                 tokenized_candidate = self.model.tokenize(mention)
 
                 filt_ids = filter_special_tokens(tokenized_candidate["input_ids"])
 
-                cand_len = len(filt_ids)
+                # TODO: does not enable with cand_mode = global_attention
+                mentions += find_occurrences(filt_ids, doc.token_ids)
 
-                # search all candidate forms in document text and save token embeddings (average polling).
-                for i in range(len(doc.token_ids)):
-                    if (
-                        filt_ids[0] == doc.token_ids[i]
-                        and filt_ids == doc.token_ids[i : i + cand_len]
-                    ):
-                        candidate_embeds.append(
-                            np.mean(
-                                doc.token_embeddings[i : i + cand_len].detach().numpy(),
-                                axis=0,
-                            )
-                        )
-                        # What is global_attention mode?
-                        # Used for custom global attention mask of the longformer.
-                        # Set attention mask = 1 at all token positions where this candidate is mentioned.
-                        # TODO: Use attention_mask for computing a new doc embeding vector?
-                        if cand_mode == "global_attention":
-                            for j in range(i, i + cand_len):
-                                doc.attention_mask[j] = 1
-
-            # If this form is not present in token ids (remember max 4096), fallback to embeding without context.
-            # Can happen that tokenization gives different input_ids and the candidate form is not found in document
-            # input_ids.
-            if candidate_embeds == []:
+            # backoff procedure, if mentions not found.
+            if len(mentions) == 0:
+                # If this form is not present in token ids (remember max 4096), fallback to embeding without context.
+                # Can happen that tokenization gives different input_ids and the candidate form is not found in document
+                # input_ids.
                 # candidate is beyond max position for emdedding
                 # return a non-contextualized embedding.
                 doc.candidate_set_embed.append(
@@ -215,7 +188,58 @@ class EmbedRankManual(BaseKPModel):
                     f"Candidate {candidate} - mentions not found: {doc.candidate_mentions[candidate]}"
                 )
             else:
-                doc.candidate_set_embed.append(np.mean(candidate_embeds, axis=0))
+                _, embed_dim = doc.token_embeddings.size()
+                embds = torch.empty(size=(len(mentions), embed_dim))
+                for i, occurrence in enumerate(mentions):
+                    embds[i] = torch.mean(doc.token_embeddings[occurrence, :], dim=0)
+
+                doc.candidate_set_embed.append(
+                    torch.mean(embds, dim=0).detach().numpy()
+                )
+
+                # TODO: Set Global Attention Mask on every candidate position.
+                if cand_mode == "global_attention":
+                    for j in chain(*mentions):  # flatten list
+                        # TODO: shouldn't be = 2 (global attention?)
+                        doc.attention_mask[j] = 1
+
+                # cand_len = len(filt_ids)
+
+                # # search all candidate forms in document text and save token embeddings (average polling).
+                # for i in range(len(doc.token_ids)):
+                #     if (
+                #         filt_ids[0] == doc.token_ids[i]
+                #         and filt_ids == doc.token_ids[i : i + cand_len]
+                #     ):
+                #         candidate_embeds.append(
+                #             np.mean(
+                #                 doc.token_embeddings[i : i + cand_len].detach().numpy(),
+                #                 axis=0,
+                #             )
+                #         )
+                #         # What is global_attention mode?
+                #         # Used for custom global attention mask of the longformer.
+                #         # Set attention mask = 1 at all token positions where this candidate is mentioned.
+                #         # TODO: Use attention_mask for computing a new doc embeding vector?
+                #         if cand_mode == "global_attention":
+                #             for j in range(i, i + cand_len):
+                #                 doc.attention_mask[j] = 1
+
+            # If this form is not present in token ids (remember max 4096), fallback to embeding without context.
+            # Can happen that tokenization gives different input_ids and the candidate form is not found in document
+            # input_ids.
+            # if candidate_embeds == []:
+            #     # candidate is beyond max position for emdedding
+            #     # return a non-contextualized embedding.
+            #     doc.candidate_set_embed.append(
+            #         self.model.encode(candidate)["sentence_embedding"].detach().numpy()
+            #     )
+            #     # TODO: problem with original 'andrew - would' vs PoS extracted 'andrew-would'
+            #     logger.debug(
+            #         f"Candidate {candidate} - mentions not found: {doc.candidate_mentions[candidate]}"
+            #     )
+            # else:
+            #     doc.candidate_set_embed.append(np.mean(candidate_embeds, axis=0))
 
         if "z_score" in post_processing:
             # TODO: Why z_score_normalization by space split?

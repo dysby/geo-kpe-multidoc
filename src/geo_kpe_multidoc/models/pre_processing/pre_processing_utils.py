@@ -3,6 +3,7 @@ import string
 from typing import Callable, List, Tuple, Union
 
 import simplemma
+import torch
 from keybert.backend._base import BaseEmbedder
 from nltk.corpus import stopwords
 from simplemma import text_lemmatizer
@@ -20,6 +21,26 @@ from .stopwords import ENGLISH_STOP_WORDS
 # tokenizer.additional_special_tokens_ids
 
 SPECIAL_TOKEN_IDS = {0, 1, 2, 3, 250001}
+
+# TODO: clean from https://github.com/adamwawrzynski/vectorized_documents_benchmark/blob/master/utils/preprocess.py
+# def clean_string_longformer(
+#         string
+# ):
+#     return preprocess_text_longformer(string)
+
+# def preprocess_text_longformer(
+#         raw,
+#         remove_stopwords=False,
+#         lemmatize=False,
+#         name_entity_extraction=False,
+#         contraction_expanding=False,
+#         regex1="[^a-zA-Z0-9'\.\?\!\:\;\"\-,]",
+# ):
+#     text_without_email = re.sub(r'[\w\.-]+@[\w\.-]+', ' ', raw)
+#     text = re.sub(regex1, " ", text_without_email)
+#     text = re.sub(r'\s+', ' ', text)
+
+#     return text
 
 
 def remove_punctuation(text: str = "") -> str:
@@ -92,7 +113,7 @@ def lemmatize(text: Union[str, List], lang: str) -> Union[str, List]:
     return " ".join([w for w in text_lemmatizer(text, lang) if w != "."]).lower()
 
 
-def filter_special_tokens(input_ids: List[List[int]]) -> List[int]:
+def filter_special_tokens(input_ids: torch.Tensor) -> List[int]:
     return [i for i in input_ids.squeeze().tolist() if i not in SPECIAL_TOKEN_IDS]
 
 

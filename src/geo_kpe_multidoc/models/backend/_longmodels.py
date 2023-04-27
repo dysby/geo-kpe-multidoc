@@ -187,7 +187,10 @@ def to_longformer_ashtonomy_grather_3_4(
 
 
 def to_longformer_t_v4(
-    base_model: SentenceTransformer, max_pos=4096, attention_window=512
+    base_model: SentenceTransformer,
+    max_pos: int = 4096,
+    attention_window: int = 512,
+    copy_from_position: int = None,
 ):
     logger.info("Transform SentenceTransformer to longformer using Transformers v 4.26")
     model = base_model._modules["0"]._modules["auto_model"]
@@ -205,6 +208,10 @@ def to_longformer_t_v4(
     # add this to keep shape compability with sentence_transformer
     tokenizer.padding = "max_lenght"
 
+    # test copy only a part of the position embeddings
+    if copy_from_position:
+        current_max_pos = copy_from_position
+
     max_pos += 2  # NOTE: RoBERTa has positions 0,1 reserved, so embedding size is max position + 2
     config.max_position_embeddings = max_pos
     assert max_pos > current_max_pos
@@ -212,15 +219,22 @@ def to_longformer_t_v4(
     new_pos_embed = model.embeddings.position_embeddings.weight.new_empty(
         max_pos, embed_size
     )
+    # TODO: HACK test copy_from_position == 130
+    if torch.any(new_pos_embed.isnan()):
+        new_pos_embed = new_pos_embed.nan_to_num()
     # copy position embeddings over and over to initialize the new position embeddings
     k = 2
     step = current_max_pos - 2
     while k < max_pos - 1:
-        new_pos_embed[k : (k + step)] = model.embeddings.position_embeddings.weight[2:]
+        # copy only from 2 to 512 or copy only from 2 to 130, current_max_pos can be
+        # set from model or from copy_from_position parameter
+        new_pos_embed[k : (k + step)] = model.embeddings.position_embeddings.weight[
+            2:current_max_pos
+        ]
         k += step
     model.embeddings.position_embeddings.weight.data = new_pos_embed
     model.embeddings.position_ids.data = torch.tensor(
-        [i for i in range(max_pos)]
+        [i for i in range(max_pos)]  # list(range(max_pos))
     ).reshape(1, max_pos)
 
     # model.roberta.embeddings.position_ids.data = torch.tensor([i for i in range(max_pos)]).reshape(1, max_pos) # v4.2.0

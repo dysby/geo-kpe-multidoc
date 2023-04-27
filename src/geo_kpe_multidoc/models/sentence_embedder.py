@@ -1,4 +1,5 @@
 from collections import OrderedDict
+from typing import Dict, List, Union
 
 import torch
 from transformers import AutoModel, AutoTokenizer
@@ -21,10 +22,12 @@ class SentenceEmbedder:
         self.model = model
         self.model.eval()
         self.tokenizer = tokenizer
-        self.max_length = 4096
-        self.attention_window = 512
+        self.max_length = tokenizer.model_max_length
+        self.attention_window = int(
+            model.encoder.layer[0].attention.self.one_sided_attn_window_size * 2
+        )
 
-    def tokenize(self, sentence):
+    def tokenize(self, sentence: Union[str, List[str]]) -> Dict:
         return self.tokenizer(
             sentence,
             padding=False,

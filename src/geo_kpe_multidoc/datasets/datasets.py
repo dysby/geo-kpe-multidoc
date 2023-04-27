@@ -15,8 +15,8 @@ DATASETS = {
     "DUC2001": {
         "zip_file": "DUC2001.zip",
         "language": "en",
-        # "tagger": "en_core_web_trf",
-        "tagger": "en_core_web_lg",
+        "tagger": "en_core_web_trf",
+        # "tagger": "en_core_web_lg",
     },
     "MKDUC01": {
         "language": "en",

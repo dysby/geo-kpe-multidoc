@@ -189,10 +189,17 @@ def main():
     if args.rank_model == "EmbedRank":
         kpe_model = EmbedRank(BACKEND_MODEL_NAME, TAGGER_NAME)
     elif args.rank_model == "EmbedRankManual":
-        model, tokenizer = to_longformer_t_v4(SentenceTransformer(BACKEND_MODEL_NAME))
+        model, tokenizer = to_longformer_t_v4(
+            SentenceTransformer(BACKEND_MODEL_NAME),
+            # max_pos=512,
+            # attention_window=128,
+            # copy_from_position=130,
+        )
         # in RAM convertion to longformer needs this.
         del model.embeddings.token_type_ids
-        kpe_model = EmbedRankManual(model, tokenizer, TAGGER_NAME)
+        kpe_model = EmbedRankManual(
+            model, tokenizer, TAGGER_NAME, "longformer_paraphrase_mnet_max4096_attw512"
+        )
     elif args.rank_model == "MaskRank":
         kpe_model = MaskRank(BACKEND_MODEL_NAME, TAGGER_NAME)
     elif args.rank_model == "MDKPERank":

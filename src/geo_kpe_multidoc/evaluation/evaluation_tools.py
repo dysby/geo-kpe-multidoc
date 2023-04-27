@@ -21,6 +21,9 @@ from geo_kpe_multidoc.datasets import DATASETS, KPEDataset
 from geo_kpe_multidoc.document import Document
 from geo_kpe_multidoc.evaluation.metrics import MAP, f1_score, nDCG, precision, recall
 from geo_kpe_multidoc.models import EmbedRank, MaskRank, MDKPERank
+from geo_kpe_multidoc.models.embedrank.embedrank_longformer_manual import (
+    EmbedRankManual,
+)
 from geo_kpe_multidoc.models.pre_processing.pre_processing_utils import lemmatize
 from geo_kpe_multidoc.utils.IO import write_to_file
 
@@ -289,7 +292,7 @@ def output_one_top_cands_geo(
 
 def extract_keyphrases_docs(
     dataset: KPEDataset,
-    model: Union[EmbedRank, MaskRank],
+    model: Union[EmbedRank, MaskRank, EmbedRankManual],
     top_n=20,
     min_len=5,
     lemmer=None,
