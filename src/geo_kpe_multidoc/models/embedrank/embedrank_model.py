@@ -21,12 +21,18 @@ from geo_kpe_multidoc import GEO_KPE_MULTIDOC_CACHE_PATH
 from geo_kpe_multidoc.document import Document
 from geo_kpe_multidoc.models.base_KP_model import BaseKPModel, find_occurrences
 from geo_kpe_multidoc.models.pre_processing.language_mapping import (
-    choose_lemmatizer, choose_tagger)
+    choose_lemmatizer,
+    choose_tagger,
+)
 from geo_kpe_multidoc.models.pre_processing.pos_tagging import POS_tagger_spacy
-from geo_kpe_multidoc.models.pre_processing.post_processing_utils import \
-    z_score_normalization
+from geo_kpe_multidoc.models.pre_processing.post_processing_utils import (
+    z_score_normalization,
+)
 from geo_kpe_multidoc.models.pre_processing.pre_processing_utils import (
-    filter_special_tokens, lemmatize, tokenize_hf)
+    filter_special_tokens,
+    lemmatize,
+    tokenize_hf,
+)
 from geo_kpe_multidoc.utils.IO import read_from_file
 
 
@@ -389,8 +395,8 @@ class EmbedRank(BaseKPModel):
         if os.path.exists(cache_file_path):
             cache = joblib.load(cache_file_path)
             doc.doc_embed = cache["doc_embedding"]
-            doc.candidate_set_embed = cache["candidate_set_embed"]
-            doc.candidate_set = cache["candidate_set"]
+            doc.candidate_set_embed = cache["candidate_embeddings"]
+            doc.candidate_set = cache["candidates"]
             # TODO: load token embeddings
             logger.debug(f"Load embeddings from cache {cache_file_path}")
             return doc.doc_embed, doc.candidate_set_embed, doc.candidate_set
