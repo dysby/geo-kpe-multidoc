@@ -82,7 +82,7 @@ class BaseKPModel:
         txt = remove_punctuation(txt)
         return remove_whitespaces(txt)[1:]
 
-    def pos_tag_doc(self, doc: Document, stemming, use_cache, **kwargs) -> None:
+    def _pos_tag_doc(self, doc: Document, stemming, use_cache, **kwargs) -> None:
         (
             doc.tagged_text,
             doc.doc_sentences,
@@ -97,7 +97,7 @@ class BaseKPModel:
         """
         Abract method to extract all candidates
         """
-        pass
+        raise NotImplemented
 
     def top_n_candidates(
         self, doc, candidate_list, top_n, min_len, **kwargs
@@ -105,7 +105,7 @@ class BaseKPModel:
         """
         Abstract method to retrieve top_n candidates
         """
-        pass
+        raise NotImplemented
 
     def extract_kp_from_doc(
         self,
@@ -120,15 +120,7 @@ class BaseKPModel:
         Concrete method that extracts key-phrases from a given document, with optional arguments
         relevant to its specific functionality
         """
-        use_cache = kwargs.get("pos_tag_memory", False)
-
-        self.pos_tag_doc(
-            doc=doc,
-            stemming=None,
-            use_cache=use_cache,
-        )
-
-        self.extract_candidates(doc, min_len, self.grammar, lemmer)
+        self.extract_candidates(doc, min_len, self.grammar, lemmer, **kwargs)
 
         top_n, candidate_set = self.top_n_candidates(
             doc, top_n, min_len, stemmer, **kwargs
@@ -137,29 +129,6 @@ class BaseKPModel:
         logger.info(f"Document #{self.counter} processed")
         self.counter += 1
         torch.cuda.empty_cache()
-
-        cache_results = kwargs.get("cache_results", False)
-        if cache_results:
-            logger.info(f"Saving {doc.id} embeddings in cache dir.")
-
-            filename = path.join(
-                GEO_KPE_MULTIDOC_CACHE_PATH,
-                f"{self.name}",
-                f"{doc.id}-embeddings.pkl",
-            )
-
-            Path(filename).parent.mkdir(exist_ok=True, parents=True)
-            joblib.dump(
-                {
-                    "dataset": doc.dataset,
-                    "topic": doc.topic,
-                    "doc": doc.id,
-                    "doc_embedding": doc.doc_embed,
-                    "candidate_embeddings": doc.candidate_set_embed,
-                    "candidates": doc.candidate_set,
-                },
-                filename,
-            )
 
         return (top_n, candidate_set)
 
@@ -182,4 +151,4 @@ class BaseKPModel:
             corpus: Dataset with topic id, list of documents (txt form) for topic, and list of keyphrases for topic.
 
         """
-        pass
+        raise NotImplemented

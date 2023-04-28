@@ -47,28 +47,6 @@ class MaskRank(BaseKPModel):
             else self.tagger
         )
 
-    def extract_mdkpe_embeds(
-        self, doc: Document, top_n, min_len, stemmer=None, lemmer=None, **kwargs
-    ) -> Tuple[Document, List[Tuple], List[str]]:
-        use_cache = kwargs.get("pos_tag_memory", False)
-
-        self.pos_tag_doc(
-            doc=doc,
-            stemming=None,
-            use_cache=use_cache,
-        )
-        self.extract_candidates(doc, min_len, self.grammar, lemmer)
-
-        cand_embeds, candidate_set = self.embed_n_candidates(
-            doc, min_len, stemmer, **kwargs
-        )
-
-        logger.info(f"Document #{self.counter} processed")
-        self.counter += 1
-        torch.cuda.empty_cache()
-
-        return (doc, cand_embeds, candidate_set)
-
     def extract_kp_from_corpus(
         self,
         corpus,
@@ -104,16 +82,16 @@ class MaskRank(BaseKPModel):
             doc.raw_text, show_progress_bar=False, output_value=None
         )
 
-        doc.token_ids = doc_embedings["input_ids"].squeeze().tolist()
-        doc.token_embeddings = doc_embedings["token_embeddings"]
-        doc.attention_mask = doc_embedings["attention_mask"]
+        doc.token_ids = doc_embedings["input_ids"].detach().cpu().squeeze().tolist()
+        doc.token_embeddings = doc_embedings["token_embeddings"].detach().cpu()
+        doc.attention_mask = doc_embedings["attention_mask"].detach().cpu()
 
-        return doc_embedings["sentence_embedding"].detach().numpy()
+        return doc_embedings["sentence_embedding"].detach().cpu().numpy()
 
-    def embed_global(self, model):
+    def _embed_global(self, model):
         raise NotImplemented
 
-    def global_embed_doc(self, model):
+    def _global_embed_doc(self, model):
         raise NotImplemented
 
     def embed_candidates(
@@ -150,7 +128,7 @@ class MaskRank(BaseKPModel):
                 for match in re.finditer(candidate, doc.raw_text):
                     masked_text = f"{doc.raw_text[:match.span()[0]]}<mask>{doc.raw_text[match.span()[1]:]}"
                     if attention == "global_attention":
-                        candidate_embeds.append(self.embed_global(masked_text))
+                        candidate_embeds.append(self._embed_global(masked_text))
                     else:
                         candidate_embeds.append(self.model.embed(masked_text))
                 doc.candidate_set_embed.append(candidate_embeds)
@@ -200,11 +178,14 @@ class MaskRank(BaseKPModel):
         min_len: int = 5,
         grammar: str = "",
         lemmer: Callable = None,
+        **kwargs,
     ):
         """
         Method that uses Regex patterns on POS tags to extract unique candidates from a tagged document and
         stores the sentences each candidate occurs in
         """
+
+        use_cache = kwargs.get("pos_tag_cache", False)
         candidate_set = set()
 
         parser = RegexpParser(grammar)
@@ -241,7 +222,7 @@ class MaskRank(BaseKPModel):
 
         return doc.candidate_set_embed, doc.candidate_set
 
-    def rank_candidates(
+    def _rank_candidates(
         self, doc_embed, candidate_set_embed, candidate_set, top_n: int = -1, **kwargs
     ):
         """
@@ -307,7 +288,7 @@ class MaskRank(BaseKPModel):
         self.embed_candidates(doc, stemmer, cand_mode, attention)
         logger.info(f"Embed Candidates in {time() -  t:.2f}s")
 
-        return self.rank_candidates(
+        return self._rank_candidates(
             doc.doc_embed, doc.candidate_set_embed, doc.candidate_set, top_n, **kwargs
         )
 

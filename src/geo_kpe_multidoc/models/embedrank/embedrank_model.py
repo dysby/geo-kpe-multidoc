@@ -1,5 +1,7 @@
 import os
+from itertools import chain
 from operator import itemgetter
+from pathlib import Path
 from time import time
 from typing import Callable, List, Optional, Set, Tuple, Union
 
@@ -16,7 +18,7 @@ from sklearn.metrics.pairwise import cosine_similarity
 
 from geo_kpe_multidoc import GEO_KPE_MULTIDOC_CACHE_PATH
 from geo_kpe_multidoc.document import Document
-from geo_kpe_multidoc.models.base_KP_model import BaseKPModel
+from geo_kpe_multidoc.models.base_KP_model import BaseKPModel, find_occurrences
 from geo_kpe_multidoc.models.pre_processing.language_mapping import (
     choose_lemmatizer,
     choose_tagger,
@@ -120,7 +122,7 @@ class EmbedRank(BaseKPModel):
         else:
             doc.doc_sents_words_embed = read_from_file(f"{memory}/{doc.id}")
 
-    def embed_doc(
+    def _embed_doc(
         self,
         doc: Document,
         stemmer: Callable = None,
@@ -147,7 +149,7 @@ class EmbedRank(BaseKPModel):
 
         return doc_embedings["sentence_embedding"].detach().numpy()
 
-    def global_embed_doc(self, doc):
+    def _global_embed_doc(self, doc):
         raise NotImplemented
 
     def _aggregate_candidate_mention_embeddings(
@@ -167,56 +169,47 @@ class EmbedRank(BaseKPModel):
         for candidate in doc.candidate_set:
             candidate_embeds = []
 
+            mentions = []
             for mention in doc.candidate_mentions[candidate]:
-                # HACK: DEBUG
-                # if mention in [
-                #     "cane crops",
-                #     "mile band",
-                #     "casualty",
-                #     "Pounds",
-                #     "Non - Marine Association",
-                #     "Texas border",
-                #     "Roberts",
-                # ]:
-                #     pass
-
-                tokenized_candidate = tokenize_hf(mention, self.model)
+                tokenized_candidate = self.model.tokenize(mention)
 
                 filt_ids = filter_special_tokens(tokenized_candidate["input_ids"])
 
-                cand_len = len(filt_ids)
+                # TODO: does not enable with cand_mode = global_attention
+                mentions += find_occurrences(filt_ids, doc.token_ids)
 
-                # search all candidate forms in document text and save token embeddings (average polling).
-                for i in range(len(doc.token_ids)):
-                    if (
-                        filt_ids[0] == doc.token_ids[i]
-                        and filt_ids == doc.token_ids[i : i + cand_len]
-                    ):
-                        candidate_embeds.append(
-                            np.mean(
-                                doc.token_embeddings[i : i + cand_len].detach().numpy(),
-                                axis=0,
-                            )
-                        )
-                        # What is global_attention mode?
-                        # Used for custom global attention mask of the longformer.
-                        # Set attention mask = 1 at all token positions where this candidate is mentioned.
-                        # TODO: Use attention_mask for computing a new doc embeding vector?
-                        if cand_mode == "global_attention":
-                            for j in range(i, i + cand_len):
-                                doc.attention_mask[j] = 1
-
-            # if this form is not present in token ids (remember max 4096), fallback to embeding without context.
-            if candidate_embeds == []:
+            # backoff procedure, if mentions not found.
+            if len(mentions) == 0:
+                # If this form is not present in token ids (remember max 4096), fallback to embeding without context.
+                # Can happen that tokenization gives different input_ids and the candidate form is not found in document
+                # input_ids.
                 # candidate is beyond max position for emdedding
                 # return a non-contextualized embedding.
-                doc.candidate_set_embed.append(self.model.embed(candidate))
+                doc.candidate_set_embed.append(
+                    self.model.encode(candidate, device=self.device)[
+                        "sentence_embedding"
+                    ]
+                    .detach()
+                    .cpu()
+                    .numpy()
+                )
                 # TODO: problem with original 'andrew - would' vs PoS extracted 'andrew-would'
                 logger.debug(
                     f"Candidate {candidate} - mentions not found: {doc.candidate_mentions[candidate]}"
                 )
             else:
-                doc.candidate_set_embed.append(np.mean(candidate_embeds, axis=0))
+                _, embed_dim = doc.token_embeddings.size()
+                embds = torch.empty(size=(len(mentions), embed_dim))
+                for i, occurrence in enumerate(mentions):
+                    embds[i] = torch.mean(doc.token_embeddings[occurrence, :], dim=0)
+
+                doc.candidate_set_embed.append(torch.mean(embds, dim=0).numpy())
+
+                # TODO: Set Global Attention Mask on every candidate position.
+                if cand_mode == "global_attention":
+                    for j in chain(*mentions):  # flatten list
+                        # TODO: shouldn't be = 2 (global attention?)
+                        doc.attention_mask[j] = 1
 
         if "z_score" in post_processing:
             # TODO: Why z_score_normalization by space split?
@@ -227,7 +220,7 @@ class EmbedRank(BaseKPModel):
         # TODO: If in global attention mode the document embeding should be computed again having the
         # attention mask changed to the candidate positions.
         if cand_mode == "global_attention":
-            doc.doc_embed = self.global_embed_doc(doc)
+            doc.doc_embed = self._global_embed_doc(doc)
 
     def extract_candidates(
         self,
@@ -235,6 +228,7 @@ class EmbedRank(BaseKPModel):
         min_len: int = 5,
         grammar: str = None,
         lemmer_lang: str = None,
+        **kwargs,
     ):
         """
         Method that uses Regex patterns on POS tags to extract unique candidates from a tagged document
@@ -253,6 +247,13 @@ class EmbedRank(BaseKPModel):
                 Model tokenizer is responsible for case handling.
         TODO: new grammar (({.*}{HYPH}{.*}){NOUN}*)|(({VBG}|{VBN})?{ADJ}*{NOUN}+)
         """
+        use_cache = kwargs.get("pos_tag_cache", False)
+        self._pos_tag_doc(
+            doc=doc,
+            stemming=None,
+            use_cache=use_cache,
+        )
+
         grammar = self.grammar if not grammar else grammar
 
         doc.candidate_set = set()
@@ -324,23 +325,13 @@ class EmbedRank(BaseKPModel):
         use_cache = kwargs.get("cache_embeddings", False)
 
         if use_cache:
-            # TODO: implement caching? is usefull only in future analysis
-            cache_file_path = os.path.join(
-                GEO_KPE_MULTIDOC_CACHE_PATH,
-                self.name[self.name.index("_") + 1 :],
-                f"{doc.id}-embeddings.pkl",
-            )
-
-            if os.path.exists(cache_file_path):
-                cache = joblib.load(cache_file_path)
-                doc.doc_embed = cache["doc_embed"]
-                doc.candidate_set_embed = cache["candidate_set_embed"]
-                doc.candidate_set = cache["candidate_set"]
-                logger.debug(f"Load embeddings from cache {cache_file_path}")
-                return doc.candidate_set_embed, doc.candidate_set
+            # this mutates doc
+            cached = self._read_embeddings_from_cache(doc)
+            if cached:
+                return cached
 
         t = time()
-        doc.doc_embed = self.embed_doc(doc, stemmer, doc_mode, post_processing)
+        doc.doc_embed = self._embed_doc(doc, stemmer, doc_mode, post_processing)
         logger.info(f"Embed Doc in {time() -  t:.2f}s")
 
         t = time()
@@ -350,11 +341,52 @@ class EmbedRank(BaseKPModel):
         logger.info(f"Embed Candidates in {time() -  t:.2f}s")
 
         if cand_mode == "global_attention":
-            doc.doc_embed = self.global_embed_doc(doc)
+            doc.doc_embed = self._global_embed_doc(doc)
 
-        return doc.candidate_set_embed, doc.candidate_set
+        if use_cache:
+            self._save_embeddings_in_cache(doc)
 
-    def rank_candidates(
+        return doc.doc_embed, doc.candidate_set_embed, doc.candidate_set
+
+    def _save_embeddings_in_cache(self, doc: Document):
+        logger.info(f"Saving {doc.id} embeddings in cache dir.")
+
+        cache_file_path = os.path.join(
+            GEO_KPE_MULTIDOC_CACHE_PATH,
+            self.name[self.name.index("_") + 1 :],
+            f"{doc.id}-embeddings.pkl",
+        )
+
+        Path(cache_file_path).parent.mkdir(exist_ok=True, parents=True)
+        joblib.dump(
+            {
+                "dataset": doc.dataset,
+                "topic": doc.topic,
+                "doc": doc.id,
+                "doc_embedding": doc.doc_embed,
+                "candidate_embeddings": doc.candidate_set_embed,
+                "candidates": doc.candidate_set,
+            },
+            cache_file_path,
+        )
+
+    def _read_embeddings_from_cache(self, doc):
+        # TODO: implement caching? is usefull only in future analysis
+        cache_file_path = os.path.join(
+            GEO_KPE_MULTIDOC_CACHE_PATH,
+            self.name[self.name.index("_") + 1 :],
+            f"{doc.id}-embeddings.pkl",
+        )
+
+        if os.path.exists(cache_file_path):
+            cache = joblib.load(cache_file_path)
+            doc.doc_embed = cache["doc_embed"]
+            doc.candidate_set_embed = cache["candidate_set_embed"]
+            doc.candidate_set = cache["candidate_set"]
+            logger.debug(f"Load embeddings from cache {cache_file_path}")
+            return doc.doc_embed, doc.candidate_set_embed, doc.candidate_set
+
+    def _rank_candidates(
         self,
         doc_embed: np.ndarray,
         candidate_set_embed: List[np.ndarray],
@@ -410,7 +442,7 @@ class EmbedRank(BaseKPModel):
 
     def top_n_candidates(
         self,
-        doc,
+        doc: Document,
         top_n: int = 5,
         min_len: int = 5,
         stemmer: Callable = None,
@@ -420,25 +452,17 @@ class EmbedRank(BaseKPModel):
         cand_mode = kwargs.get("cand_mode", "")
         post_processing = kwargs.get("post_processing", [""])
         use_cache = kwargs.get("embed_memory", False)
-        # TODO: move to rank function
-        # mmr_mode = kwargs.get("mmr", False)
-        # mmr_diversity = kwargs.get("diversity", 0.8)
-
-        t = time()
-        doc.doc_embed = self.embed_doc(doc, stemmer, doc_mode, post_processing)
-        logger.info(f"Embed Doc in {time() -  t:.2f}s")
-
         if cand_mode != "" and cand_mode != "AvgContext":
-            logger.debug(f"Getting Embeddings for word sentence (not used?)")
-            self.embed_sents_words(doc, stemmer, use_cache)
+            logger.error(f"Getting Embeddings for word sentence (not used?)")
+            # self.embed_sents_words(doc, stemmer, use_cache)
 
-        t = time()
-        self.embed_candidates(doc, stemmer, cand_mode, post_processing)
-        logger.info(f"Embed Candidates in {time() -  t:.2f}s")
+        self.embed_candidates(doc, stemmer, cand_mode, post_processing, **kwargs)
 
-        return self.rank_candidates(
+        ranking = self._rank_candidates(
             doc.doc_embed, doc.candidate_set_embed, doc.candidate_set, top_n, **kwargs
         )
+
+        return ranking
         # doc_sim = []
         # if mmr_mode:
         #     assert mmr_diversity > 0

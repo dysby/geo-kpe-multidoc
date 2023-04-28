@@ -57,6 +57,13 @@ class CandidateExtract(BaseKPModel):
         Method that uses Regex patterns on POS tags to extract unique candidates from a tagged document
         """
 
+        use_cache = kwargs.get("pos_tag_memory", False)
+        self._pos_tag_doc(
+            doc=doc,
+            stemming=None,
+            use_cache=use_cache,
+        )
+
         candidate_set = set()
         parser = RegexpParser(self.grammar)
         np_trees = parser.parse_sents(tagged_doc)

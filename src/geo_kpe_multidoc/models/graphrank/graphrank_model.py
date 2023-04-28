@@ -14,6 +14,7 @@ from models.pre_processing.pre_processing_utils import (
     remove_punctuation,
     remove_whitespaces,
 )
+from nltk import RegexpParser
 from nltk.stem import PorterStemmer
 from torch import cosine_similarity
 
@@ -101,7 +102,7 @@ class GraphRank(BaseKPModel):
             for doc in corpus
         ]
 
-    def pos_tag_doc(self, doc: Document, tagger, memory, id):
+    def _pos_tag_doc(self, doc: Document, tagger, memory, id):
         """
         Method that handles POS_tagging of an entire document, whilst storing it seperated by sentences
         """
@@ -171,11 +172,13 @@ class GraphRank(BaseKPModel):
         doc.doc_embed = (
             self.model.embed(stemmer.stem(doc.raw_text))
             if stemmer
-            else model.embed(doc.raw_text)
+            else self.model.embed(doc.raw_text)
         )
         candidates = [candidate for candidate in doc.candidate_dic.keys()]
         candidate_embed_list = [
-            model.embed(stemmer.stem(candidate)) if stemmer else model.embed(candidate)
+            self.model.embed(stemmer.stem(candidate))
+            if stemmer
+            else self.model.embed(candidate)
             for candidate in doc.candidate_dic
         ]
 

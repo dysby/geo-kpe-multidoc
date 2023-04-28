@@ -59,13 +59,7 @@ class MDKPERank(BaseKPModel):
         Extracts key-phrases from a given document, with optional arguments
         relevant to its specific functionality
         """
-        use_cache = kwargs.get("pos_tag_memory", False)
 
-        self.base_model_embed.pos_tag_doc(
-            doc=doc,
-            stemming=None,
-            use_cache=use_cache,
-        )
         self.base_model_embed.extract_candidates(doc, min_len, lemmer_lang=lemmer)
 
         cand_embeds, candidate_set = self.base_model_embed.embed_candidates(
