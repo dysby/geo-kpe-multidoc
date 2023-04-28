@@ -219,7 +219,7 @@ def main():
             f"longformer_paraphrase_mnet_max{new_max_pos}_attw{attention_window}"
         )
         if copy_from_position:
-            model_name += f"cpmaxpos{copy_from_position}"
+            model_name += f"_cpmaxpos{copy_from_position}"
 
         model, tokenizer = to_longformer_t_v4(
             SentenceTransformer(BACKEND_MODEL_NAME),

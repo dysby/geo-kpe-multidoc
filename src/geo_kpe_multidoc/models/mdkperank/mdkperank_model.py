@@ -1,10 +1,13 @@
 import re
 from dataclasses import dataclass
 from itertools import chain
+from operator import itemgetter
 from statistics import mean
 from typing import Callable, Dict, Iterable, List, Set, Tuple
 
 import numpy as np
+import torch
+from loguru import logger
 from nltk.stem import PorterStemmer
 
 from geo_kpe_multidoc.datasets.datasets import KPEDataset
@@ -56,9 +59,24 @@ class MDKPERank(BaseKPModel):
         Extracts key-phrases from a given document, with optional arguments
         relevant to its specific functionality
         """
-        return self.base_model_embed.extract_mdkpe_embeds(
-            doc, top_n, min_len, stemmer, lemmer, **kwargs
+        use_cache = kwargs.get("pos_tag_memory", False)
+
+        self.base_model_embed.pos_tag_doc(
+            doc=doc,
+            stemming=None,
+            use_cache=use_cache,
         )
+        self.base_model_embed.extract_candidates(doc, min_len, lemmer_lang=lemmer)
+
+        cand_embeds, candidate_set = self.base_model_embed.embed_candidates(
+            doc, stemmer, **kwargs
+        )
+
+        logger.info(f"Document #{self.counter} processed")
+        self.counter += 1
+        torch.cuda.empty_cache()
+
+        return (doc, cand_embeds, candidate_set)
 
     def _get_locations(
         self, docs_geo_coords, docs_of_candidate: List[str]
@@ -294,10 +312,11 @@ class MDKPERank(BaseKPModel):
             )
             for doc in topic_docs
         ]
+
         cands = {}
         for _doc, cand_embeds, cand_set in topic_res:
-            for candidate, embeding in zip(cand_set, cand_embeds):
-                cands.setdefault(candidate, []).append(embeding)
+            for candidate, embedding in zip(cand_set, cand_embeds):
+                cands.setdefault(candidate, []).append(embedding)
 
         # The candidate embedding is the average of each word embeding
         # of the candidate in the document.
@@ -327,6 +346,50 @@ class MDKPERank(BaseKPModel):
         )
 
         return top_n_scores, cand_set
+
+    def _rank_kp(self, ranking_p_doc):
+        """Rank keyphrase candidades and scores from documents into a global topic keyphrase ranking
+
+        Parameters
+        ----------
+        topic_kp_candidates : List[Tuple[Document, Any, Any]]
+            list of documents and candidate embeddings
+
+        Returns
+        -------
+        _type_
+            _description_
+        """
+        # cands = {}
+        # for _doc, cand_embeds, cand_set in topic_kp_candidates:
+        #     for candidate, embedding in zip(cand_set, cand_embeds):
+        #         cands.setdefault(candidate, []).append(embedding)
+
+        # # The candidate embedding is the average of each word embeding
+        # # of the candidate in the document.
+        # cand_embeds = [np.mean(embed, axis=0) for _cand, embed in cands.items()]
+        # cand_set = list(cands.keys())
+
+        # ranking_p_doc = [
+        #     self.base_model_embed.rank_candidates(doc.doc_embed, cand_embeds, cand_set)
+        #     for doc, _, _ in topic_kp_candidates
+        # ]
+        scores_per_candidate = {}
+        cand_set = set()
+
+        for candidates_and_score, _ in ranking_p_doc:
+            for candidate, score in candidates_and_score:
+                cand_set.add(candidate)
+                scores_per_candidate.setdefault(candidate, []).append(score)
+
+        # TODO: If a candidate is only mentioned in one doc, the overall score can be biased.
+        scores_per_candidate = sorted(
+            [(cand, np.mean(scores)) for cand, scores in scores_per_candidate.items()],
+            reverse=True,
+            key=itemgetter(1),  # sort by score_per_candidate
+        )
+
+        return scores_per_candidate, cand_set
 
     def _rank_by_geo(
         self,

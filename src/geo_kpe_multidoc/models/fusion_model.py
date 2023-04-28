@@ -1,6 +1,7 @@
 import re
 from enum import Enum
 from itertools import repeat
+from operator import itemgetter
 from typing import Callable, List, Set, Tuple
 
 import numpy as np
@@ -120,7 +121,7 @@ class FusionModel:
             sorted(
                 [(kp, kp_score[doc][kp]) for kp in kp_score[doc]],
                 reverse=True,
-                key=lambda x: x[1],
+                key=itemgetter(1),
             )
             for doc in kp_score
         ]

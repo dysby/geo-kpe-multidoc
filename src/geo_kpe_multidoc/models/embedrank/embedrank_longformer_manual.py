@@ -1,7 +1,10 @@
+import os
 from itertools import chain
+from operator import itemgetter
 from time import time
 from typing import Callable, List, Optional, Set, Tuple, Union
 
+import joblib
 import numpy as np
 import simplemma
 import torch
@@ -12,6 +15,7 @@ from nltk.stem import PorterStemmer
 from nltk.stem.api import StemmerI
 from sklearn.metrics.pairwise import cosine_similarity
 
+from geo_kpe_multidoc import GEO_KPE_MULTIDOC_CACHE_PATH
 from geo_kpe_multidoc.document import Document
 from geo_kpe_multidoc.models.base_KP_model import BaseKPModel, find_occurrences
 from geo_kpe_multidoc.models.pre_processing.language_mapping import (
@@ -46,8 +50,8 @@ class EmbedRankManual(BaseKPModel):
         if device is None:
             device = "cuda" if torch.cuda.is_available() else "cpu"
             logger.info("EmbedRankManual use pytorch device: {}".format(device))
-        model.to(device)
 
+        model.to(device)
         self.device = device
 
         self.model = SentenceEmbedder(model, tokenizer)
@@ -59,26 +63,6 @@ class EmbedRankManual(BaseKPModel):
             if choose_tagger(dataset) != self.tagger.name
             else self.tagger
         )
-
-    def extract_mdkpe_embeds(
-        self, doc: Document, top_n, min_len, stemmer=None, lemmer=None, **kwargs
-    ) -> Tuple[Document, List[np.ndarray], List[str]]:
-        use_cache = kwargs.get("pos_tag_memory", False)
-
-        self.pos_tag_doc(
-            doc=doc,
-            stemming=None,
-            use_cache=use_cache,
-        )
-        self.extract_candidates(doc, min_len, self.grammar, lemmer)
-
-        cand_embeds, candidate_set = self.embed_n_candidates(doc, stemmer, **kwargs)
-
-        logger.info(f"Document #{self.counter} processed")
-        self.counter += 1
-        torch.cuda.empty_cache()
-
-        return (doc, cand_embeds, candidate_set)
 
     def extract_kp_from_corpus(
         self,
@@ -155,7 +139,7 @@ class EmbedRankManual(BaseKPModel):
     def global_embed_doc(self, doc):
         raise NotImplemented
 
-    def embed_candidates(
+    def _aggregate_candidate_mention_embeddings(
         self,
         doc: Document,
         stemmer: Optional[StemmerI] = None,
@@ -267,7 +251,7 @@ class EmbedRankManual(BaseKPModel):
         self,
         doc: Document,
         min_len: int = 5,
-        grammar: str = "",
+        grammar: str = None,
         lemmer_lang: str = None,
     ):
         """
@@ -287,6 +271,8 @@ class EmbedRankManual(BaseKPModel):
                 Model tokenizer is responsible for case handling.
         TODO: new grammar (({.*}{HYPH}{.*}){NOUN}*)|(({VBG}|{VBN})?{ADJ}*{NOUN}+)
         """
+
+        grammar = self.grammar if not grammar else grammar
         doc.candidate_set = set()
         doc.candidate_mentions = {}
 
@@ -336,8 +322,9 @@ class EmbedRankManual(BaseKPModel):
                     )
 
         doc.candidate_set = sorted(list(doc.candidate_set), key=len, reverse=True)
+        return doc.candidate_set, doc.candidate_mentions
 
-    def embed_n_candidates(
+    def embed_candidates(
         self, doc: Document, stemmer, **kwargs
     ) -> Tuple[List[np.ndarray], List[str]]:
         """
@@ -351,24 +338,36 @@ class EmbedRankManual(BaseKPModel):
         doc_mode = kwargs.get("doc_mode", "")
         cand_mode = kwargs.get("global_attention", "")
         post_processing = kwargs.get("post_processing", [""])
-
         use_cache = kwargs.get("cache_embeddings", False)
 
         if use_cache:
             # TODO: implement caching? is usefull only in future analysis
-            _file_name = self.name[self.name.index("_") + 1 :]
-            raise NotImplemented
-        else:
-            t = time()
-            doc.doc_embed = self.embed_doc(doc, stemmer, doc_mode, post_processing)
-            logger.info(f"Embed Doc in {time() -  t:.2f}s")
+            cache_file_path = os.path.join(
+                GEO_KPE_MULTIDOC_CACHE_PATH,
+                self.name[self.name.index("_") + 1 :],
+                f"{doc.id}-embeddings.pkl",
+            )
 
-            t = time()
-            self.embed_candidates(doc, stemmer, cand_mode, post_processing)
-            logger.info(f"Embed Candidates in {time() -  t:.2f}s")
+            if os.path.exists(cache_file_path):
+                cache = joblib.load(cache_file_path)
+                doc.doc_embed = cache["doc_embed"]
+                doc.candidate_set_embed = cache["candidate_set_embed"]
+                doc.candidate_set = cache["candidate_set"]
+                logger.debug(f"Load embeddings from cache {cache_file_path}")
+                return doc.candidate_set_embed, doc.candidate_set
 
-            if cand_mode == "global_attention":
-                doc.doc_embed = self.global_embed_doc(doc)
+        t = time()
+        doc.doc_embed = self.embed_doc(doc, stemmer, doc_mode, post_processing)
+        logger.info(f"Embed Doc in {time() -  t:.2f}s")
+
+        t = time()
+        self._aggregate_candidate_mention_embeddings(
+            doc, stemmer, cand_mode, post_processing
+        )
+        logger.info(f"Embed Candidates in {time() -  t:.2f}s")
+
+        if cand_mode == "global_attention":
+            doc.doc_embed = self.global_embed_doc(doc)
 
         return doc.candidate_set_embed, doc.candidate_set
 
@@ -377,6 +376,7 @@ class EmbedRankManual(BaseKPModel):
         doc_embed: np.ndarray,
         candidate_set_embed: List[np.ndarray],
         candidate_set: List[str],
+        top_n: int = -1,
         **kwargs,
     ) -> Tuple[List[Tuple[str, float]], List[str]]:
         """
@@ -393,18 +393,22 @@ class EmbedRankManual(BaseKPModel):
         if mmr_mode:
             assert mmr_diversity > 0
             assert mmr_diversity < 1
+
+            valid_top_n = len(candidate_set)
+            if top_n > 0:
+                valid_top_n = min(valid_top_n, top_n)
+
             doc_sim = mmr(
                 doc_embed.reshape(1, -1),
                 candidate_set_embed,
                 candidate_set,
+                top_n=valid_top_n,
                 diversity=mmr_diversity,
             )
             # TODO: Not same format as cosine_similarity
             logger.error("TODO: Not same format as cosine_similarity")
         else:
-            doc_sim = np.absolute(
-                cosine_similarity(candidate_set_embed, doc_embed.reshape(1, -1))
-            )
+            doc_sim = cosine_similarity(candidate_set_embed, doc_embed.reshape(1, -1))
 
         candidate_score = sorted(
             [
@@ -413,10 +417,13 @@ class EmbedRankManual(BaseKPModel):
             ],
             # [(candidate_set[i], doc_sim[i][0]) for i in range(len(doc_sim))],
             reverse=True,
-            key=lambda x: x[1],
+            key=itemgetter(1),
         )
 
-        return candidate_score, [candidate[0] for candidate in candidate_score]
+        if top_n == -1:
+            return candidate_score, [candidate[0] for candidate in candidate_score]
+
+        return candidate_score[:top_n], [candidate[0] for candidate in candidate_score]
 
     def top_n_candidates(
         self,
@@ -430,48 +437,53 @@ class EmbedRankManual(BaseKPModel):
         cand_mode = kwargs.get("cand_mode", "")
         post_processing = kwargs.get("post_processing", [""])
         use_cache = kwargs.get("embed_memory", False)
-        mmr_mode = kwargs.get("mmr", False)
-        mmr_diversity = kwargs.get("diversity", 0.8)
+        # TODO: move to rank function
+        # mmr_mode = kwargs.get("mmr", False)
+        # mmr_diversity = kwargs.get("diversity", 0.8)
 
         t = time()
         doc.doc_embed = self.embed_doc(doc, stemmer, doc_mode, post_processing)
         logger.info(f"Embed Doc in {time() -  t:.2f}s")
 
         if cand_mode != "" and cand_mode != "AvgContext":
+            logger.debug(f"Getting Embeddings for word sentence (not used?)")
             self.embed_sents_words(doc, stemmer, use_cache)
 
         t = time()
         self.embed_candidates(doc, stemmer, cand_mode, post_processing)
         logger.info(f"Embed Candidates in {time() -  t:.2f}s")
 
-        doc_sim = []
-        if mmr_mode:
-            assert mmr_diversity > 0
-            assert mmr_diversity < 1
-            valid_top_n = len(doc.candidate_set)
-            if top_n > 0:
-                valid_top_n = (
-                    len(doc.candidate_set) if len(doc.candidate_set) < top_n else top_n
-                )
-            doc_sim = mmr(
-                doc.doc_embed.reshape(1, -1),
-                doc.candidate_set_embed,
-                doc.candidate_set,
-                valid_top_n,
-                diversity=mmr_diversity,
-            )
-        else:
-            doc_sim = np.absolute(
-                cosine_similarity(doc.candidate_set_embed, doc.doc_embed.reshape(1, -1))
-            )
-
-        candidate_score = sorted(
-            [(doc.candidate_set[i], doc_sim[i][0]) for i in range(len(doc_sim))],
-            reverse=True,
-            key=lambda x: x[1],
+        return self.rank_candidates(
+            doc.doc_embed, doc.candidate_set_embed, doc.candidate_set, top_n, **kwargs
         )
+        # doc_sim = []
+        # if mmr_mode:
+        #     assert mmr_diversity > 0
+        #     assert mmr_diversity < 1
+        #     valid_top_n = len(doc.candidate_set)
+        #     if top_n > 0:
+        #         valid_top_n = (
+        #             len(doc.candidate_set) if len(doc.candidate_set) < top_n else top_n
+        #         )
+        #     doc_sim = mmr(
+        #         doc.doc_embed.reshape(1, -1),
+        #         doc.candidate_set_embed,
+        #         doc.candidate_set,
+        #         valid_top_n,
+        #         diversity=mmr_diversity,
+        #     )
+        # else:
+        #     doc_sim = np.absolute(
+        #         cosine_similarity(doc.candidate_set_embed, doc.doc_embed.reshape(1, -1))
+        #     )
 
-        if top_n == -1:
-            return candidate_score, [candidate[0] for candidate in candidate_score]
+        # candidate_score = sorted(
+        #     [(doc.candidate_set[i], doc_sim[i][0]) for i in range(len(doc_sim))],
+        #     reverse=True,
+        #     key=lambda x: x[1],
+        # )
 
-        return candidate_score[:top_n], [candidate[0] for candidate in candidate_score]
+        # if top_n == -1:
+        #     return candidate_score, [candidate[0] for candidate in candidate_score]
+
+        # return candidate_score[:top_n], [candidate[0] for candidate in candidate_score]

@@ -1,4 +1,5 @@
 import re
+from operator import itemgetter
 from time import time
 from typing import Callable, List, Optional, Set, Tuple
 
@@ -25,8 +26,11 @@ from geo_kpe_multidoc.models.pre_processing.pre_processing_utils import (
 
 class MaskRank(BaseKPModel):
     """
-    Simple class to encapsulate MaskRank functionality. Uses
-    the KeyBert backend to retrieve models
+    Simple class to encapsulate MaskRank functionality.
+
+    Extract candidates and rank by cosine similarity of document embedding with masked document embedding.
+
+    Uses KeyBert backend to retrieve models.
     """
 
     def __init__(self, model, tagger):
@@ -237,9 +241,9 @@ class MaskRank(BaseKPModel):
 
         return doc.candidate_set_embed, doc.candidate_set
 
-    def evaluate_n_candidates(
-        self, doc_embed: np.ndarray, candidate_set_embed, candidate_set
-    ) -> List[Tuple]:
+    def rank_candidates(
+        self, doc_embed, candidate_set_embed, candidate_set, top_n: int = -1, **kwargs
+    ):
         """
         This method is key for each ranking model.
         Here the ranking heuritic is applied according to model definition.
@@ -247,22 +251,42 @@ class MaskRank(BaseKPModel):
         MaskRank selects the candidates that have embedings of masked document form far from emedings of the original document.
         Looking for 1 - similarity.
         """
-        # Why MaskRank candidate score is diferent from EmbedRank? Least similar? doc_sim is the masked document?
-        # doc_embed = doc.doc_embed.reshape(1, -1)
-        doc_sim = np.absolute(
-            cosine_similarity(candidate_set_embed, doc_embed.reshape(1, -1))
-        )
+        cand_mode = kwargs.get("cand_mode", "MaskAll")
+
+        doc_sim = []
+
+        doc_embed = doc_embed.reshape(1, -1)
+        # TODO: simplify cand_mode if to test only MaskHighest
+        if "cand_mode" not in kwargs or kwargs["cand_mode"] != "MaskHighest":
+            doc_sim = cosine_similarity(candidate_set_embed, doc_embed)
+
+        elif kwargs["cand_mode"] == "MaskHighest":
+            for mask_cand_occur in candidate_set_embed:
+                if mask_cand_occur != []:
+                    doc_sim.append(
+                        [
+                            # np.ndarray.min(
+                            #     np.absolute(
+                            #         cosine_similarity(mask_cand_occur, doc_embed)
+                            #     )
+                            # )
+                            cosine_similarity(mask_cand_occur, doc_embed).min()
+                        ]
+                    )
+                else:
+                    doc_sim.append(np.array([1.0]))
+
+        # TODO: refactor candidate scores sorting
         candidate_score = sorted(
-            [
-                (candidate, 1.0 - candidate_doc_sim[0])
-                for (candidate, candidate_doc_sim) in zip(candidate_set, doc_sim)
-            ],
-            # [(candidate_set[i], 1.0 - doc_sim[i][0]) for i in range(len(doc_sim))],
+            [(candidate_set[i], 1.0 - doc_sim[i][0]) for i in range(len(doc_sim))],
             reverse=True,
-            key=lambda x: x[1],
+            key=itemgetter(1),
         )
 
-        return candidate_score, [candidate[0] for candidate in candidate_score]
+        if top_n == -1:
+            return candidate_score, [candidate[0] for candidate in candidate_score]
+
+        return candidate_score[:top_n], [candidate[0] for candidate in candidate_score]
 
     def top_n_candidates(
         self,
@@ -283,37 +307,41 @@ class MaskRank(BaseKPModel):
         self.embed_candidates(doc, stemmer, cand_mode, attention)
         logger.info(f"Embed Candidates in {time() -  t:.2f}s")
 
-        doc_sim = []
-        # TODO: simplify cand_mode if to test only MaskHighest
-        if "cand_mode" not in kwargs or kwargs["cand_mode"] != "MaskHighest":
-            doc_sim = np.absolute(
-                cosine_similarity(doc.candidate_set_embed, doc.doc_embed.reshape(1, -1))
-            )
-
-        elif kwargs["cand_mode"] == "MaskHighest":
-            doc_embed = doc.doc_embed.reshape(1, -1)
-            for mask_cand_occur in doc.candidate_set_embed:
-                if mask_cand_occur != []:
-                    doc_sim.append(
-                        [
-                            np.ndarray.min(
-                                np.absolute(
-                                    cosine_similarity(mask_cand_occur, doc_embed)
-                                )
-                            )
-                        ]
-                    )
-                else:
-                    doc_sim.append([1.0])
-
-        # TODO: refactor candidate scores sorting
-        candidate_score = sorted(
-            [(doc.candidate_set[i], 1.0 - doc_sim[i][0]) for i in range(len(doc_sim))],
-            reverse=True,
-            key=lambda x: x[1],
+        return self.rank_candidates(
+            doc.doc_embed, doc.candidate_set_embed, doc.candidate_set, top_n, **kwargs
         )
 
-        if top_n == -1:
-            return candidate_score, [candidate[0] for candidate in candidate_score]
+        # doc_sim = []
+        # # TODO: simplify cand_mode if to test only MaskHighest
+        # if "cand_mode" not in kwargs or kwargs["cand_mode"] != "MaskHighest":
+        #     doc_sim = np.absolute(
+        #         cosine_similarity(doc.candidate_set_embed, doc.doc_embed.reshape(1, -1))
+        #     )
 
-        return candidate_score[:top_n], [candidate[0] for candidate in candidate_score]
+        # elif kwargs["cand_mode"] == "MaskHighest":
+        #     doc_embed = doc.doc_embed.reshape(1, -1)
+        #     for mask_cand_occur in doc.candidate_set_embed:
+        #         if mask_cand_occur != []:
+        #             doc_sim.append(
+        #                 [
+        #                     np.ndarray.min(
+        #                         np.absolute(
+        #                             cosine_similarity(mask_cand_occur, doc_embed)
+        #                         )
+        #                     )
+        #                 ]
+        #             )
+        #         else:
+        #             doc_sim.append([1.0])
+
+        # # TODO: refactor candidate scores sorting
+        # candidate_score = sorted(
+        #     [(doc.candidate_set[i], 1.0 - doc_sim[i][0]) for i in range(len(doc_sim))],
+        #     reverse=True,
+        #     key=itemgetter(1),
+        # )
+
+        # if top_n == -1:
+        #     return candidate_score, [candidate[0] for candidate in candidate_score]
+
+        # return candidate_score[:top_n], [candidate[0] for candidate in candidate_score]

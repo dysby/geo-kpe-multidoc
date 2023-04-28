@@ -85,7 +85,7 @@ from geo_kpe_multidoc.datasets.datasets import load_data
 docs = load_data("DUC2001", "/home/helder/doc/mecd/thesis/data/")
 
 # Dataset doc token size
-# sorted([(n, doc[0], model_longformer.tokenize([doc[1]])['input_ids'].size()) for n, doc in enumerate(docs)], key=lambda x: x[2], reverse=True)
+# sorted([(n, doc[0], model_longformer.tokenize([doc[1]])['input_ids'].size()) for n, doc in enumerate(docs)], key=itemgetter(2), reverse=True)
 
 small = 85
 large = 194
