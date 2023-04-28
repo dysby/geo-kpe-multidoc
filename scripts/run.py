@@ -305,6 +305,8 @@ def main():
 
     if args.cache_results:
         options["cache_results"] = True
+    if args.use_cache:
+        options["use_cache"] = True
     data = load_data(ds_name, GEO_KPE_MULTIDOC_DATA_PATH)
     logger.info(f"Args: {args}")
     logger.info("Start Testing ...")

@@ -10,6 +10,7 @@ import numpy as np
 import simplemma
 import torch
 from keybert._mmr import mmr
+from keybert.backend._base import BaseEmbedder
 from loguru import logger
 from nltk import RegexpParser
 from nltk.stem import PorterStemmer
@@ -161,7 +162,9 @@ class EmbedRank(BaseKPModel):
     ):
         """
         Method that embeds the current candidate set, having several modes according to usage.
-            The default value just embeds candidates directly.
+        The default value just embeds candidates directly.
+
+        TODO: deal with subclassing EmbedRankManual
         """
         # TODO: keep this init?
         doc.candidate_set_embed = []
@@ -171,7 +174,12 @@ class EmbedRank(BaseKPModel):
 
             mentions = []
             for mention in doc.candidate_mentions[candidate]:
-                tokenized_candidate = self.model.tokenize(mention)
+                if isinstance(self.model, BaseEmbedder):
+                    # original tokenization by KeyBert/SentenceTransformer
+                    tokenized_candidate = tokenize_hf(mention, self.model)
+                else:
+                    # tokenize via local SentenceEmbedder Class
+                    tokenized_candidate = self.model.tokenize(mention)
 
                 filt_ids = filter_special_tokens(tokenized_candidate["input_ids"])
 
@@ -185,14 +193,19 @@ class EmbedRank(BaseKPModel):
                 # input_ids.
                 # candidate is beyond max position for emdedding
                 # return a non-contextualized embedding.
-                doc.candidate_set_embed.append(
-                    self.model.encode(candidate, device=self.device)[
-                        "sentence_embedding"
-                    ]
-                    .detach()
-                    .cpu()
-                    .numpy()
-                )
+                if isinstance(self.model, BaseEmbedder):
+                    embd = self.model.embed(candidate)
+                else:
+                    embd = (
+                        self.model.encode(candidate, device=self.device)[
+                            "sentence_embedding"
+                        ]
+                        .detach()
+                        .cpu()
+                        .numpy()
+                    )
+
+                doc.candidate_set_embed.append(embd)
                 # TODO: problem with original 'andrew - would' vs PoS extracted 'andrew-would'
                 logger.debug(
                     f"Candidate {candidate} - mentions not found: {doc.candidate_mentions[candidate]}"
@@ -322,7 +335,7 @@ class EmbedRank(BaseKPModel):
         doc_mode = kwargs.get("doc_mode", "")
         cand_mode = kwargs.get("global_attention", "")
         post_processing = kwargs.get("post_processing", [""])
-        use_cache = kwargs.get("cache_embeddings", False)
+        use_cache = kwargs.get("use_cache", False)
 
         if use_cache:
             # this mutates doc
@@ -456,7 +469,7 @@ class EmbedRank(BaseKPModel):
             logger.error(f"Getting Embeddings for word sentence (not used?)")
             # self.embed_sents_words(doc, stemmer, use_cache)
 
-        self.embed_candidates(doc, stemmer, cand_mode, post_processing, **kwargs)
+        self.embed_candidates(doc, stemmer, **kwargs)
 
         ranking = self._rank_candidates(
             doc.doc_embed, doc.candidate_set_embed, doc.candidate_set, top_n, **kwargs
