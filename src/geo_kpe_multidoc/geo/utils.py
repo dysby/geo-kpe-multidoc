@@ -2,7 +2,7 @@ import itertools
 import os
 from datetime import datetime
 from time import time
-from typing import Callable, Dict
+from typing import Callable, Dict, List
 
 import numpy as np
 import pandas as pd
@@ -22,6 +22,7 @@ from geo_kpe_multidoc.geo.measures import (
 def process_geo_associations_for_topics(
     data: pd.DataFrame,
     docs_data: pd.DataFrame,
+    topic_candidate_document_matrix: Dict[str, pd.DataFrame],
     doc_coordinate_data: pd.DataFrame = None,
     w_function: Callable = inv_dist,
     w_function_param=1,
@@ -89,8 +90,19 @@ def process_geo_associations_for_topics(
 
         for keyphrase in data.loc[topic].index:
             # logger.debug(f"Geo associations for {keyphrase}.")
-            kp_scores = docs_data.loc[(topic, slice(None), keyphrase), :].droplevel(2)
+
+            in_docs = (
+                topic_candidate_document_matrix["d04"]
+                .loc[keyphrase]
+                .loc[lambda x: x == 1]
+                .index
+            )
+
+            kp_scores = docs_data.loc[
+                pd.IndexSlice[topic, in_docs, keyphrase], :
+            ].droplevel(2)
             # kp_scores have the semantic scores of the keyphrase in each of the documents it appears.
+            # kp_score[(topic, doc), "semantic_score"]
             moran_i, geary_c, getis_g = geo_associations(
                 kp_scores, docs_coordinates, w_function, w_function_param
             )

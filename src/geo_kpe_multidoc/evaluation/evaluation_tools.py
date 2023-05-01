@@ -366,6 +366,7 @@ def extract_keyphrases_topics(
     model_results = {dataset.name: []}
     true_labels = {dataset.name: []}
     cache_results = kwargs.get("cache_results", False)
+    experiment = kwargs.get("experiment", "debug")
 
     if n_docs_limit == -1:
         # no limit
@@ -444,7 +445,7 @@ def extract_keyphrases_topics(
         if cache_results:
             filename = path.join(
                 GEO_KPE_MULTIDOC_CACHE_PATH,
-                dataset.name,
+                experiment,
                 f"{topic_id}-mdkpe-geo.pkl",
             )
 
