@@ -92,7 +92,7 @@ def process_geo_associations_for_topics(
             # logger.debug(f"Geo associations for {keyphrase}.")
 
             in_docs = (
-                topic_candidate_document_matrix["d04"]
+                topic_candidate_document_matrix[topic]
                 .loc[keyphrase]
                 .loc[lambda x: x == 1]
                 .index
