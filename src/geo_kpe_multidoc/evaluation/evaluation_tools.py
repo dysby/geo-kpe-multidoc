@@ -442,8 +442,6 @@ def extract_keyphrases_topics(
             gold_kp = lemmatize(gold_kp, lemmer)
 
         if cache_results:
-            logger.info(f"Saving {topic_id} results in cache dir.")
-
             filename = path.join(
                 GEO_KPE_MULTIDOC_CACHE_PATH,
                 dataset.name,
@@ -461,6 +459,7 @@ def extract_keyphrases_topics(
                 },
                 filename,
             )
+            logger.info(f"Saving {topic_id} results in cache dir {filename}")
 
         true_labels[dataset.name].append(gold_kp)
         gc.collect()
