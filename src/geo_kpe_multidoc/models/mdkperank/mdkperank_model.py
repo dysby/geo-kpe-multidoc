@@ -1,4 +1,3 @@
-import re
 from dataclasses import dataclass
 from itertools import chain
 from operator import itemgetter
@@ -6,9 +5,9 @@ from statistics import mean
 from typing import Callable, Dict, Iterable, List, Set, Tuple
 
 import numpy as np
-import torch
+import pandas as pd
 from loguru import logger
-from nltk.stem import PorterStemmer
+from sklearn.metrics.pairwise import cosine_similarity
 
 from geo_kpe_multidoc.datasets.datasets import KPEDataset
 from geo_kpe_multidoc.datasets.process_mordecai import load_topic_geo_locations
@@ -19,9 +18,6 @@ from ..base_KP_model import BaseKPModel, KPEScore
 from ..embedrank import EmbedRank
 from ..fusion_model import FusionModel
 from ..maskrank import MaskRank
-from ..pre_processing.language_mapping import choose_lemmatizer, choose_tagger
-from ..pre_processing.pos_tagging import POS_tagger_spacy
-from ..pre_processing.pre_processing_utils import remove_punctuation, remove_whitespaces
 
 # from datasets.process_datasets import *
 
@@ -44,12 +40,13 @@ class MDKPERankOutput:
 
 
 class MDKPERank(BaseKPModel):
-    def __init__(self, model_name: str, tagger):
-        self.base_model_embed: EmbedRank = EmbedRank(model_name, tagger)
+    def __init__(self, model: EmbedRank):
+        self.base_model_embed: EmbedRank = model
         # TODO: what how to join MaskRank
         # self.base_model_mask = MaskRank(model, tagger)
-        self.name = "{}_{}".format(
-            str(self.__str__).split()[3], re.sub("-", "_", model_name)
+        self.name = (
+            ".".join([self.__class__.__name__, model.name.split("_")[0]])
+            + model.name[model.name.index("_") :]
         )
 
     def extract_kp_from_doc(
@@ -62,13 +59,9 @@ class MDKPERank(BaseKPModel):
 
         self.base_model_embed.extract_candidates(doc, min_len, lemmer_lang=lemmer)
 
-        cand_embeds, candidate_set = self.base_model_embed.embed_candidates(
+        _, cand_embeds, candidate_set = self.base_model_embed.embed_candidates(
             doc, stemmer, **kwargs
         )
-
-        logger.info(f"Document #{self.counter} processed")
-        self.counter += 1
-        torch.cuda.empty_cache()
 
         return (doc, cand_embeds, candidate_set)
 
@@ -109,7 +102,7 @@ class MDKPERank(BaseKPModel):
         Returns
         -------
         List[KPEScore]
-            List of KPE extracted from the agregation of documents set, with their score(/embeding?)
+            List of KPE extracted from the agregation of documents set, with their score(/embedding?)
         """
         topic_res = [
             self.extract_kp_from_doc(
@@ -122,31 +115,31 @@ class MDKPERank(BaseKPModel):
             )
             for doc in topic_docs
         ]
-        # Topic_res is a list for each document with (doc, candidades_embedings, candidates)
+        # Topic_res is a list for each document with (doc, candidades_embeddings, candidates)
 
-        candidates = {}
+        candidates = {}  # candidate: [embedding]
         docs_ids = []
         # a dict with the set of docs the candidate is mentioned
         candidate_document_matrix = {}
         for doc, doc_cand_embeds, doc_cand_set in topic_res:
-            for candidate, embeding_in_doc in zip(doc_cand_set, doc_cand_embeds):
-                candidates.setdefault(candidate, []).append(embeding_in_doc)
+            for candidate, embedding_in_doc in zip(doc_cand_set, doc_cand_embeds):
+                candidates.setdefault(candidate, []).append(embedding_in_doc)
                 candidate_document_matrix.setdefault(candidate, set()).add(doc.id)
             docs_ids.append(doc.id)
 
-        # The candidate embedding is the average of each word embeding
+        # The candidate embedding is the average of each embedding
         # of the candidate in the documents.
         # use sorting to assert arrays have the same index
-        candidates_embedings = [
-            np.mean(embedings_in_docs, axis=0)
-            for _candidate, embedings_in_docs in sorted(candidates.items())
+        candidates_embeddings = [
+            np.mean(embeddings_in_docs, axis=0)
+            for _candidate, embeddings_in_docs in sorted(candidates.items())
         ]
         candidates = sorted(candidates.keys())
 
         # compute a candidate <- document score matrix
         ranking_p_doc: Dict[Tuple[List[Tuple[str, float]], List[str]]] = {
-            doc.id: self.base_model_embed.rank_candidates(
-                doc.doc_embed, candidates_embedings, candidates
+            doc.id: self.base_model_embed._rank_candidates(
+                doc.doc_embed, candidates_embeddings, candidates
             )
             for doc, _, _ in topic_res
         }
@@ -293,7 +286,7 @@ class MDKPERank(BaseKPModel):
 
         Returns
         -------
-            List KPE extracted from the agregation of documents set, with their score(/embeding?)
+            List KPE extracted from the agregation of documents set, with their score(/embedding?)
         """
         topic_res = [
             self.extract_kp_from_doc(
@@ -307,83 +300,47 @@ class MDKPERank(BaseKPModel):
             for doc in topic_docs
         ]
 
-        cands = {}
-        for _doc, cand_embeds, cand_set in topic_res:
+        documents_embeddings = {}
+        candidate_embeddings = {}
+        for doc, cand_embeds, cand_set in topic_res:
+            documents_embeddings[doc.id] = doc.doc_embed  # .reshape(1, -1)
+            # Size([1, 768])
+
             for candidate, embedding in zip(cand_set, cand_embeds):
-                cands.setdefault(candidate, []).append(embedding)
+                candidate_embeddings.setdefault(candidate, []).append(embedding)
 
-        # The candidate embedding is the average of each word embeding
+        # The candidate embedding is the average of each embedding
         # of the candidate in the document.
-        cand_embeds = [np.mean(embed, axis=0) for _cand, embed in cands.items()]
-        cand_set = list(cands.keys())
+        candidate_embeddings = {
+            candidate: np.mean(embeddings, axis=0)
+            for candidate, embeddings in candidate_embeddings.items()
+        }
 
-        ranking_p_doc = [
-            self.base_model_embed.rank_candidates(doc.doc_embed, cand_embeds, cand_set)
-            for doc, _, _ in topic_res
-        ]
-        scores_per_candidate = {}
-
-        for doc, _ in ranking_p_doc:
-            for cand_t in doc:
-                if cand_t[0] not in scores_per_candidate:
-                    scores_per_candidate[cand_t[0]] = []
-                scores_per_candidate[cand_t[0]].append(cand_t[1])
-
-        # TODO: If a candidate is only mentioned in one doc, the overall score can be biased.
-        for cand in scores_per_candidate:
-            scores_per_candidate[cand] = np.mean(scores_per_candidate[cand])
-
-        top_n_scores = sorted(
-            [(cand, scores_per_candidate[cand]) for cand in scores_per_candidate],
-            reverse=True,
-            key=lambda x: x[1],  # sort by score_per_candidate
+        documents_embeddings = pd.DataFrame.from_dict(
+            documents_embeddings, orient="index"
+        )
+        candidate_embeddings = pd.DataFrame.from_dict(
+            candidate_embeddings, orient="index"
         )
 
-        return top_n_scores, cand_set
-
-    def _rank_kp(self, ranking_p_doc):
-        """Rank keyphrase candidades and scores from documents into a global topic keyphrase ranking
-
-        Parameters
-        ----------
-        topic_kp_candidates : List[Tuple[Document, Any, Any]]
-            list of documents and candidate embeddings
-
-        Returns
-        -------
-        _type_
-            _description_
-        """
-        # cands = {}
-        # for _doc, cand_embeds, cand_set in topic_kp_candidates:
-        #     for candidate, embedding in zip(cand_set, cand_embeds):
-        #         cands.setdefault(candidate, []).append(embedding)
-
-        # # The candidate embedding is the average of each word embeding
-        # # of the candidate in the document.
-        # cand_embeds = [np.mean(embed, axis=0) for _cand, embed in cands.items()]
-        # cand_set = list(cands.keys())
-
-        # ranking_p_doc = [
-        #     self.base_model_embed.rank_candidates(doc.doc_embed, cand_embeds, cand_set)
-        #     for doc, _, _ in topic_kp_candidates
-        # ]
-        scores_per_candidate = {}
-        cand_set = set()
-
-        for candidates_and_score, _ in ranking_p_doc:
-            for candidate, score in candidates_and_score:
-                cand_set.add(candidate)
-                scores_per_candidate.setdefault(candidate, []).append(score)
-
-        # TODO: If a candidate is only mentioned in one doc, the overall score can be biased.
-        scores_per_candidate = sorted(
-            [(cand, np.mean(scores)) for cand, scores in scores_per_candidate.items()],
-            reverse=True,
-            key=itemgetter(1),  # sort by score_per_candidate
+        # >>> doc_embed = np.random.rand(6, 768)
+        # >>> candidates_embed = np.random.rand(100, 768)
+        # >>> cosine_similarity(candidates_embed, doc_embed).shape
+        # (100, 6)
+        score_per_document = pd.DataFrame(
+            cosine_similarity(candidate_embeddings, documents_embeddings)
         )
+        score_per_document.index = candidate_embeddings.index
+        score_per_document.columns = documents_embeddings.index
 
-        return scores_per_candidate, cand_set
+        top_n_scores = score_per_document.mean(axis=1).sort_values(ascending=False)
+
+        # new dataframe with 0
+        candidate_document_matrix = (score_per_document * 0).astype(int)
+        for doc, _, cand_set in topic_res:
+            candidate_document_matrix.loc[cand_set, doc.id] += 1
+
+        return (top_n_scores, score_per_document, candidate_document_matrix)
 
     def _rank_by_geo(
         self,

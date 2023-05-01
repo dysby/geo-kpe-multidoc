@@ -15,6 +15,7 @@ from loguru import logger
 from nltk.stem import PorterStemmer
 from nltk.stem.api import StemmerI
 from tabulate import tabulate
+from tqdm import tqdm
 
 from geo_kpe_multidoc import GEO_KPE_MULTIDOC_CACHE_PATH, GEO_KPE_MULTIDOC_OUTPUT_PATH
 from geo_kpe_multidoc.datasets import DATASETS, KPEDataset
@@ -369,10 +370,11 @@ def extract_keyphrases_topics(
     if n_docs_limit == -1:
         # no limit
         loader = dataset
+        n_docs_limit = len(dataset)
     else:
         loader = islice(dataset, n_docs_limit)
 
-    for topic_id, docs, gold_kp in loader:
+    for i, (topic_id, docs, gold_kp) in enumerate(tqdm(loader, total=n_docs_limit)):
         # TODO: limit dataset mordecai error
         if topic_id in [
             # "d04",
@@ -412,12 +414,10 @@ def extract_keyphrases_topics(
 
         logger.info(f"KPE for topic {topic_id}")
         (
-            top_n_and_scores,
-            candidates,
+            top_n_scores,
+            score_per_document,
             candidate_document_matrix,
-            # keyphrase_coordinates,
-            ranking_per_doc,
-        ) = model.extract_kp_from_topic_geo(
+        ) = model.extract_kp_from_topic(
             # top_n_and_scores, candidates = model.extract_kp_from_topic(
             # top_n_and_scores, candidates = model.extract_kp_geo(
             # TODO: ***Warning*** this is only true for MultiDocument Dataset!
@@ -433,8 +433,8 @@ def extract_keyphrases_topics(
 
         model_results[dataset.name].append(
             (
-                top_n_and_scores,
-                candidates,
+                list(zip(top_n_scores.index.tolist(), top_n_scores.tolist())),
+                top_n_scores.index.tolist(),
             )
         )
 
@@ -453,14 +453,12 @@ def extract_keyphrases_topics(
             Path(filename).parent.mkdir(exist_ok=True, parents=True)
 
             joblib.dump(
-                (
-                    top_n_and_scores,
-                    candidates,
-                    candidate_document_matrix,
-                    # keyphrase_coordinates,
-                    ranking_per_doc,
-                    gold_kp,
-                ),
+                {
+                    "top_n_scores": top_n_scores,
+                    "score_per_document": score_per_document,
+                    "candidate_document_matrix": candidate_document_matrix,
+                    "gold_kp": gold_kp,
+                },
                 filename,
             )
 

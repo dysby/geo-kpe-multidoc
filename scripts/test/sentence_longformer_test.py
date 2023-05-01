@@ -98,31 +98,31 @@ def get_embeddings(docs, idx, model_original, model_alternative):
     return sentence_embedding_original, sentence_embedding_alternative
 
 
-def equal_embedings(vector1, vector2):
+def equal_embeddings(vector1, vector2):
     return np.all(np.isclose(vector1, vector2))
 
 
 print("Small doc")
 print(
     "Original vs Longformer :",
-    # equal_embedings(*get_embeddings(docs, small, model_original, model_longformer)),
-    equal_embedings(*get_embeddings(docs, small, model_original, model_custom)),
+    # equal_embeddings(*get_embeddings(docs, small, model_original, model_longformer)),
+    equal_embeddings(*get_embeddings(docs, small, model_original, model_custom)),
 )
 print(
     "Original vs XLMroberta-long :",
-    equal_embedings(
+    equal_embeddings(
         *get_embeddings(docs, small, model_original, model_xlmroberta_long)
     ),
 )
 print("Large_doc")
 print(
     "Original vs Longformer :",
-    equal_embedings(*get_embeddings(docs, large, model_original, model_custom)),
-    # equal_embedings(*get_embeddings(docs, large, model_original, model_longformer)),
+    equal_embeddings(*get_embeddings(docs, large, model_original, model_custom)),
+    # equal_embeddings(*get_embeddings(docs, large, model_original, model_longformer)),
 )
 print(
     "Original vs XLMroberta-long :",
-    equal_embedings(
+    equal_embeddings(
         *get_embeddings(docs, large, model_original, model_xlmroberta_long)
     ),
 )

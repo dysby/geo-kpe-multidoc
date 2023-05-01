@@ -47,12 +47,12 @@ class EmbedRankManual(EmbedRank):
         # Check why document text is mutated to lower:
         # Used after POS_TAGGING,
         # at 1st stage document POS Tagging uses normal text including capital letters,
-        # but later document handling will use only lowered text, embedings, and such.
+        # but later document handling will use only lowered text, embeddingds, and such.
         # doc.raw_text = doc.raw_text.lower()
-        doc_embedings = self.model.encode(doc.raw_text, device=self.device)
+        doc_embeddings = self.model.encode(doc.raw_text, device=self.device)
 
-        doc.token_ids = doc_embedings["input_ids"].squeeze().tolist()
-        doc.token_embeddings = doc_embedings["token_embeddings"].detach().cpu()
-        doc.attention_mask = doc_embedings["attention_mask"].detach().cpu()
+        doc.token_ids = doc_embeddings["input_ids"].squeeze().tolist()
+        doc.token_embeddings = doc_embeddings["token_embeddings"].detach().cpu()
+        doc.attention_mask = doc_embeddings["attention_mask"].detach().cpu()
 
-        return doc_embedings["sentence_embedding"].detach().cpu().numpy()
+        return doc_embeddings["sentence_embedding"].detach().cpu().numpy()

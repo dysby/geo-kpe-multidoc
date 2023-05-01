@@ -51,7 +51,7 @@ class Document:
     token_ids = []
     token_embeddings = []
 
-    # Embedings
+    # Embeddings
     doc_embed = None
     attention_mask = []  # Global attention mask
     candidate_set_embed = []

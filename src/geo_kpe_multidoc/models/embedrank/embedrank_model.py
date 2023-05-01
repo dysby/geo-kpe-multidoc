@@ -105,7 +105,7 @@ class EmbedRank(BaseKPModel):
         """
         Embed each word in the sentence by it self
         Non-conterxtualized embedding.
-        Embed_sent_words (Use only on non-contextualized candicate embeding mode, not used).
+        Embed_sent_words (Use only on non-contextualized candicate embedding mode, not used).
         TODO: validate, not used, we always want contexttualized embeddings of the candidades.
         TODO: correct cache/memory usage
         """
@@ -138,17 +138,17 @@ class EmbedRank(BaseKPModel):
         # Check why document text is mutated to lower:
         # Used after POS_TAGGING,
         # at 1st stage document POS Tagging uses normal text including capital letters,
-        # but later document handling will use only lowered text, embedings, and such.
+        # but later document handling will use only lowered text, embeddings, and such.
         # doc.raw_text = doc.raw_text.lower()
-        doc_embedings = self.model.embedding_model.encode(
+        doc_embeddings = self.model.embedding_model.encode(
             doc.raw_text, show_progress_bar=False, output_value=None
         )
 
-        doc.token_ids = doc_embedings["input_ids"].squeeze().tolist()
-        doc.token_embeddings = doc_embedings["token_embeddings"]
-        doc.attention_mask = doc_embedings["attention_mask"]
+        doc.token_ids = doc_embeddings["input_ids"].squeeze().tolist()
+        doc.token_embeddings = doc_embeddings["token_embeddings"]
+        doc.attention_mask = doc_embeddings["attention_mask"]
 
-        return doc_embedings["sentence_embedding"].detach().numpy()
+        return doc_embeddings["sentence_embedding"].detach().numpy()
 
     def _global_embed_doc(self, doc):
         raise NotImplemented
@@ -188,7 +188,7 @@ class EmbedRank(BaseKPModel):
 
             # backoff procedure, if mentions not found.
             if len(mentions) == 0:
-                # If this form is not present in token ids (remember max 4096), fallback to embeding without context.
+                # If this form is not present in token ids (remember max 4096), fallback to embedding without context.
                 # Can happen that tokenization gives different input_ids and the candidate form is not found in document
                 # input_ids.
                 # candidate is beyond max position for emdedding
@@ -230,7 +230,7 @@ class EmbedRank(BaseKPModel):
                 doc.candidate_set_embed, doc.raw_text, self.model
             )
 
-        # TODO: If in global attention mode the document embeding should be computed again having the
+        # TODO: If in global attention mode the document embedding should be computed again having the
         # attention mask changed to the candidate positions.
         if cand_mode == "global_attention":
             doc.doc_embed = self._global_embed_doc(doc)
@@ -329,7 +329,7 @@ class EmbedRank(BaseKPModel):
 
         Return
         ------
-            candidate_set_embed:    np.ndarray of the embedings for each candidate.
+            candidate_set_embed:    np.ndarray of the embeddings for each candidate.
             candicate_set:          List of candidates.
         """
         doc_mode = kwargs.get("doc_mode", "")
@@ -418,6 +418,7 @@ class EmbedRank(BaseKPModel):
         """
         mmr_mode = kwargs.get("mmr", False)
         mmr_diversity = kwargs.get("diversity", 0.8)
+        top_n = len(candidate_set) if top_n == -1 else top_n
 
         doc_sim = []
         if mmr_mode:
@@ -449,9 +450,6 @@ class EmbedRank(BaseKPModel):
             reverse=True,
             key=itemgetter(1),
         )
-
-        if top_n == -1:
-            return candidate_score, [candidate[0] for candidate in candidate_score]
 
         return candidate_score[:top_n], [candidate[0] for candidate in candidate_score]
 

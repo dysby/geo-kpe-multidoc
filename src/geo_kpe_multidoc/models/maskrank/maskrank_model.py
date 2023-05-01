@@ -78,15 +78,15 @@ class MaskRank(BaseKPModel):
         """
 
         # doc_info = model.embed_full(self.raw_text) # encode(documents, show_progress_bar=False, output_value = None)
-        doc_embedings = self.model.embedding_model.encode(
+        doc_embeddings = self.model.embedding_model.encode(
             doc.raw_text, show_progress_bar=False, output_value=None
         )
 
-        doc.token_ids = doc_embedings["input_ids"].detach().cpu().squeeze().tolist()
-        doc.token_embeddings = doc_embedings["token_embeddings"].detach().cpu()
-        doc.attention_mask = doc_embedings["attention_mask"].detach().cpu()
+        doc.token_ids = doc_embeddings["input_ids"].detach().cpu().squeeze().tolist()
+        doc.token_embeddings = doc_embeddings["token_embeddings"].detach().cpu()
+        doc.attention_mask = doc_embeddings["attention_mask"].detach().cpu()
 
-        return doc_embedings["sentence_embedding"].detach().cpu().numpy()
+        return doc_embeddings["sentence_embedding"].detach().cpu().numpy()
 
     def _embed_global(self, model):
         raise NotImplemented
@@ -208,7 +208,7 @@ class MaskRank(BaseKPModel):
         """
         Return
         ------
-            candidate_set_embed:    np.ndarray of the embedings for each candidate.
+            candidate_set_embed:    np.ndarray of the embeddings for each candidate.
             candicate_set:          List of candidates.
         """
         # TODO: why embed_doc in MaskRank is different, no post_processing or doc_mode
@@ -229,10 +229,11 @@ class MaskRank(BaseKPModel):
         This method is key for each ranking model.
         Here the ranking heuritic is applied according to model definition.
 
-        MaskRank selects the candidates that have embedings of masked document form far from emedings of the original document.
+        MaskRank selects the candidates that have embeddings of masked document form far from emedings of the original document.
         Looking for 1 - similarity.
         """
         cand_mode = kwargs.get("cand_mode", "MaskAll")
+        top_n = len(candidate_set) if top_n == -1 else top_n
 
         doc_sim = []
 
@@ -263,9 +264,6 @@ class MaskRank(BaseKPModel):
             reverse=True,
             key=itemgetter(1),
         )
-
-        if top_n == -1:
-            return candidate_score, [candidate[0] for candidate in candidate_score]
 
         return candidate_score[:top_n], [candidate[0] for candidate in candidate_score]
 

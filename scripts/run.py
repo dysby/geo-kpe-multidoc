@@ -185,6 +185,36 @@ def save(results: DataFrame, args):
         json.dump(args.__dict__, f, indent=4)
 
 
+def generateLongformerRanker(backend_model_name, tagger_name, args):
+    new_max_pos = args.longformer_max_length
+    attention_window = args.longformer_attention_window
+    copy_from_position = (
+        args.longformer_only_copy_to_max_position
+        if args.longformer_only_copy_to_max_position
+        else None
+    )
+
+    model_name = f"longformer_paraphrase_mnet_max{new_max_pos}_attw{attention_window}"
+    if copy_from_position:
+        model_name += f"_cpmaxpos{copy_from_position}"
+
+    model, tokenizer = to_longformer_t_v4(
+        SentenceTransformer(backend_model_name),
+        max_pos=new_max_pos,
+        attention_window=attention_window,
+        copy_from_position=copy_from_position,
+    )
+    # in RAM convertion to longformer needs this.
+    del model.embeddings.token_type_ids
+
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+    kpe_model = EmbedRankManual(
+        model, tokenizer, tagger_name, device=device, name=model_name
+    )
+    return kpe_model
+
+
 def main():
     args = parse_args()
 
@@ -207,38 +237,18 @@ def main():
     if args.rank_model == "EmbedRank":
         kpe_model = EmbedRank(BACKEND_MODEL_NAME, TAGGER_NAME)
     elif args.rank_model == "EmbedRankManual":
-        new_max_pos = args.longformer_max_length
-        attention_window = args.longformer_attention_window
-        copy_from_position = (
-            args.longformer_only_copy_to_max_position
-            if args.longformer_only_copy_to_max_position
-            else None
-        )
-
-        model_name = (
-            f"longformer_paraphrase_mnet_max{new_max_pos}_attw{attention_window}"
-        )
-        if copy_from_position:
-            model_name += f"_cpmaxpos{copy_from_position}"
-
-        model, tokenizer = to_longformer_t_v4(
-            SentenceTransformer(BACKEND_MODEL_NAME),
-            max_pos=new_max_pos,
-            attention_window=attention_window,
-            copy_from_position=copy_from_position,
-        )
-        # in RAM convertion to longformer needs this.
-        del model.embeddings.token_type_ids
-
-        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-
-        kpe_model = EmbedRankManual(
-            model, tokenizer, TAGGER_NAME, device=device, name=model_name
-        )
+        kpe_model = generateLongformerRanker(BACKEND_MODEL_NAME, TAGGER_NAME, args)
     elif args.rank_model == "MaskRank":
         kpe_model = MaskRank(BACKEND_MODEL_NAME, TAGGER_NAME)
     elif args.rank_model == "MDKPERank":
-        kpe_model = MDKPERank(BACKEND_MODEL_NAME, TAGGER_NAME)
+        if "longformer" in BACKEND_MODEL_NAME:
+            base_name = BACKEND_MODEL_NAME.replace("longformer-", "")
+            kpe_model = MDKPERank(
+                generateLongformerRanker(base_name, TAGGER_NAME, args)
+            )
+        else:
+            ranker = EmbedRank(BACKEND_MODEL_NAME, TAGGER_NAME)
+            kpe_model = MDKPERank(ranker)
     elif args.rank_model == "FusionRank":
         kpe_model = FusionModel(
             [
