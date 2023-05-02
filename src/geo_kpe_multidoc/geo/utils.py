@@ -11,7 +11,13 @@ from vincenty import vincenty
 
 from geo_kpe_multidoc import GEO_KPE_MULTIDOC_CACHE_PATH
 from geo_kpe_multidoc.datasets.process_mordecai import load_topic_geo_locations
-from geo_kpe_multidoc.geo.measures import GearyC, GetisOrdG, MoranI, inv_dist
+from geo_kpe_multidoc.geo.measures import (
+    GearyC,
+    GetisOrdG,
+    MoranI,
+    cached_vincenty,
+    inv_dist,
+)
 
 
 def process_geo_associations_for_topics(
@@ -234,7 +240,16 @@ def scores_weight_matrix(
     weight_matrix = np.zeros((n, n))
     inds = np.triu_indices_from(weight_matrix, k=1)  # k=1 don't compute diagonal
     for i, j in zip(*inds):
-        weight_matrix[i, j] = vincenty(coordinates[i], coordinates[j])
+        weight_matrix[i, j] = (
+            # To exploit caching the function parameter order must be the same.
+            # Fortunatly distance is simetric so we keep always the smallest value first.
+            # But each coordenate have 2 values threfore we compare on the sum
+            # of the coordenates (lat+long vs lat+long).
+            cached_vincenty(coordinates[i], coordinates[j])
+            if sum(coordinates[i]) <= sum(coordinates[j])
+            else cached_vincenty(coordinates[i], coordinates[j])
+        )
+    # # vincenty(coordinates[i], coordinates[j])
 
     weight_matrix = weight_matrix + weight_matrix.T  # - np.diag(0, n)
 
