@@ -7,16 +7,11 @@ from typing import Callable, Dict, List
 import numpy as np
 import pandas as pd
 from loguru import logger
+from vincenty import vincenty
 
 from geo_kpe_multidoc import GEO_KPE_MULTIDOC_CACHE_PATH
 from geo_kpe_multidoc.datasets.process_mordecai import load_topic_geo_locations
-from geo_kpe_multidoc.geo.measures import (
-    GearyC,
-    GetisOrdG,
-    MoranI,
-    cached_vincenty,
-    inv_dist,
-)
+from geo_kpe_multidoc.geo.measures import GearyC, GetisOrdG, MoranI, inv_dist
 
 
 def process_geo_associations_for_topics(
@@ -115,11 +110,11 @@ def process_geo_associations_for_topics(
         # save data in cache at each loop over topics
         if save_cache:
             data.to_parquet(
-                os.path.join(GEO_KPE_MULTIDOC_CACHE_PATH, "MKDUC01", filename)
+                os.path.join(GEO_KPE_MULTIDOC_CACHE_PATH, "debug", filename)
             )
 
     if save_cache:
-        logger.debug(f"Geo association measures saved in cache dir: {filename}.")
+        logger.debug(f"Geo association measures saved in debug/cache dir: {filename}.")
 
     return data
 
@@ -231,21 +226,33 @@ def scores_weight_matrix(
 
     start = time()
     # logger.debug(f"vincenty dist start n={n}")
-    weight_matrix = np.asarray(
-        [
-            [
-                # To exploit caching the function parameter order must be the same.
-                # Fortunatly distance is simetric so we keep always the smallest value first.
-                # But each coordenate have 2 values threfore we compare on the sum
-                # of the coordenates (lat+long vs lat+long).
-                cached_vincenty(coordinates[i], coordinates[j])
-                if sum(coordinates[i]) <= sum(coordinates[j])
-                else cached_vincenty(coordinates[i], coordinates[j])
-                for i in range(n)
-            ]
-            for j in range(n)
-        ]
-    )
+
+    # TODO: optimize computation because weight_matrix is symetrical
+    # diagonal is all zeros = a_diag
+    # we can compute the upper triangular matrix and add the transpose to get the symetrical weight matrix
+    # sym = triu + triu.T - diag
+    weight_matrix = np.zeros((n, n))
+    inds = np.triu_indices_from(weight_matrix, k=1)  # k=1 don't compute diagonal
+    for i, j in zip(*inds):
+        weight_matrix[i, j] = vincenty(coordinates[i], coordinates[j])
+
+    weight_matrix = weight_matrix + weight_matrix.T  # - np.diag(0, n)
+
+    # weight_matrix = np.asarray(
+    #     [
+    #         [
+    #             # To exploit caching the function parameter order must be the same.
+    #             # Fortunatly distance is simetric so we keep always the smallest value first.
+    #             # But each coordenate have 2 values threfore we compare on the sum
+    #             # of the coordenates (lat+long vs lat+long).
+    #             cached_vincenty(coordinates[i], coordinates[j])
+    #             if sum(coordinates[i]) <= sum(coordinates[j])
+    #             else cached_vincenty(coordinates[i], coordinates[j])
+    #             for i in range(n)
+    #         ]
+    #         for j in range(n)
+    #     ]
+    # )
     end = time()
     # logger.debug(
     #     "vincenty distance for n={} points processing time: {:.1f}s".format(
