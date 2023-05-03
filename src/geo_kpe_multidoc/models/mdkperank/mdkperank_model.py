@@ -57,7 +57,9 @@ class MDKPERank(BaseKPModel):
         relevant to its specific functionality
         """
 
-        self.base_model_embed.extract_candidates(doc, min_len, lemmer_lang=lemmer)
+        self.base_model_embed.extract_candidates(
+            doc, min_len, lemmer_lang=lemmer, **kwargs
+        )
 
         _, cand_embeds, candidate_set = self.base_model_embed.embed_candidates(
             doc, stemmer, **kwargs

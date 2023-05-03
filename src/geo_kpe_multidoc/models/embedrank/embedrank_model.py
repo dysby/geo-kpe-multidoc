@@ -259,6 +259,7 @@ class EmbedRank(BaseKPModel):
                 otherwise mentions are not found in document. Do not change original mention form.
                 Model tokenizer is responsible for case handling.
         TODO: new grammar (({.*}{HYPH}{.*}){NOUN}*)|(({VBG}|{VBN})?{ADJ}*{NOUN}+)
+        TODO: SIFRank grammar (<NN.*|JJ> * <NN.* >)  ,  NN = NOUN, JJ = ADJ
         """
         use_cache = kwargs.get("pos_tag_cache", False)
         self._pos_tag_doc(

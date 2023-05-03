@@ -117,12 +117,6 @@ def parse_args():
         choices=["weighted", "harmonic"],
     )
     parser.add_argument(
-        "--save_pos_tags", action="store_true", help="bool flag to save POS tags"
-    )
-    parser.add_argument(
-        "--save_embeds", action="store_true", help="bool flag to save generated embeds"
-    )
-    parser.add_argument(
         "--use_cache",
         action="store_true",
         help="bool flag to use pos tags and embeds from cache",
@@ -317,6 +311,7 @@ def main():
         options["cache_results"] = True
     if args.use_cache:
         options["use_cache"] = True
+        options["pos_tag_cache"] = True
     data = load_data(ds_name, GEO_KPE_MULTIDOC_DATA_PATH)
     logger.info(f"Args: {args}")
     logger.info("Start Testing ...")

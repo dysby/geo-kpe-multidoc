@@ -231,6 +231,7 @@ def output_one_top_cands(
     model_results: Dict[str, List] = {},
     true_labels: Dict[str, Tuple[List]] = {},
     top_n: int = 20,
+    doc_id: str = None,
 ):
     """
     Print one example Top N candidate and Gold Candidate list
@@ -239,10 +240,12 @@ def output_one_top_cands(
     -----------
         model_results: values are a list with results for each document [((doc1_top_n_candidates, doc1_top_n_scores], doc1_candidates), ...]
     """
+
     for dataset in model_results.keys():
-        doc_keys = [kp for kp, _ in model_results[dataset][0][0]]
-        gold_keys = true_labels[dataset][0]
-        print(doc_ids[0])
+        doc_idx = doc_ids.index(doc_id) if doc_id else 0
+        doc_keys = [kp for kp, _ in model_results[dataset][doc_idx][0]]
+        gold_keys = true_labels[dataset][doc_idx]
+        print(f"Keyphrase extraction for {doc_id}")
         print(
             tabulate(
                 [

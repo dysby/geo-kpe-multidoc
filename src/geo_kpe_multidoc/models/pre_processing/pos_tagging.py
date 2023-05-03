@@ -1,5 +1,6 @@
 from abc import ABC, abstractmethod
 from os import path
+from pathlib import Path
 from typing import List, Tuple
 
 import joblib
@@ -90,13 +91,19 @@ class POS_tagger_spacy(POS_tagger):
 
         # only bypass spacy PoS tagging, other transformations are not skipped (e.g. joining NOUN HYP NOUN).
         if use_cache:
-            if path.exists(path.join(GEO_KPE_MULTIDOC_CACHE_PATH, f"{id}-PoS.cache")):
-                doc = read_from_file(
-                    path.join(GEO_KPE_MULTIDOC_CACHE_PATH, f"{id}-PoS.cache")
-                )
+            cache_file_path = path.join(
+                GEO_KPE_MULTIDOC_CACHE_PATH,
+                "POS_CACHE",
+                f"{self.name}-{id}-PoS.cache",
+            )
+            if path.exists(cache_file_path):
+                doc = joblib.load(cache_file_path)
+                logger.debug(f"Load POS tags from cache {cache_file_path}")
             else:
                 doc = self.tagger(text)
-                self.save_on_cache(doc, id)
+                Path(cache_file_path).parent.mkdir(exist_ok=True, parents=True)
+                joblib.dump(doc, cache_file_path)
+                logger.info(f"Save {id} POS tags in {cache_file_path}")
         else:
             doc = self.tagger(text)
 
@@ -111,8 +118,8 @@ class POS_tagger_spacy(POS_tagger):
                 # HACK: DEBUG {'Non - Marine Association'}
                 # if "Marine" in text:
                 #     pass
-                if "Mr." in sent.text:
-                    pass
+                # if "Mr." in sent.text:
+                #     pass
 
                 for token in sent:
                     tagged_text_s.append((token.text, token.pos_))
@@ -162,8 +169,11 @@ class POS_tagger_spacy(POS_tagger):
 
         return (tagged_text, list(doc.sents), doc_word_sents)
 
-    def save_on_cache(self, tagged_text, doc_id: str = "") -> None:
+    def _save_on_cache(self, tagged_text, doc_id: str = "") -> None:
         logger.info(f"Caching PoS Tags for Document {doc_id}")
         joblib.dump(
-            tagged_text, path.join(GEO_KPE_MULTIDOC_CACHE_PATH, f"{id}-PoS.cache")
+            tagged_text,
+            path.join(
+                GEO_KPE_MULTIDOC_CACHE_PATH, "POS_CACHE", f"{self.name}-{id}-PoS.cache"
+            ),
         )
