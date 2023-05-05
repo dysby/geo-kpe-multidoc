@@ -30,6 +30,7 @@ from geo_kpe_multidoc.models.embedrank.embedrank_longformer_manual import (
 )
 from geo_kpe_multidoc.models.pre_processing.pre_processing_utils import (
     remove_punctuation,
+    remove_whitespaces,
 )
 
 
@@ -298,7 +299,7 @@ def main():
         options["pos_tag_cache"] = True
 
     if args.preprocess:
-        options["preprocess"] = [remove_punctuation]
+        options["preprocess"] = [remove_punctuation, remove_whitespaces]
 
     data = load_data(ds_name, GEO_KPE_MULTIDOC_DATA_PATH)
     logger.info(f"Args: {args}")

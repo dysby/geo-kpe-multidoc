@@ -58,7 +58,7 @@ def remove_whitespaces(text: str = "") -> str:
     """
     Quick snippet to remove whitespaces
     """
-    text = re.sub("\n", " ", text)
+    # text = re.sub("\n", " ", text)
     return re.sub("\s{2,}", " ", text)
 
 
