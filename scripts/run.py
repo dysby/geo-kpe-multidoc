@@ -22,14 +22,13 @@ from geo_kpe_multidoc.evaluation.evaluation_tools import (
     postprocess_dataset_labels,
     postprocess_res_labels,
 )
-from geo_kpe_multidoc.evaluation.mkduc01_eval import MKDUC01_Eval
 from geo_kpe_multidoc.models import EmbedRank, FusionModel, MaskRank, MDKPERank
 from geo_kpe_multidoc.models.backend._longmodels import to_longformer_t_v4
 from geo_kpe_multidoc.models.embedrank.embedrank_longformer_manual import (
     EmbedRankManual,
 )
 from geo_kpe_multidoc.models.pre_processing.pre_processing_utils import (
-    remove_punctuation,
+    remove_special_chars,
     remove_whitespaces,
 )
 
@@ -299,7 +298,7 @@ def main():
         options["pos_tag_cache"] = True
 
     if args.preprocess:
-        options["preprocess"] = [remove_punctuation, remove_whitespaces]
+        options["preprocess"] = [remove_special_chars, remove_whitespaces]
 
     data = load_data(ds_name, GEO_KPE_MULTIDOC_DATA_PATH)
     logger.info(f"Args: {args}")

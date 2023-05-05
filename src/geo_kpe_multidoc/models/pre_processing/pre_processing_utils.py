@@ -54,6 +54,17 @@ def remove_punctuation(text: str = "") -> str:
     return re.sub("[.,;:\"'!?`´()$£€\-^|=/<>]", " ", text)
 
 
+def remove_special_chars(text: str) -> str:
+    """
+    Quick snippet to remove punctuation marks
+    """
+    # self.punctuation_regex = (
+    #         "[!\"#\$%&'\(\)\*\+,\.\/:;<=>\?@\[\]\^_`{\|}~\-\–\—\‘\’\“\”]"
+    #     )
+    # TODO: why this is different from document pontuation regex?
+    return re.sub(r"[\"'`´()$£€\-_^|=/<>~]", " ", text)
+
+
 def remove_whitespaces(text: str = "") -> str:
     """
     Quick snippet to remove whitespaces
