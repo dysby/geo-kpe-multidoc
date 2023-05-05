@@ -1,5 +1,9 @@
 from dataclasses import dataclass, field
-from typing import List, Tuple
+from typing import Callable, List, Tuple
+
+from geo_kpe_multidoc.models.pre_processing.pre_processing_utils import (
+    remove_punctuation,
+)
 
 
 @dataclass
@@ -59,7 +63,16 @@ class Document:
     # GeoTags
     # geo_locations: List[Tuple[float, float]] = []
 
-    def __init__(self, raw_text, id, dataset: str = None, topic: str = None):
+    def __init__(
+        self,
+        raw_text,
+        id,
+        dataset: str = None,
+        topic: str = None,
+        pre_processing_pipeline: List[Callable] = [],
+    ):
+        for f in pre_processing_pipeline:
+            raw_text = f(raw_text)
         self.raw_text = raw_text
         self.id = id
         self.dataset = dataset if dataset else ""

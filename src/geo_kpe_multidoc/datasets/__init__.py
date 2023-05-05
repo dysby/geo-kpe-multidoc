@@ -1,1 +1,1 @@
-from .datasets import DATASETS, KPEDataset
+from .datasets import DATASETS, KPEDataset, load_data

@@ -51,17 +51,18 @@ def process_geo_associations_for_topics(
         Updated `data` DataFrame with geo association measures computed for each (topic, candidate) pair.
     """
     t = datetime.now()
-    filename = (
-        "-".join(
-            [
-                "geo-measures",
-                w_function.__name__,
-                str(w_function_param),
-                t.strftime(r"%Y%m%d-%H%M%S"),
-            ]
+    if save_cache:
+        filename = (
+            "-".join(
+                [
+                    "geo-measures",
+                    w_function.__name__,
+                    str(w_function_param),
+                    t.strftime(r"%Y%m%d-%H%M%S"),
+                ]
+            )
+            + ".parquet"
         )
-        + ".parquet"
-    )
 
     # logger.info(
     #     f"Computing geo associations with distance function:{w_function.__name__} and a={w_function_param}"
@@ -98,6 +99,9 @@ def process_geo_associations_for_topics(
                 .loc[lambda x: x == 1]
                 .index
             )
+
+            # extractive candidates must be present in at least one document
+            assert len(in_docs) >= 1
 
             kp_scores = docs_data.loc[
                 pd.IndexSlice[topic, in_docs, keyphrase], :
@@ -278,7 +282,7 @@ def scores_weight_matrix(
     # transform distance matrix to similatity measure
     weight_matrix = weighting_func(weight_matrix, weighting_func_param)
     # row standartize
-    weight_matrix = weight_matrix / weight_matrix.sum(axis=0)
+    weight_matrix = weight_matrix / weight_matrix.sum(axis=1)
 
     end = time()
     # logger.debug(

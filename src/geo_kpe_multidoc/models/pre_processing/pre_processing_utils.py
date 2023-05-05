@@ -66,7 +66,6 @@ def remove_stopwords(text: str = "") -> str:
     """
     Quick snippet to remove stopwords
     """
-
     res = ""
     for word in text.split():
         if word not in stopwords.words("English"):

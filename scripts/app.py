@@ -5,15 +5,17 @@ from os import path
 
 import orjson
 import streamlit as st
+import torch
 from annotated_text.util import get_annotated_html
+from sentence_transformers import SentenceTransformer
 
 from geo_kpe_multidoc import GEO_KPE_MULTIDOC_DATA_PATH
-from geo_kpe_multidoc.datasets import DATASETS, KPEDataset
+from geo_kpe_multidoc.datasets import DATASETS, KPEDataset, load_data
 from geo_kpe_multidoc.document import Document
 from geo_kpe_multidoc.models import EmbedRank, MaskRank
-from geo_kpe_multidoc.models.pre_processing.pre_processing_utils import (
-    remove_punctuation,
-    remove_whitespaces,
+from geo_kpe_multidoc.models.backend._longmodels import to_longformer_t_v4
+from geo_kpe_multidoc.models.embedrank.embedrank_longformer_manual import (
+    EmbedRankManual,
 )
 
 # from pipelines.keyphrase_extraction_pipeline import KeyphraseExtractionPipeline
@@ -38,10 +40,39 @@ def load_pipeline(chosen_model, chosen_language):
             kpe_model = EmbedRank(BACKEND_MODEL_NAME, TAGGER_NAME)
         case "MaskRank":
             kpe_model = MaskRank(BACKEND_MODEL_NAME, TAGGER_NAME)
-        case _:
-            raise ValueError("Model selection must be one of [EmbedRank, MaskRank].")
+        case "EmbedRankLongformer":
+            new_max_pos = 4096
+            attention_window = 128
+            copy_from_position = 130
 
-    return partial(kpe_model.extract_kp_from_doc, top_n=20, min_len=2, lemmer="en")
+            model_name = (
+                f"longformer_paraphrase_mnet_max{new_max_pos}_attw{attention_window}"
+            )
+            if copy_from_position:
+                model_name += f"_cpmaxpos{copy_from_position}"
+
+            model, tokenizer = to_longformer_t_v4(
+                SentenceTransformer("paraphrase-multilingual-mpnet-base-v2"),
+                max_pos=new_max_pos,
+                attention_window=attention_window,
+                copy_from_position=copy_from_position,
+            )
+            # in RAM convertion to longformer needs this.
+            del model.embeddings.token_type_ids
+
+            device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+            kpe_model = EmbedRankManual(
+                model, tokenizer, TAGGER_NAME, device=device, name=model_name
+            )
+        case _:
+            raise ValueError(
+                "Model selection must be one of [EmbedRank, MaskRank, EmbedRankLongformer]."
+            )
+
+    return partial(
+        kpe_model.extract_kp_from_doc, top_n=-1, min_len=5, lemmer=chosen_language
+    )
 
 
 def generate_run_id():
@@ -54,9 +85,8 @@ def extract_keyphrases():
     if st.session_state.chosen_dataset == "--INPUT--":
         txt = st.session_state.input_text
     else:
-        ds = KPEDataset(
+        ds = load_data(
             st.session_state.chosen_dataset,
-            DATASETS[st.session_state.chosen_dataset].get("zip_file"),
             GEO_KPE_MULTIDOC_DATA_PATH,
         )
         d_idx = ds.ids.index(st.session_state.chosen_doc_id)
@@ -67,8 +97,8 @@ def extract_keyphrases():
 
     st.session_state.input_text = txt
 
-    top_n_and_scores, candicates = pipe(Document(txt, st.session_state.current_run_id))
-    st.session_state.keyphrases = [kp for kp, _ in top_n_and_scores]
+    top_n_and_scores, candidates = pipe(Document(txt, st.session_state.current_run_id))
+    st.session_state.keyphrases = top_n_and_scores
     st.session_state.gold_keyphrases = gold_keyphrases
     st.session_state.history[generate_run_id()] = {
         "run_id": st.session_state.current_run_id,
@@ -81,10 +111,10 @@ def extract_keyphrases():
 
 
 def get_annotated_text(text, keyphrases, color="#d294ff"):
-    for keyphrase in keyphrases:
+    for i, (keyphrase, _) in enumerate(keyphrases):
         text = re.sub(
             rf"({keyphrase})([^A-Za-z0-9])",
-            rf"$K:{keyphrases.index(keyphrase)}\2",
+            rf"$K:{i}\2",
             text,
             flags=re.I,
         )
@@ -107,7 +137,7 @@ def get_annotated_text(text, keyphrases, color="#d294ff"):
                                     ),
                                 ).group(1)
                             )
-                        ],
+                        ][0],
                         word,
                     ),
                     "KEY",
@@ -158,6 +188,20 @@ def render_output(layout, runs, reverse=False):
                 f"<p style=\"margin: 1rem 0 0 0\"><strong>Gold keyphrases:</strong> {get_annotated_html(*gold_keyphrases) if gold_keyphrases else 'None' }</p>",
                 unsafe_allow_html=True,
             )
+        layout.markdown("---")
+        candidates_keyphrases = [
+            (f"{keyphrase} ({score.item():.2f})", "KEY", "#d294ff")
+            for keyphrase, score in run.get("keyphrases")
+            # if keyphrase.lower() not in run.get("text").lower()
+        ]
+        for i in range(len(candidates_keyphrases)):
+            if i % 2 == 0:
+                candidates_keyphrases.insert(i + 1, " ")
+
+        layout.markdown(
+            f"<p style=\"margin: 1rem 0 0 0\"><strong>Candidate keyphrases:</strong> {get_annotated_html(*candidates_keyphrases) if candidates_keyphrases else 'None' }</p>",
+            unsafe_allow_html=True,
+        )
         layout.markdown("---")
 
 
