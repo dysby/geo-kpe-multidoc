@@ -1,10 +1,6 @@
 from dataclasses import dataclass, field
 from typing import Callable, List, Tuple
 
-from geo_kpe_multidoc.models.pre_processing.pre_processing_utils import (
-    remove_punctuation,
-)
-
 
 @dataclass
 class Document:
