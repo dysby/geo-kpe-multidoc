@@ -297,7 +297,7 @@ def main():
         options["use_cache"] = True
         options["pos_tag_cache"] = True
 
-    if args.preprocess:
+    if args.preprocessing:
         options["preprocess"] = [remove_special_chars, remove_whitespaces]
 
     data = load_data(ds_name, GEO_KPE_MULTIDOC_DATA_PATH)
