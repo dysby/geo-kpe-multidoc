@@ -28,6 +28,9 @@ from geo_kpe_multidoc.models.backend._longmodels import to_longformer_t_v4
 from geo_kpe_multidoc.models.embedrank.embedrank_longformer_manual import (
     EmbedRankManual,
 )
+from geo_kpe_multidoc.models.pre_processing.pre_processing_utils import (
+    remove_punctuation,
+)
 
 
 def parse_args():
@@ -157,6 +160,11 @@ def parse_args():
         default=4096,
         help="Longformer: max length of the new model",
     )
+    parser.add_argument(
+        "--preprocessing",
+        action="store_true",
+        help="Preprocess text documents by removing pontuation",
+    )
     return parser.parse_args()
 
 
@@ -259,30 +267,6 @@ def main():
         )
         sys.exit(-1)
 
-    # Only python 3.11
-    # match args.rank_model:
-    #     case "EmbedRank":
-    #         kpe_model = EmbedRank(BACKEND_MODEL_NAME, TAGGER_NAME)
-    #     case "MaskRank":
-    #         kpe_model = MaskRank(BACKEND_MODEL_NAME, TAGGER_NAME)
-    #     case "MDKPERank":
-    #         kpe_model = MDKPERank(BACKEND_MODEL_NAME, TAGGER_NAME)
-    #     case "FusionRank":
-    #         kpe_model = FusionModel(
-    #             [
-    #                 EmbedRank(BACKEND_MODEL_NAME, TAGGER_NAME),
-    #                 MaskRank(BACKEND_MODEL_NAME, TAGGER_NAME),
-    #             ],
-    #             averaging_strategy=args.ensemble_mode,
-    #             # models_weights=args.weights,
-    #         )
-    #     case _:
-    #         # raise ValueError("Model selection must be one of [EmbedRank, MaskRank].")
-    #         logger.critical(
-    #             "Model selection must be one of [EmbedRank, MaskRank, MDKPERank]."
-    #         )
-    #         sys.exit(-1)
-
     if isinstance(kpe_model, MDKPERank):
         extract_eval = extract_keyphrases_topics
         if ds_name != "MKDUC01":
@@ -312,6 +296,10 @@ def main():
     if args.use_cache:
         options["use_cache"] = True
         options["pos_tag_cache"] = True
+
+    if args.preprocess:
+        options["preprocess"] = [remove_punctuation]
+
     data = load_data(ds_name, GEO_KPE_MULTIDOC_DATA_PATH)
     logger.info(f"Args: {args}")
     logger.info("Start Testing ...")

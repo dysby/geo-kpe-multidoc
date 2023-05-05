@@ -309,6 +309,7 @@ def extract_keyphrases_docs(
     model_results = {dataset.name: []}
     true_labels = {dataset.name: []}
     experiment = kwargs.get("experiment", "debug")
+    preprocessing = kwargs.get("preprocessing", [])
 
     if n_docs_limit == -1:
         loader = dataset
@@ -318,7 +319,12 @@ def extract_keyphrases_docs(
     for doc_id, txt, gold_kp in loader:
         logger.info(f"KPE for document {doc_id}")
         top_n_and_scores, candicates = model.extract_kp_from_doc(
-            Document(txt, doc_id),  # kpe_model.pre_process(doc),
+            Document(
+                txt,
+                doc_id,
+                dataset.name,
+                pre_processing_pipeline=preprocessing,
+            ),
             top_n=top_n,
             min_len=min_len,
             lemmer=lemmer,
@@ -370,6 +376,7 @@ def extract_keyphrases_topics(
     true_labels = {dataset.name: []}
     cache_results = kwargs.get("cache_results", False)
     experiment = kwargs.get("experiment", "debug")
+    preprocessing = kwargs.get("preprocessing", [])
 
     if n_docs_limit == -1:
         # no limit
@@ -379,43 +386,6 @@ def extract_keyphrases_topics(
         loader = islice(dataset, n_docs_limit)
 
     for i, (topic_id, docs, gold_kp) in enumerate(tqdm(loader, total=n_docs_limit)):
-        # TODO: limit dataset mordecai error
-        if topic_id in [
-            # "d04",
-            # "d05",
-            # "d06",
-            # "d11",
-            # "d12",
-            # "d13",
-            # "d15",
-            # "d19",
-            # "d24",
-            # "d27",
-            # "d30",
-            # "d31",
-            # "d32",
-            # "d34",
-            # "d37",
-            # "d39",
-            # "d41",
-            # "d43",
-            # "d44",
-            # "d45",
-            # "d54",
-            # "d56",
-            # "d57",
-            # "d08",  # errors
-            # "d14",
-            # "d22",
-            # "d28",
-            # "d34",
-            # "d50",
-            # "d53",
-            # "d59",
-        ]:
-            logger.debug(f"Skiping {topic_id} error in mordecai geo tagging.")
-            continue
-
         logger.info(f"KPE for topic {topic_id}")
         (
             top_n_scores,
@@ -426,7 +396,13 @@ def extract_keyphrases_topics(
             # top_n_and_scores, candidates = model.extract_kp_geo(
             # TODO: ***Warning*** this is only true for MultiDocument Dataset!
             [
-                Document(txt, doc_name, dataset.name, topic_id)
+                Document(
+                    txt,
+                    doc_name,
+                    dataset.name,
+                    topic_id,
+                    pre_processing_pipeline=preprocessing,
+                )
                 for doc_name, txt in docs
             ],  # kpe_model.pre_process(doc),
             top_n=top_n,
