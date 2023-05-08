@@ -153,6 +153,79 @@ class EmbedRank(BaseKPModel):
     def _global_embed_doc(self, doc):
         raise NotImplemented
 
+    def _embedding_in_context(self, doc: Document, candidate: str, cand_mode=None):
+        mentions = []
+        for mention in doc.candidate_mentions[candidate]:
+            if isinstance(self.model, BaseEmbedder):
+                # original tokenization by KeyBert/SentenceTransformer
+                tokenized_candidate = tokenize_hf(mention, self.model)
+            else:
+                # tokenize via local SentenceEmbedder Class
+                tokenized_candidate = self.model.tokenize(mention)
+
+            filt_ids = filter_special_tokens(tokenized_candidate["input_ids"])
+
+            # TODO: does not enable with cand_mode = global_attention
+            mentions += find_occurrences(filt_ids, doc.token_ids)
+
+        # backoff procedure, if mentions not found.
+        if len(mentions) == 0:
+            # If this form is not present in token ids (remember max 4096), fallback to embedding without context.
+            # Can happen that tokenization gives different input_ids and the candidate form is not found in document
+            # input_ids.
+            # candidate is beyond max position for emdedding
+            # return a non-contextualized embedding.
+            # TODO: candidate -> mentions
+            _, embed_dim = doc.token_embeddings.size()
+            embds = torch.empty(
+                size=(len(doc.candidate_mentions[candidate]), embed_dim)
+            )
+            for i, mention in enumerate(doc.candidate_mentions[candidate]):
+                if isinstance(self.model, BaseEmbedder):
+                    embd = self.model.embed(mention)
+                else:
+                    embd = (
+                        self.model.encode(mention, device=self.device)[
+                            "sentence_embedding"
+                        ]
+                        .detach()
+                        .cpu()
+                        .numpy()
+                    )
+                embds[i] = embd
+
+            doc.candidate_set_embed.append(torch.mean(embds, dim=0).numpy())
+            # TODO: problem with original 'andrew - would' vs PoS extracted 'andrew-would'
+            logger.debug(
+                f"Candidate {candidate} - mentions not found: {doc.candidate_mentions[candidate]}"
+            )
+        else:
+            _, embed_dim = doc.token_embeddings.size()
+            embds = torch.empty(size=(len(mentions), embed_dim))
+            for i, occurrence in enumerate(mentions):
+                embds[i] = torch.mean(doc.token_embeddings[occurrence, :], dim=0)
+
+            doc.candidate_set_embed.append(torch.mean(embds, dim=0).numpy())
+
+            # TODO: Set Global Attention Mask on every candidate position.
+            if cand_mode == "global_attention":
+                for j in chain(*mentions):  # flatten list
+                    # TODO: shouldn't be = 2 (global attention?)
+                    doc.attention_mask[j] = 1
+
+    def _embedding_out_context(self, doc: Document, candidate: str):
+        if isinstance(self.model, BaseEmbedder):
+            embd = self.model.embed(candidate)
+        else:
+            embd = (
+                self.model.encode(candidate, device=self.device)["sentence_embedding"]
+                .detach()
+                .cpu()
+                .numpy()
+            )
+
+        doc.candidate_set_embed.append(embd)
+
     def _aggregate_candidate_mention_embeddings(
         self,
         doc: Document,
@@ -169,9 +242,29 @@ class EmbedRank(BaseKPModel):
         # TODO: keep this init?
         doc.candidate_set_embed = []
 
-        for candidate in doc.candidate_set:
-            candidate_embeds = []
+        # special simple case
+        if cand_mode == "no_context":
+            # TODO: call _embedding_out_context
+            logger.debug(f"Getting candidate embeddings without context.")
+            for candidate in doc.candidate_set:
+                if isinstance(self.model, BaseEmbedder):
+                    embd = self.model.embed(candidate)
+                else:
+                    embd = (
+                        self.model.encode(candidate, device=self.device)[
+                            "sentence_embedding"
+                        ]
+                        .detach()
+                        .cpu()
+                        .numpy()
+                    )
 
+                doc.candidate_set_embed.append(embd)
+            return
+
+        # Other cand_modes
+        # TODO: call embedding_in_context
+        for candidate in doc.candidate_set:
             mentions = []
             for mention in doc.candidate_mentions[candidate]:
                 if isinstance(self.model, BaseEmbedder):
@@ -193,6 +286,7 @@ class EmbedRank(BaseKPModel):
                 # input_ids.
                 # candidate is beyond max position for emdedding
                 # return a non-contextualized embedding.
+                # TODO: candidate -> mentions
                 if isinstance(self.model, BaseEmbedder):
                     embd = self.model.embed(candidate)
                 else:
@@ -258,8 +352,36 @@ class EmbedRank(BaseKPModel):
         DONE: candidate mentions should not be lemmatized, maybe lowercased (document will be embed in lowercase form),
                 otherwise mentions are not found in document. Do not change original mention form.
                 Model tokenizer is responsible for case handling.
-        TODO: new grammar (({.*}{HYPH}{.*}){NOUN}*)|(({VBG}|{VBN})?{ADJ}*{NOUN}+)
+
+        NP: {<PROPN|NOUN|ADJ>*<PROPN|NOUN>+<ADJ>*}
+        TODO: new grammar (({.*}{HYPH}{.*}){NOUN}*)|(({VBG}|{VBN})?{ADJ}*{NOUN}+) Keyphrase-Vectorizers paper ()
+                        r'(({.*}-.*-{.*}){NN}*)|(({VBG}|{VBN})?{JJ}*{NN}+)'
         TODO: SIFRank grammar (<NN.*|JJ> * <NN.* >)  ,  NN = NOUN, JJ = ADJ
+
+
+        Consider this pattern:  (({.*}{HYPH}{.*}){NOUN}*)|(({VBG}|{VBN})?{ADJ}*{NOUN}+) and write it in RegexpParser syntax
+
+        ChatGPT
+        To write the pattern (({.*}{HYPH}{.*}){NOUN}*)|(({VBG}|{VBN})?{ADJ}*{NOUN}+) in RegexpParser syntax, you can follow these steps:
+
+        Replace the curly braces {} with square brackets [].
+
+        Remove the vertical bars | and wrap each part of the pattern in parentheses.
+
+        Add the appropriate regular expression syntax for each part of the pattern.
+
+        Using these steps, the pattern can be written in RegexpParser syntax as follows:
+
+        python
+        Copy code
+        pattern = r'(({.*}HYPH{.*})?|({VBG}|{VBN})?{JJ}*{NN}+)'
+        Here, we replaced the first set of curly braces {} with square brackets [], and added ? to make the hyphen and the surrounding curly braces optional. We also wrapped the entire first part of the pattern in parentheses, to match the grouping in the original pattern.
+
+        For the second part of the pattern, we also wrapped it in parentheses and added the appropriate regular expression syntax. We used {VBG}|{VBN} to match either a gerund or a past participle, {JJ}* to match any number of adjectives, and {NN}+ to match one or more nouns.
+
+        Note that the RegexpParser syntax uses regular expressions to define patterns for chunking text into noun phrases, verb phrases, etc. You can use this pattern with the RegexpParser class in NLTK to extract noun phrases or other structures from text that match this pattern.
+
+
         """
         use_cache = kwargs.get("pos_tag_cache", False)
         self._pos_tag_doc(
@@ -418,7 +540,7 @@ class EmbedRank(BaseKPModel):
         TODO: why does not have MMR? - copied mmr from top_n_candidates
         """
         mmr_mode = kwargs.get("mmr", False)
-        mmr_diversity = kwargs.get("diversity", 0.8)
+        mmr_diversity = kwargs.get("mmr_diversity", 0.8)
         top_n = len(candidate_set) if top_n == -1 else top_n
 
         doc_sim = []

@@ -66,12 +66,16 @@ def cached_vincenty(c1, c2):
 
 
 def MoranI(scores, weight_matrix):
-    """
+    r"""
+    .. math::
+        I = \frac{z\top W z}{z \top z}
     Return
     ------
     float:
         we follow `pysal` for special cases and `return 1` when all samples have
         the same value regardless of spacial position.
+
+
     """
     n = len(scores)
 
@@ -79,20 +83,27 @@ def MoranI(scores, weight_matrix):
         # logger.warning("MoranI over a single observation. Returning np.NAN.")
         return np.nan
 
-    mean = np.mean(scores)
-    adjusted_scores = scores - mean
-
-    if all(np.isclose(adjusted_scores, 0)):
+    std = scores.std()
+    if std == 0:
         # logger.debug("MoranI over a constant surface. Returning 1.")
         return 1
+    z = (scores - scores.mean()) / (scores.std())
 
-    moranI = n / np.sum(adjusted_scores**2)
+    moranI = z.T @ weight_matrix @ z / (z.T @ z)
+    # mean = np.mean(scores)
+    # adjusted_scores = scores - mean
 
-    outer_mul_scores = np.outer(adjusted_scores, adjusted_scores)
+    # if all(np.isclose(adjusted_scores, 0)):
+    #     # logger.debug("MoranI over a constant surface. Returning 1.")
+    #     return 1
 
-    sum1 = (weight_matrix * outer_mul_scores).sum()  # elementwize product and sum all
-    sum2 = weight_matrix.sum()
-    moranI = moranI * (sum1 / sum2)
+    # moranI = n / np.sum(adjusted_scores**2)
+
+    # outer_mul_scores = np.outer(adjusted_scores, adjusted_scores)
+
+    # sum1 = (weight_matrix * outer_mul_scores).sum()  # elementwize product and sum all
+    # sum2 = weight_matrix.sum()
+    # moranI = moranI * (sum1 / sum2)
     return moranI
 
 

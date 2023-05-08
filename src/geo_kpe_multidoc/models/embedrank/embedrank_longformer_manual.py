@@ -43,13 +43,11 @@ class EmbedRankManual(EmbedRank):
         Method that embeds the document, having several modes according to usage.
         The default value just embeds the document normally.
         """
-
-        # Check why document text is mutated to lower:
-        # Used after POS_TAGGING,
-        # at 1st stage document POS Tagging uses normal text including capital letters,
-        # but later document handling will use only lowered text, embeddingds, and such.
-        # doc.raw_text = doc.raw_text.lower()
-        doc_embeddings = self.model.encode(doc.raw_text, device=self.device)
+        doc_embeddings = self.model.encode(
+            doc.raw_text,
+            global_attention_mask=doc.attention_mask,
+            device=self.device,
+        )
 
         doc.token_ids = doc_embeddings["input_ids"].squeeze().tolist()
         doc.token_embeddings = doc_embeddings["token_embeddings"].detach().cpu()
