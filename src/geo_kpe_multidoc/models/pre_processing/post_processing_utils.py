@@ -36,7 +36,7 @@ def whitening_torch(embeddings: torch.tensor) -> np.array:
     ud = torch.mm(u, torch.diag(1 / torch.sqrt(s)))
     embeddings = torch.mm(embeddings - mu, ud)
 
-    return np.array([embedding.detach().numpy() for embedding in embeddings])
+    return np.array([embedding.detach().cpu().numpy() for embedding in embeddings])
 
 
 def whitening_np(embeddings: torch.tensor) -> np.array:
@@ -99,7 +99,7 @@ def embed_hf(inputs, model: BaseEmbedder) -> Tuple:
 
     # Perform pooling. In this case, mean pooling.
     embed = mean_pooling(outputs[0], inputs["attention_mask"])
-    return embed.detach().numpy()
+    return embed.detach().cpu().numpy()
 
 
 def embed_hf_global_att(
@@ -134,4 +134,4 @@ def embed_hf_global_att(
 
     # Perform pooling. In this case, max pooling.
     embed = mean_pooling(outputs[0], inputs["attention_mask"])
-    return embed.detach().numpy()
+    return embed.detach().cpu().numpy()

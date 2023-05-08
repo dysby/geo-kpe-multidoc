@@ -57,4 +57,4 @@ converted_embedding = converted_model.encode(
     ["helder"], convert_to_tensor=True, output_value=None
 )
 
-torch.allclose(original_embedding, sentence_embeddings.detach().numpy())
+torch.allclose(original_embedding, sentence_embeddings.detach().cpu().numpy())

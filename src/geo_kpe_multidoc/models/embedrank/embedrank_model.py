@@ -148,7 +148,7 @@ class EmbedRank(BaseKPModel):
         doc.token_embeddings = doc_embeddings["token_embeddings"]
         doc.attention_mask = doc_embeddings["attention_mask"]
 
-        return doc_embeddings["sentence_embedding"].detach().numpy()
+        return doc_embeddings["sentence_embedding"].detach().cpu().numpy()
 
     def _global_embed_doc(self, doc):
         raise NotImplemented
