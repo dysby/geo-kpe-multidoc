@@ -456,7 +456,7 @@ class EmbedRank(BaseKPModel):
             candicate_set:          List of candidates.
         """
         doc_mode = kwargs.get("doc_mode", "")
-        cand_mode = kwargs.get("global_attention", "")
+        cand_mode = kwargs.get("cand_mode", "")
         post_processing = kwargs.get("post_processing", [""])
         use_cache = kwargs.get("use_cache", False)
 

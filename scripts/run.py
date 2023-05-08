@@ -187,6 +187,33 @@ def save(results: DataFrame, args):
         json.dump(args.__dict__, f, indent=4)
 
 
+def _args_to_options(args):
+    options = dict()
+
+    if args.embedrank_mmr:
+        options["mmr"] = True
+        if args.embedrank_diversity:
+            options["mmr_diversity"] = args.embedrank_diversity
+        else:
+            logger.warning("EmbedRank MMR selected but diversity is default 0.8")
+        if isinstance(kpe_model, MaskRank):
+            logger.warning("EmbedRank MMR selected but model is not EmbedRank")
+
+    if args.cache_results:
+        options["cache_results"] = True
+    if args.use_cache:
+        options["use_cache"] = True
+        options["pos_tag_cache"] = True
+
+    if args.preprocessing:
+        options["preprocess"] = [remove_special_chars, remove_whitespaces]
+
+    if args.candidate_mode:
+        options["cand_mode"] = args.candidate_mode
+
+    return options
+
+
 def generateLongformerRanker(backend_model_name, tagger_name, args):
     new_max_pos = args.longformer_max_length
     attention_window = args.longformer_attention_window
@@ -267,6 +294,10 @@ def main():
         )
         sys.exit(-1)
 
+    # TODO: Test grammar
+    # kpe_model.grammar = """  NP:
+    #     (({.*}HYPH{.*})?|({VBG}|{VBN})?{JJ}*{NN}+)"""
+
     if isinstance(kpe_model, MDKPERank):
         extract_eval = extract_keyphrases_topics
         if ds_name != "MKDUC01":
@@ -280,25 +311,7 @@ def main():
     if not lemmer:
         logger.warning("Running without lemmatization. Results will be poor.")
 
-    options = dict()
-
-    if args.embedrank_mmr:
-        options["mmr"] = True
-        if args.embedrank_diversity:
-            options["mmr_diversity"] = args.embedrank_diversity
-        else:
-            logger.warning("EmbedRank MMR selected but diversity is default 0.8")
-        if isinstance(kpe_model, MaskRank):
-            logger.warning("EmbedRank MMR selected but model is not EmbedRank")
-
-    if args.cache_results:
-        options["cache_results"] = True
-    if args.use_cache:
-        options["use_cache"] = True
-        options["pos_tag_cache"] = True
-
-    if args.preprocessing:
-        options["preprocess"] = [remove_special_chars, remove_whitespaces]
+    options = _args_to_options(args)
 
     data = load_data(ds_name, GEO_KPE_MULTIDOC_DATA_PATH)
     logger.info(f"Args: {args}")
