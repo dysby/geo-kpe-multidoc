@@ -287,19 +287,22 @@ class EmbedRank(BaseKPModel):
                 # candidate is beyond max position for emdedding
                 # return a non-contextualized embedding.
                 # TODO: candidate -> mentions
-                if isinstance(self.model, BaseEmbedder):
-                    embd = self.model.embed(candidate)
-                else:
-                    embd = (
-                        self.model.encode(candidate, device=self.device)[
-                            "sentence_embedding"
-                        ]
-                        .detach()
-                        .cpu()
-                        .numpy()
-                    )
+                for mention in doc.candidate_mentions[candidate]:
+                    embds = []
+                    if isinstance(self.model, BaseEmbedder):
+                        embd = self.model.embed(mention)
+                    else:
+                        embd = (
+                            self.model.encode(mention, device=self.device)[
+                                "sentence_embedding"
+                            ]
+                            .detach()
+                            .cpu()
+                            .numpy()
+                        )
+                    embds.append(embd)
 
-                doc.candidate_set_embed.append(embd)
+                doc.candidate_set_embed.append(np.mean(embds, 0))
                 # TODO: problem with original 'andrew - would' vs PoS extracted 'andrew-would'
                 logger.debug(
                     f"Candidate {candidate} - mentions not found: {doc.candidate_mentions[candidate]}"

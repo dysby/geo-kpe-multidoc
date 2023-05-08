@@ -192,12 +192,13 @@ def _args_to_options(args):
 
     if args.embedrank_mmr:
         options["mmr"] = True
+        logger.warning("MMR is only used with EmbedRank type models.")
         if args.embedrank_diversity:
             options["mmr_diversity"] = args.embedrank_diversity
         else:
             logger.warning("EmbedRank MMR selected but diversity is default 0.8")
-        if isinstance(kpe_model, MaskRank):
-            logger.warning("EmbedRank MMR selected but model is not EmbedRank")
+        # if isinstance(kpe_model, MaskRank):
+        #     logger.warning("EmbedRank MMR selected but model is not EmbedRank")
 
     if args.cache_results:
         options["cache_results"] = True
