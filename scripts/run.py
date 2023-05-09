@@ -235,7 +235,8 @@ def generateLongformerRanker(backend_model_name, tagger_name, args):
         copy_from_position=copy_from_position,
     )
     # in RAM convertion to longformer needs this.
-    del model.embeddings.token_type_ids
+    if hasattr(model.embeddings, "token_type_ids"):
+        del model.embeddings.token_type_ids
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 

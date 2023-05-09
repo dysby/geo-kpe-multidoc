@@ -56,14 +56,14 @@ class SentenceEmbedder:
         local_mask = encoded_input["attention_mask"].detach().clone()
 
         if global_attention_mask is not None:
+            encoded_input["global_attention_mask"] = global_attention_mask
+            # TODO: old longformer model attention handling
             # 0 masked
             # 1 local attention
             # 2 global attention
-            encoded_input["attention_mask"] = (
-                encoded_input["attention_mask"] + global_attention_mask
-            )
-
-            # raise NotImplemented
+            # encoded_input["attention_mask"] = (
+            #     encoded_input["attention_mask"] + global_attention_mask
+            # )
 
         if device:
             encoded_input = batch_to_device(encoded_input, device)

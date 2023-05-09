@@ -1,7 +1,6 @@
 import copy
-import logging
-import math
 import os
+from tempfile import TemporaryDirectory
 from typing import Callable
 
 import torch
@@ -257,6 +256,23 @@ def to_longformer_t_v4(
 
     # TODO: check base model is good
     base_model.max_seq_length = tokenizer.model_max_length
+
+    with TemporaryDirectory() as temp_dir:
+        model.config.architectures = ["LongformerModel"]
+        model.config.model_type = "longformer"
+        del model.embeddings.token_type_ids
+
+        # TODO: set model name
+        tokenizer.save_pretrained(temp_dir)
+        model.save_pretrained(temp_dir)
+
+        # TODO: check best tokenizer
+        # or do not reload tokenizer
+        tokenizer = AutoTokenizer.from_pretrained(temp_dir, use_fast=True)
+        # tokenizer = LongformerTokenizerFast.from_pretrained(temp_dir)
+        # tokenizer = XLMRobertaTokenizer.from_pretrained(temp_dir)
+        model = LongformerModel.from_pretrained(temp_dir)
+
     return model, tokenizer
 
 
@@ -379,15 +395,18 @@ def create_longformer(
     if not os.path.exists(save_model_to):
         os.makedirs(save_model_to)
 
-    model.save_pretrained(save_model_to)
-    tokenizer.save_pretrained(save_model_to)
-
-    # HACK: need manual change config.json
     # DONE: changed config.json architecture XLMRobertaModel to LonformerModel
     #       changed model_type xlm-roberta to longformer
-    logger.warning(
-        "Need manual change config.json: `architecture` XLMRobertaModel to LonformerModel; `model_type` xlm-roberta to longformer"
-    )
+    # logger.warning(
+    #     "Need manual change config.json: `architecture` XLMRobertaModel to LonformerModel; `model_type` xlm-roberta to longformer"
+    # )
+    model.config.architectures = [
+        "LongformerModel",
+    ]
+    model.config.model_type = "longformer"
+
+    model.save_pretrained(save_model_to)
+    tokenizer.save_pretrained(save_model_to)
 
     # this does not work...
     # callable_model.embedding_model.max_seq_length = tokenizer.model_max_length
