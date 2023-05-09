@@ -33,7 +33,7 @@ del model.embeddings.token_type_ids
 kpe_model = EmbedRankManual(model, tokenizer, TAGGER_NAME)
 
 
-top_n_and_scores, candicates = kpe_model.extract_kp_from_doc(
+top_n_and_scores, candidates = kpe_model.extract_kp_from_doc(
     Document(raw_text=doc, id=dataset[1][0], topic=dataset[1][0], dataset="DUC2001"),
     # kpe_model.pre_process(doc),
     top_n=-1,

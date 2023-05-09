@@ -318,7 +318,7 @@ def extract_keyphrases_docs(
 
     for doc_id, txt, gold_kp in loader:
         logger.info(f"KPE for document {doc_id}")
-        top_n_and_scores, candicates = model.extract_kp_from_doc(
+        top_n_and_scores, candidates = model.extract_kp_from_doc(
             Document(
                 txt,
                 doc_id,
@@ -333,7 +333,7 @@ def extract_keyphrases_docs(
         model_results[dataset.name].append(
             (
                 top_n_and_scores,
-                candicates,
+                candidates,
             )
         )
 

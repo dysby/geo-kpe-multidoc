@@ -91,9 +91,6 @@ class MaskRank(BaseKPModel):
     def _embed_global(self, model):
         raise NotImplemented
 
-    def _global_embed_doc(self, model):
-        raise NotImplemented
-
     def embed_candidates(
         self,
         doc: Document,

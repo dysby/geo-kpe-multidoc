@@ -53,7 +53,8 @@ class Document:
 
     # Embeddings
     doc_embed = None
-    attention_mask = []  # Global attention mask
+    attention_mask = []  # Attention mask
+    global_attention_mask = None
     candidate_set_embed = []
 
     # GeoTags

@@ -45,7 +45,7 @@ class EmbedRankManual(EmbedRank):
         """
         doc_embeddings = self.model.encode(
             doc.raw_text,
-            global_attention_mask=doc.attention_mask,
+            global_attention_mask=doc.global_attention_mask,
             device=self.device,
         )
 

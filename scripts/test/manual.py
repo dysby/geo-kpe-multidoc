@@ -116,7 +116,7 @@ def test_KPERank():
         model_results[ds_name] = []
         true_labels[ds_name] = []
         for _doc_id, doc, gold_kp in data:
-            top_n_and_scores, candicates = kpe_model.extract_kp_from_doc(
+            top_n_and_scores, candidates = kpe_model.extract_kp_from_doc(
                 kpe_model.pre_process(doc),
                 top_n=20,
                 min_len=2,
@@ -125,7 +125,7 @@ def test_KPERank():
             model_results[ds_name].append(
                 (
                     top_n_and_scores,
-                    candicates,
+                    candidates,
                 )
             )
             true_labels[ds_name].append(gold_kp)

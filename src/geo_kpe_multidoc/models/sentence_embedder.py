@@ -27,13 +27,17 @@ class SentenceEmbedder:
             model.encoder.layer[0].attention.self.one_sided_attn_window_size * 2
         )
 
-    def tokenize(self, sentence: Union[str, List[str]]) -> Dict:
+    def tokenize(self, sentence: Union[str, List[str]], **kwargs) -> Dict:
+        # for global_attention
+        padding = kwargs.pop("padding", False)
+
         return self.tokenizer(
             sentence,
-            padding=False,
+            padding=padding,
             truncation=True,
             max_length=self.max_length,
             return_tensors="pt",
+            **kwargs,
         )
 
     def encode(self, sentence, global_attention_mask=None, device=None):
@@ -49,8 +53,17 @@ class SentenceEmbedder:
             return_attention_mask=True,
         )
 
-        if global_attention_mask:
-            raise NotImplemented
+        local_mask = encoded_input["attention_mask"].detach().clone()
+
+        if global_attention_mask is not None:
+            # 0 masked
+            # 1 local attention
+            # 2 global attention
+            encoded_input["attention_mask"] = (
+                encoded_input["attention_mask"] + global_attention_mask
+            )
+
+            # raise NotImplemented
 
         if device:
             encoded_input = batch_to_device(encoded_input, device)
@@ -60,13 +73,13 @@ class SentenceEmbedder:
             model_output = self.model(**encoded_input)
 
         # Perform pooling. In this case, mean pooling
-        sentence_embedding = mean_pooling(model_output, encoded_input["attention_mask"])
+        sentence_embedding = mean_pooling(model_output, local_mask)
         output = OrderedDict(
             {
                 # TODO: remove batch dimension?
                 "token_embeddings": model_output[0].squeeze(),
                 "input_ids": encoded_input["input_ids"],
-                "attention_mask": encoded_input["attention_mask"],
+                "attention_mask": local_mask,
                 "sentence_embedding": sentence_embedding.squeeze(),
             }
         )

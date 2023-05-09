@@ -145,15 +145,12 @@ class EmbedRank(BaseKPModel):
         )
 
         doc.token_ids = doc_embeddings["input_ids"].squeeze().tolist()
-        doc.token_embeddings = doc_embeddings["token_embeddings"]
-        doc.attention_mask = doc_embeddings["attention_mask"]
+        doc.token_embeddings = doc_embeddings["token_embeddings"].detach().cpu()
+        doc.attention_mask = doc_embeddings["attention_mask"].detach().cpu()
 
         return doc_embeddings["sentence_embedding"].detach().cpu().numpy()
 
-    def _global_embed_doc(self, doc):
-        raise NotImplemented
-
-    def _embedding_in_context(self, doc: Document, candidate: str, cand_mode=None):
+    def _search_mentions(self, doc, candidate):
         mentions = []
         for mention in doc.candidate_mentions[candidate]:
             if isinstance(self.model, BaseEmbedder):
@@ -165,119 +162,12 @@ class EmbedRank(BaseKPModel):
 
             filt_ids = filter_special_tokens(tokenized_candidate["input_ids"])
 
-            # TODO: does not enable with cand_mode = global_attention
             mentions += find_occurrences(filt_ids, doc.token_ids)
+        return mentions
 
-        # backoff procedure, if mentions not found.
-        if len(mentions) == 0:
-            # If this form is not present in token ids (remember max 4096), fallback to embedding without context.
-            # Can happen that tokenization gives different input_ids and the candidate form is not found in document
-            # input_ids.
-            # candidate is beyond max position for emdedding
-            # return a non-contextualized embedding.
-            # TODO: candidate -> mentions
-            _, embed_dim = doc.token_embeddings.size()
-            embds = torch.empty(
-                size=(len(doc.candidate_mentions[candidate]), embed_dim)
-            )
-            for i, mention in enumerate(doc.candidate_mentions[candidate]):
-                if isinstance(self.model, BaseEmbedder):
-                    embd = self.model.embed(mention)
-                else:
-                    embd = (
-                        self.model.encode(mention, device=self.device)[
-                            "sentence_embedding"
-                        ]
-                        .detach()
-                        .cpu()
-                        .numpy()
-                    )
-                embds[i] = embd
-
-            doc.candidate_set_embed.append(torch.mean(embds, dim=0).numpy())
-            # TODO: problem with original 'andrew - would' vs PoS extracted 'andrew-would'
-            logger.debug(
-                f"Candidate {candidate} - mentions not found: {doc.candidate_mentions[candidate]}"
-            )
-        else:
-            _, embed_dim = doc.token_embeddings.size()
-            embds = torch.empty(size=(len(mentions), embed_dim))
-            for i, occurrence in enumerate(mentions):
-                embds[i] = torch.mean(doc.token_embeddings[occurrence, :], dim=0)
-
-            doc.candidate_set_embed.append(torch.mean(embds, dim=0).numpy())
-
-            # TODO: Set Global Attention Mask on every candidate position.
-            if cand_mode == "global_attention":
-                for j in chain(*mentions):  # flatten list
-                    # TODO: shouldn't be = 2 (global attention?)
-                    doc.attention_mask[j] = 1
-
-    def _embedding_out_context(self, doc: Document, candidate: str):
-        if isinstance(self.model, BaseEmbedder):
-            embd = self.model.embed(candidate)
-        else:
-            embd = (
-                self.model.encode(candidate, device=self.device)["sentence_embedding"]
-                .detach()
-                .cpu()
-                .numpy()
-            )
-
-        doc.candidate_set_embed.append(embd)
-
-    def _aggregate_candidate_mention_embeddings(
-        self,
-        doc: Document,
-        stemmer: Optional[StemmerI] = None,
-        cand_mode: str = "",
-        post_processing: List[str] = [],
-    ):
-        """
-        Method that embeds the current candidate set, having several modes according to usage.
-        The default value just embeds candidates directly.
-
-        TODO: deal with subclassing EmbedRankManual
-        """
-        # TODO: keep this init?
-        doc.candidate_set_embed = []
-
-        # special simple case
-        if cand_mode == "no_context":
-            # TODO: call _embedding_out_context
-            logger.debug(f"Getting candidate embeddings without context.")
-            for candidate in doc.candidate_set:
-                if isinstance(self.model, BaseEmbedder):
-                    embd = self.model.embed(candidate)
-                else:
-                    embd = (
-                        self.model.encode(candidate, device=self.device)[
-                            "sentence_embedding"
-                        ]
-                        .detach()
-                        .cpu()
-                        .numpy()
-                    )
-
-                doc.candidate_set_embed.append(embd)
-            return
-
-        # Other cand_modes
-        # TODO: call embedding_in_context
+    def _embedding_in_context(self, doc: Document):
         for candidate in doc.candidate_set:
-            mentions = []
-            for mention in doc.candidate_mentions[candidate]:
-                if isinstance(self.model, BaseEmbedder):
-                    # original tokenization by KeyBert/SentenceTransformer
-                    tokenized_candidate = tokenize_hf(mention, self.model)
-                else:
-                    # tokenize via local SentenceEmbedder Class
-                    tokenized_candidate = self.model.tokenize(mention)
-
-                filt_ids = filter_special_tokens(tokenized_candidate["input_ids"])
-
-                # TODO: does not enable with cand_mode = global_attention
-                mentions += find_occurrences(filt_ids, doc.token_ids)
+            mentions = self._search_mentions(doc, candidate)
 
             # backoff procedure, if mentions not found.
             if len(mentions) == 0:
@@ -315,11 +205,44 @@ class EmbedRank(BaseKPModel):
 
                 doc.candidate_set_embed.append(torch.mean(embds, dim=0).numpy())
 
-                # TODO: Set Global Attention Mask on every candidate position.
-                if cand_mode == "global_attention":
-                    for j in chain(*mentions):  # flatten list
-                        # TODO: shouldn't be = 2 (global attention?)
-                        doc.attention_mask[j] = 1
+    def _embedding_out_context(self, doc: Document):
+        logger.debug(f"Getting candidate embeddings without context.")
+        for candidate in doc.candidate_set:
+            if isinstance(self.model, BaseEmbedder):
+                embd = self.model.embed(candidate)
+            else:
+                embd = (
+                    self.model.encode(candidate, device=self.device)[
+                        "sentence_embedding"
+                    ]
+                    .detach()
+                    .cpu()
+                    .numpy()
+                )
+
+            doc.candidate_set_embed.append(embd)
+
+    def _aggregate_candidate_mention_embeddings(
+        self,
+        doc: Document,
+        stemmer: Optional[StemmerI] = None,
+        cand_mode: str = "",
+        post_processing: List[str] = [],
+    ):
+        """
+        Method that embeds the current candidate set, having several modes according to usage.
+        The default value just embeds candidates directly.
+
+        TODO: deal with subclassing EmbedRankManual
+        """
+        # TODO: keep this init?
+        doc.candidate_set_embed = []
+
+        # special simple case
+        if cand_mode == "no_context":
+            self._embedding_out_context(doc)
+        else:
+            self._embedding_in_context(doc)
 
         if "z_score" in post_processing:
             # TODO: Why z_score_normalization by space split?
@@ -327,10 +250,16 @@ class EmbedRank(BaseKPModel):
                 doc.candidate_set_embed, doc.raw_text, self.model
             )
 
-        # TODO: If in global attention mode the document embedding should be computed again having the
-        # attention mask changed to the candidate positions.
-        if cand_mode == "global_attention":
-            doc.doc_embed = self._global_embed_doc(doc)
+    def _set_global_attention(self, doc: Document):
+        mentions = []
+        for candidate in doc.candidate_set:
+            mentions_positions = self._search_mentions(doc, candidate)
+            if len(mentions_positions) > 0:
+                # candidate mentions where found in document token_ids
+                mentions.extend(mentions_positions)
+        mentions = tuple(set(chain(*mentions)))
+        logger.debug(f"Global Attention in {len(mentions)} tokens")
+        doc.global_attention_mask[:, mentions] = 1
 
     def extract_candidates(
         self,
@@ -469,6 +398,22 @@ class EmbedRank(BaseKPModel):
             if cached:
                 return cached
 
+        if cand_mode == "global_attention":
+            # set attention mask size
+            if isinstance(self.model, BaseEmbedder):
+                # original tokenization by KeyBert/SentenceTransformer
+                tokenized_doc = tokenize_hf(doc.raw_text, self.model)
+            else:
+                # tokenize via local SentenceEmbedder Class
+                tokenized_doc = self.model.tokenize(
+                    doc.raw_text,
+                    padding=True,
+                    pad_to_multiple_of=self.model.attention_window,
+                )
+            doc.token_ids = tokenized_doc["input_ids"].squeeze().tolist()
+            doc.global_attention_mask = torch.zeros(tokenized_doc["input_ids"].shape)
+            self._set_global_attention(doc)
+
         t = time()
         doc.doc_embed = self._embed_doc(doc, stemmer, doc_mode, post_processing)
         logger.info(f"Embed Doc in {time() -  t:.2f}s")
@@ -478,9 +423,6 @@ class EmbedRank(BaseKPModel):
             doc, stemmer, cand_mode, post_processing
         )
         logger.info(f"Embed Candidates in {time() -  t:.2f}s")
-
-        if cand_mode == "global_attention":
-            doc.doc_embed = self._global_embed_doc(doc)
 
         if use_cache:
             self._save_embeddings_in_cache(doc)
