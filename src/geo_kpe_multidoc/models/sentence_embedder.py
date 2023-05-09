@@ -53,8 +53,6 @@ class SentenceEmbedder:
             return_attention_mask=True,
         )
 
-        local_mask = encoded_input["attention_mask"].detach().clone()
-
         if global_attention_mask is not None:
             encoded_input["global_attention_mask"] = global_attention_mask
             # TODO: old longformer model attention handling
@@ -73,13 +71,13 @@ class SentenceEmbedder:
             model_output = self.model(**encoded_input)
 
         # Perform pooling. In this case, mean pooling
-        sentence_embedding = mean_pooling(model_output, local_mask)
+        sentence_embedding = mean_pooling(model_output, encoded_input["attention_mask"])
         output = OrderedDict(
             {
                 # TODO: remove batch dimension?
                 "token_embeddings": model_output[0].squeeze(),
                 "input_ids": encoded_input["input_ids"],
-                "attention_mask": local_mask,
+                "attention_mask": encoded_input["attention_mask"],
                 "sentence_embedding": sentence_embedding.squeeze(),
             }
         )
