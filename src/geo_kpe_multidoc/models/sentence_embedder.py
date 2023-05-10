@@ -67,7 +67,7 @@ class SentenceEmbedder:
 
         if device:
             encoded_input = batch_to_device(encoded_input, device)
-            local_mask.to(device)
+            local_mask = local_mask.to(device)
 
         # Compute token embeddings
         with torch.no_grad():
