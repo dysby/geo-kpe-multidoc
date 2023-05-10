@@ -67,6 +67,7 @@ class SentenceEmbedder:
 
         if device:
             encoded_input = batch_to_device(encoded_input, device)
+            local_mask.to(device)
 
         # Compute token embeddings
         with torch.no_grad():
@@ -74,6 +75,9 @@ class SentenceEmbedder:
 
         # Perform pooling. In this case, mean pooling
         sentence_embedding = mean_pooling(model_output, local_mask)
+
+        # TODO: check cpu
+        local_mask = local_mask.cpu()
         output = OrderedDict(
             {
                 # TODO: remove batch dimension?
