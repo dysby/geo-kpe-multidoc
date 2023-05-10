@@ -158,12 +158,17 @@ def parse_args():
         "--longformer_max_length",
         type=int,
         default=4096,
-        help="Longformer: max length of the new model",
+        help="longformer: max length of the new model",
     )
     parser.add_argument(
         "--preprocessing",
         action="store_true",
         help="Preprocess text documents by removing pontuation",
+    )
+    parser.add_argument(
+        "--tagger_name",
+        type=str,
+        help="Explicit use this Spacy tagger",
     )
     return parser.parse_args()
 
@@ -216,6 +221,24 @@ def _args_to_options(args):
 
 
 def generateLongformerRanker(backend_model_name, tagger_name, args):
+    # Load AllenAi Longformer
+    if backend_model_name == "allenai/longformer-base-4096":
+        from transformers import AutoTokenizer, LongformerModel
+
+        model = LongformerModel(backend_model_name)
+        tokenizer = AutoTokenizer(backend_model_name, use_fast=True)
+        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+        kpe_model = EmbedRankManual(
+            model,
+            tokenizer,
+            tagger_name,
+            device=device,
+            name=backend_model_name.replace("/", "-"),
+        )
+        return kpe_model
+
+    # Generate Longformer from Sentence Transformer
     new_max_pos = args.longformer_max_length
     attention_window = args.longformer_attention_window
     copy_from_position = (
@@ -263,7 +286,9 @@ def main():
         )
         sys.exit(-1)
 
-    TAGGER_NAME = DATASETS[ds_name].get("tagger")
+    TAGGER_NAME = (
+        args.tagger_name if args.tagger_name else DATASETS[ds_name].get("tagger")
+    )
 
     if args.rank_model == "EmbedRank":
         kpe_model = EmbedRank(BACKEND_MODEL_NAME, TAGGER_NAME)
