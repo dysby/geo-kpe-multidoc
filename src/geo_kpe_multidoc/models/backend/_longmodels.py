@@ -221,6 +221,7 @@ def to_longformer_t_v4(
     )
     # TODO: HACK test copy_from_position == 130
     if torch.any(new_pos_embed.isnan()):
+        logger.warning("New position embeddings have NAN. Converting to numeric.")
         new_pos_embed = new_pos_embed.nan_to_num()
     # copy position embeddings over and over to initialize the new position embeddings
     k = 2
@@ -258,8 +259,10 @@ def to_longformer_t_v4(
     base_model.max_seq_length = tokenizer.model_max_length
 
     with TemporaryDirectory() as temp_dir:
-        model.config.architectures = ["LongformerModel"]
-        model.config.model_type = "longformer"
+        config.architectures = ["LongformerModel"]
+        # config.__class__.model_type = "longformer"  # Hack!
+        model.config = config
+
         del model.embeddings.token_type_ids
 
         # TODO: set model name

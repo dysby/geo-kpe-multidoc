@@ -444,3 +444,28 @@ def extract_keyphrases_topics(
         true_labels[dataset.name].append(gold_kp)
         gc.collect()
     return model_results, true_labels
+
+
+def model_scores_to_dataframe(model_results, true_labels) -> pd.DataFrame:
+    df = pd.DataFrame()
+
+    for dataset, doc_candidade_values in model_results.items():
+        for i, (candidate_scores, doc_gold_kp) in enumerate(
+            zip(doc_candidade_values, true_labels[dataset])
+        ):
+            candidates_score, _candidates = candidate_scores
+            doc_gold_kp
+
+            rows = [
+                {
+                    "doc": i,
+                    "candidate": candidate,
+                    "score": score.item(),
+                    "in_gold": candidate in doc_gold_kp,
+                }
+                for candidate, score in candidates_score
+            ]
+
+        df = pd.concat([df, pd.DataFrame.from_records(rows)])
+
+    return df

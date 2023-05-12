@@ -182,7 +182,9 @@ class MaskRank(BaseKPModel):
         stores the sentences each candidate occurs in
         """
 
-        use_cache = kwargs.get("pos_tag_cache", False)
+        use_cache = kwargs.get("cache_pos_tags", False)
+        if use_cache:
+            logger.warning("POS Tag Cache in maskrank not implemented")
         candidate_set = set()
 
         parser = RegexpParser(grammar)

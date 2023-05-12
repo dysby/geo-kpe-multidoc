@@ -21,4 +21,4 @@ class ExperimentConfig:
     similarity: Similarity
     diversity: str
     post_processing: str
-    pos_tag_cache: str  # replace pos_tag_memory
+    cache_pos_tags: bool  # replace pos_tag_memory

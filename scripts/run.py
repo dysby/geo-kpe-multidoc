@@ -18,10 +18,12 @@ from geo_kpe_multidoc.evaluation.evaluation_tools import (
     evaluate_kp_extraction,
     extract_keyphrases_docs,
     extract_keyphrases_topics,
+    model_scores_to_dataframe,
     output_one_top_cands,
     postprocess_dataset_labels,
     postprocess_res_labels,
 )
+from geo_kpe_multidoc.evaluation.report import plot_score_distribuitions_with_gold
 from geo_kpe_multidoc.models import EmbedRank, FusionModel, MaskRank, MDKPERank
 from geo_kpe_multidoc.models.backend._longmodels import to_longformer_t_v4
 from geo_kpe_multidoc.models.embedrank.embedrank_longformer_manual import (
@@ -120,11 +122,6 @@ def parse_args():
         choices=["weighted", "harmonic"],
     )
     parser.add_argument(
-        "--use_cache",
-        action="store_true",
-        help="bool flag to use pos tags and embeds from cache",
-    )
-    parser.add_argument(
         "--stemming", action="store_true", help="bool flag to use stemming"
     )
     parser.add_argument(
@@ -139,9 +136,19 @@ def parse_args():
         help="EmbedRank MMR diversity parameter value.",
     )
     parser.add_argument(
+        "--cache_pos_tags",
+        action="store_true",
+        help="Save/Load doc POS Tagging in cache directory.",
+    )
+    parser.add_argument(
+        "--cache_embeddings",
+        action="store_true",
+        help="Save/Load doc and candidates embeddings in cache directory.",
+    )
+    parser.add_argument(
         "--cache_results",
         action="store_true",
-        help="Save KPE Model outputs to cache directory.",
+        help="Save KPE Model outputs (top N per doc) to cache directory.",
     )
     parser.add_argument(
         "--longformer_attention_window",
@@ -173,16 +180,14 @@ def parse_args():
     return parser.parse_args()
 
 
-def save(results: DataFrame, args):
+def save(results: DataFrame, fig: plt.Figure, args):
     from geo_kpe_multidoc import GEO_KPE_MULTIDOC_OUTPUT_PATH
 
     t = datetime.now()
     filename = (
-        "-".join(["results", args.experiment_name, t.strftime(r"%Y%m%d-%H%M%S")])
-        + ".csv"
+        "-".join(["results", args.experiment_name, t.strftime(r"%Y%m%d-%H%M")]) + ".csv"
     )
     results.to_csv(path.join(GEO_KPE_MULTIDOC_OUTPUT_PATH, filename))
-    logger.info(f"Results saved in {filename}")
 
     filename = filename[:-3] + "txt"
     with open(
@@ -190,6 +195,11 @@ def save(results: DataFrame, args):
     ) as f:
         # f.write(args.__repr__())
         json.dump(args.__dict__, f, indent=4)
+
+    filename = filename[:-3] + "pdf"
+    fig.savefig(path.join(GEO_KPE_MULTIDOC_OUTPUT_PATH, filename), dpi=100)
+
+    logger.info(f"Results saved in {filename}")
 
 
 def _args_to_options(args):
@@ -207,9 +217,13 @@ def _args_to_options(args):
 
     if args.cache_results:
         options["cache_results"] = True
-    if args.use_cache:
-        options["use_cache"] = True
-        options["pos_tag_cache"] = True
+    if args.cache_pos_tags:
+        options["cache_pos_tags"] = True
+        # options["use_cache"] = True
+        # options["pos_tag_cache"] = True
+
+    if args.cache_embeddings:
+        options["cache_embeddings"] = True
 
     if args.preprocessing:
         options["preprocess"] = [remove_special_chars, remove_whitespaces]
@@ -380,8 +394,13 @@ def main():
             path.join(GEO_KPE_MULTIDOC_CACHE_PATH, "debug-predict-gold.pkl"),
         )
 
+    fig = plot_score_distribuitions_with_gold(
+        results=model_scores_to_dataframe(model_results, true_labels),
+        title="",
+    )
+
     results = evaluate_kp_extraction(model_results, true_labels)
-    save(results, args)
+    save(results, fig, args)
 
 
 if __name__ == "__main__":

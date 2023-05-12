@@ -9,6 +9,19 @@ import seaborn as sb
 from geo_kpe_multidoc import GEO_KPE_MULTIDOC_OUTPUT_PATH
 
 
+def plot_score_distribuitions_with_gold(
+    results: pd.DataFrame, title: str
+) -> plt.Figure:
+    plt.rcParams["figure.figsize"] = (6.4, 4.8)
+
+    fig, ax = plt.subplots()
+    ax = results[results["in_gold"] == False]["score"].plot.hist(density=True)
+    ax = results[results["in_gold"] == True]["score"].plot.hist(density=True, alpha=0.5)
+    ax.set_title(title, fontsize=12)
+    plt.legend(["non-gold", "gold"])
+    return fig
+
+
 def plot_non_versus_gold_density(
     gold_values: pd.Series, not_gold_values: pd.Series, title: str = None, density=False
 ):

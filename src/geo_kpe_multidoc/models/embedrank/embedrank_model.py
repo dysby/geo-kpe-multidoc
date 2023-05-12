@@ -315,11 +315,11 @@ class EmbedRank(BaseKPModel):
 
 
         """
-        use_cache = kwargs.get("pos_tag_cache", False)
+        cache_pos_tags = kwargs.get("cache_pos_tags", False)
         self._pos_tag_doc(
             doc=doc,
             stemming=None,
-            use_cache=use_cache,
+            use_cache=cache_pos_tags,
         )
 
         grammar = self.grammar if not grammar else grammar
@@ -390,7 +390,7 @@ class EmbedRank(BaseKPModel):
         doc_mode = kwargs.get("doc_mode", "")
         cand_mode = kwargs.get("cand_mode", "")
         post_processing = kwargs.get("post_processing", [""])
-        use_cache = kwargs.get("use_cache", False)
+        use_cache = kwargs.get("cache_embeddings", False)
 
         if use_cache:
             # this mutates doc
@@ -452,7 +452,7 @@ class EmbedRank(BaseKPModel):
             cache_file_path,
         )
 
-    def _read_embeddings_from_cache(self, doc):
+    def _read_embeddings_from_cache(self, doc: Document):
         # TODO: implement caching? is usefull only in future analysis
         cache_file_path = os.path.join(
             GEO_KPE_MULTIDOC_CACHE_PATH,
@@ -532,7 +532,7 @@ class EmbedRank(BaseKPModel):
         doc_mode = kwargs.get("doc_mode", "")
         cand_mode = kwargs.get("cand_mode", "")
         post_processing = kwargs.get("post_processing", [""])
-        use_cache = kwargs.get("embed_memory", False)
+        # TODO: remove? use_cache = kwargs.get("embed_memory", False)
         if cand_mode != "" and cand_mode != "AvgContext":
             logger.error(f"Getting Embeddings for word sentence (not used?)")
             # self.embed_sents_words(doc, stemmer, use_cache)
