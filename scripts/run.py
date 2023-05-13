@@ -8,6 +8,7 @@ from time import time
 
 import torch
 from loguru import logger
+from matplotlib import pyplot as plt
 from nltk.stem import PorterStemmer
 from pandas import DataFrame
 from sentence_transformers import SentenceTransformer
@@ -205,6 +206,8 @@ def save(results: DataFrame, fig: plt.Figure, args):
 def _args_to_options(args):
     options = dict()
 
+    options["experiment"] = args.experiment_name
+
     if args.embedrank_mmr:
         options["mmr"] = True
         logger.warning("MMR is only used with EmbedRank type models.")
@@ -239,8 +242,8 @@ def generateLongformerRanker(backend_model_name, tagger_name, args):
     if backend_model_name == "allenai/longformer-base-4096":
         from transformers import AutoTokenizer, LongformerModel
 
-        model = LongformerModel(backend_model_name)
-        tokenizer = AutoTokenizer(backend_model_name, use_fast=True)
+        model = LongformerModel.from_pretrained(backend_model_name)
+        tokenizer = AutoTokenizer.from_pretrained(backend_model_name, use_fast=True)
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
         kpe_model = EmbedRankManual(
@@ -336,8 +339,10 @@ def main():
         sys.exit(-1)
 
     # TODO: Test grammar
-    # kpe_model.grammar = """  NP:
-    #     (({.*}HYPH{.*})?|({VBG}|{VBN})?{JJ}*{NN}+)"""
+    # original NP:
+    #    {<PROPN|NOUN|ADJ>*<PROPN|NOUN>+<ADJ>*}
+    # test     NP:
+    #     ((<.*>-+<.*>)<NN>*)|((<VBG|VBN>)?<JJ>*<NN>+)"""
 
     if isinstance(kpe_model, MDKPERank):
         extract_eval = extract_keyphrases_topics
@@ -360,7 +365,6 @@ def main():
     logger.info(f"KP extraction for {len(data)} examples.")
     logger.info(f"Options: {options}")
 
-    options["experiment"] = args.experiment_name
     # -------------------------------------------------
     # --------------- Run Experiment ------------------
     # -------------------------------------------------
@@ -396,7 +400,7 @@ def main():
 
     fig = plot_score_distribuitions_with_gold(
         results=model_scores_to_dataframe(model_results, true_labels),
-        title="",
+        title=args.experiment_name,
     )
 
     results = evaluate_kp_extraction(model_results, true_labels)

@@ -288,8 +288,11 @@ class EmbedRank(BaseKPModel):
         NP: {<PROPN|NOUN|ADJ>*<PROPN|NOUN>+<ADJ>*}
         TODO: new grammar (({.*}{HYPH}{.*}){NOUN}*)|(({VBG}|{VBN})?{ADJ}*{NOUN}+) Keyphrase-Vectorizers paper ()
                         r'(({.*}-.*-{.*}){NN}*)|(({VBG}|{VBN})?{JJ}*{NN}+)'
-        TODO: SIFRank grammar (<NN.*|JJ> * <NN.* >)  ,  NN = NOUN, JJ = ADJ
+            WORKS! in KeyphraseVectorizer
+                        '((<.*>-+<.*>)<NN>*)|((<VBG|VBN>)?<JJ>*<NN>+)'
+        TODO: SIFRank grammar '<NN.*|JJ>*<NN.*>'  ,  NN = NOUN, JJ = ADJ
 
+        ""
 
         Consider this pattern:  (({.*}{HYPH}{.*}){NOUN}*)|(({VBG}|{VBN})?{ADJ}*{NOUN}+) and write it in RegexpParser syntax
 
@@ -328,6 +331,12 @@ class EmbedRank(BaseKPModel):
         doc.candidate_mentions = {}
 
         parser = RegexpParser(grammar)
+
+        # grammar by pos_ or by tag_?
+        # here use use pos_, KeyphraseVectorizers use tag_
+        # A choice between using a coarse-grained tag set that is consistent across languages (.pos),
+        # or a fine-grained tag set (.tag) that is specific to a particular treebank, and hence a particular language.
+
         np_trees = list(parser.parse_sents(doc.tagged_text))
 
         for i in range(len(np_trees)):
