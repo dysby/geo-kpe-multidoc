@@ -58,8 +58,8 @@ class POS_tagger_spacy(POS_tagger):
     Concrete data class for POS tagging using spacy
     """
 
-    def __init__(self, model):
-        self.tagger = spacy.load(model)
+    def __init__(self, model, exclude=["ner", "attribute_ruler", "lemmatizer"]):
+        self.tagger = spacy.load(model, exclude=exclude)
         self.name = model
 
     def pos_tag_str(self, text: str = "") -> spacy.tokens.doc.Doc:

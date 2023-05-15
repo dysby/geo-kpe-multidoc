@@ -140,6 +140,11 @@ class EmbedRank(BaseKPModel):
         # at 1st stage document POS Tagging uses normal text including capital letters,
         # but later document handling will use only lowered text, embeddings, and such.
         # doc.raw_text = doc.raw_text.lower()
+        if doc_mode == "global_attention":
+            logger.warning(
+                "Global Attention not used in SentenceTransformer API, use EmbedRankManual"
+            )
+
         doc_embeddings = self.model.embedding_model.encode(
             doc.raw_text, show_progress_bar=False, output_value=None
         )
@@ -396,7 +401,8 @@ class EmbedRank(BaseKPModel):
             candidate_set_embed:    np.ndarray of the embeddings for each candidate.
             candicate_set:          List of candidates.
         """
-        doc_mode = kwargs.get("doc_mode", "")
+        # doc_mode = kwargs.get("doc_mode", "")
+        doc_mode = kwargs.get("cand_mode", "")
         cand_mode = kwargs.get("cand_mode", "")
         post_processing = kwargs.get("post_processing", [""])
         use_cache = kwargs.get("cache_embeddings", False)
