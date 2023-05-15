@@ -10,13 +10,15 @@ from geo_kpe_multidoc import GEO_KPE_MULTIDOC_OUTPUT_PATH
 
 
 def plot_score_distribuitions_with_gold(
-    results: pd.DataFrame, title: str
+    results: pd.DataFrame, title: str, xlim=None
 ) -> plt.Figure:
     plt.rcParams["figure.figsize"] = (6.4, 4.8)
 
     fig, ax = plt.subplots()
     ax = results[results["in_gold"] == False]["score"].plot.hist(density=True)
     ax = results[results["in_gold"] == True]["score"].plot.hist(density=True, alpha=0.5)
+    if xlim is not None:
+        ax.set_xlim(xlim)
     ax.set_title(title, fontsize=12)
     plt.legend(["non-gold", "gold"])
     return fig
