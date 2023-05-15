@@ -210,22 +210,42 @@ class EmbedRank(BaseKPModel):
 
                 doc.candidate_set_embed.append(torch.mean(embds, dim=0).numpy())
 
-    def _embedding_out_context(self, doc: Document):
+    def _embedding_out_context(self, doc: Document, cand_mode: str = ""):
         logger.debug(f"Getting candidate embeddings without context.")
-        for candidate in doc.candidate_set:
-            if isinstance(self.model, BaseEmbedder):
-                embd = self.model.embed(candidate)
-            else:
-                embd = (
-                    self.model.encode(candidate, device=self.device)[
-                        "sentence_embedding"
-                    ]
-                    .detach()
-                    .cpu()
-                    .numpy()
-                )
 
-            doc.candidate_set_embed.append(embd)
+        if "mentions" in cand_mode:
+            for candidate in doc.candidate_set:
+                for mention in doc.candidate_mentions[candidate]:
+                    embds = []
+                    if isinstance(self.model, BaseEmbedder):
+                        embd = self.model.embed(mention)
+                    else:
+                        embd = (
+                            self.model.encode(mention, device=self.device)[
+                                "sentence_embedding"
+                            ]
+                            .detach()
+                            .cpu()
+                            .numpy()
+                        )
+                    embds.append(embd)
+
+                doc.candidate_set_embed.append(np.mean(embds, 0))
+        else:
+            for candidate in doc.candidate_set:
+                if isinstance(self.model, BaseEmbedder):
+                    embd = self.model.embed(candidate)
+                else:
+                    embd = (
+                        self.model.encode(candidate, device=self.device)[
+                            "sentence_embedding"
+                        ]
+                        .detach()
+                        .cpu()
+                        .numpy()
+                    )
+
+                doc.candidate_set_embed.append(embd)
 
     def _aggregate_candidate_mention_embeddings(
         self,
@@ -244,8 +264,8 @@ class EmbedRank(BaseKPModel):
         doc.candidate_set_embed = []
 
         # special simple case
-        if cand_mode == "no_context":
-            self._embedding_out_context(doc)
+        if "no_context" in cand_mode:
+            self._embedding_out_context(doc, cand_mode)
         else:
             self._embedding_in_context(doc)
 
@@ -296,6 +316,8 @@ class EmbedRank(BaseKPModel):
             WORKS! in KeyphraseVectorizer
                         '((<.*>-+<.*>)<NN>*)|((<VBG|VBN>)?<JJ>*<NN>+)'
         TODO: SIFRank grammar '<NN.*|JJ>*<NN.*>'  ,  NN = NOUN, JJ = ADJ
+        TODO: Automatic Extraction of Relevant Keyphrases for the Study of Issue Competition
+                (<NOUN>+<ADJ>*<PREP>*)?<NOUN>+<ADJ>*
 
         ""
 
@@ -427,6 +449,7 @@ class EmbedRank(BaseKPModel):
                 )
             doc.token_ids = tokenized_doc["input_ids"].squeeze().tolist()
             doc.global_attention_mask = torch.zeros(tokenized_doc["input_ids"].shape)
+            doc.global_attention_mask[:, 0] = 1  # CLS token
             self._set_global_attention(doc)
 
         t = time()

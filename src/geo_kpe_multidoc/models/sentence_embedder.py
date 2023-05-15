@@ -2,7 +2,7 @@ from collections import OrderedDict
 from typing import Dict, List, Union
 
 import torch
-from transformers import AutoModel, AutoTokenizer
+from transformers import AutoModel, AutoTokenizer, LongformerModel
 
 
 def mean_pooling(model_output, attention_mask):
@@ -62,6 +62,10 @@ class SentenceEmbedder:
             # encoded_input["attention_mask"] = (
             #     encoded_input["attention_mask"] + global_attention_mask
             # )
+        elif global_attention_mask is None and isinstance(self.model, LongformerModel):
+            global_attention_mask = torch.zeros_like(encoded_input["attention_mask"])
+            global_attention_mask[:, 0] = 1  # CLS token
+            encoded_input["global_attention_mask"] = global_attention_mask
 
         if device:
             encoded_input = batch_to_device(encoded_input, device)

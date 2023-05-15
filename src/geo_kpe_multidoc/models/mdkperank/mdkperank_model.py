@@ -1,3 +1,4 @@
+from collections import OrderedDict, namedtuple
 from dataclasses import dataclass
 from itertools import chain
 from operator import itemgetter
@@ -19,8 +20,6 @@ from ..embedrank import EmbedRank
 from ..fusion_model import FusionModel
 from ..maskrank import MaskRank
 
-# from datasets.process_datasets import *
-
 
 @dataclass
 class KpeModelScores:
@@ -34,9 +33,10 @@ class KpeModelScores:
         return self.candidates[index], self.scores[index]
 
 
-@dataclass
-class MDKPERankOutput:
-    results: List[KPEScore]
+MDKPERankOutput = namedtuple(
+    "MDKPERankOutput",
+    "top_n_scores score_per_document candidate_document_matrix documents_embeddings candidate_embeddings",
+)
 
 
 class MDKPERank(BaseKPModel):
@@ -278,7 +278,7 @@ class MDKPERank(BaseKPModel):
         stemming: bool = False,
         lemmatize: bool = False,
         **kwargs,
-    ) -> List[KPEScore]:
+    ) -> MDKPERankOutput:
         """
         Extract keyphrases from list of documents
 
@@ -342,7 +342,13 @@ class MDKPERank(BaseKPModel):
         for doc, _, cand_set in topic_res:
             candidate_document_matrix.loc[cand_set, doc.id] += 1
 
-        return (top_n_scores, score_per_document, candidate_document_matrix)
+        return MDKPERankOutput(
+            top_n_scores,
+            score_per_document,
+            candidate_document_matrix,
+            documents_embeddings,
+            candidate_embeddings,
+        )
 
     def _rank_by_geo(
         self,

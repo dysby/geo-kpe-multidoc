@@ -310,6 +310,7 @@ def extract_keyphrases_docs(
     true_labels = {dataset.name: []}
     experiment = kwargs.get("experiment", "debug")
     preprocessing = kwargs.get("preprocessing", [])
+    cache_results = kwargs.get("cache_results", False)
 
     if n_docs_limit == -1:
         loader = dataset
@@ -342,20 +343,24 @@ def extract_keyphrases_docs(
 
         true_labels[dataset.name].append(gold_kp)
 
-        # save results
-        os.makedirs(path.join(GEO_KPE_MULTIDOC_CACHE_PATH, experiment), exist_ok=True)
-        joblib.dump(
-            {
-                "dataset": dataset.name,
-                "topic": doc_id,
-                "doc": doc_id,
-                "top_n_scores": top_n_and_scores,
-                "gold": gold_kp,
-            },
-            path.join(
-                GEO_KPE_MULTIDOC_CACHE_PATH, experiment, f"{doc_id}-top_n_scores.pkl"
-            ),
-        )
+        if cache_results:
+            os.makedirs(
+                path.join(GEO_KPE_MULTIDOC_CACHE_PATH, experiment), exist_ok=True
+            )
+            joblib.dump(
+                {
+                    "dataset": dataset.name,
+                    "topic": doc_id,
+                    "doc": doc_id,
+                    "top_n_scores": top_n_and_scores,
+                    "gold": gold_kp,
+                },
+                path.join(
+                    GEO_KPE_MULTIDOC_CACHE_PATH,
+                    experiment,
+                    f"{doc_id}-top_n_scores.pkl",
+                ),
+            )
 
     return model_results, true_labels
 
@@ -391,6 +396,8 @@ def extract_keyphrases_topics(
             top_n_scores,
             score_per_document,
             candidate_document_matrix,
+            documents_embeddings,
+            candidate_embeddings,
         ) = model.extract_kp_from_topic(
             # top_n_and_scores, candidates = model.extract_kp_from_topic(
             # top_n_and_scores, candidates = model.extract_kp_geo(
