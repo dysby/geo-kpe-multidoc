@@ -461,7 +461,6 @@ def model_scores_to_dataframe(model_results, true_labels) -> pd.DataFrame:
             zip(doc_candidade_values, true_labels[dataset])
         ):
             candidates_score, _candidates = candidate_scores
-            doc_gold_kp
 
             rows = [
                 {
@@ -472,7 +471,6 @@ def model_scores_to_dataframe(model_results, true_labels) -> pd.DataFrame:
                 }
                 for candidate, score in candidates_score
             ]
-
-        df = pd.concat([df, pd.DataFrame.from_records(rows)])
+            df = pd.concat([df, pd.DataFrame.from_records(rows)])
 
     return df
