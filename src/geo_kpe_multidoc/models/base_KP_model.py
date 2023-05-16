@@ -87,7 +87,9 @@ class BaseKPModel:
             doc.tagged_text,
             doc.doc_sentences,
             doc.doc_sentences_words,
-        ) = self.tagger.pos_tag_text_sents_words(doc.raw_text, use_cache, doc.id)
+        ) = self.tagger.pos_tag_text_sents_words(
+            doc.raw_text, use_cache, doc.dataset, doc.id
+        )
 
         doc.doc_sentences = [
             sent.text for sent in doc.doc_sentences if sent.text.strip()

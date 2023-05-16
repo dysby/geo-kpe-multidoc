@@ -310,40 +310,29 @@ class EmbedRank(BaseKPModel):
                 otherwise mentions are not found in document. Do not change original mention form.
                 Model tokenizer is responsible for case handling.
 
-        NP: {<PROPN|NOUN|ADJ>*<PROPN|NOUN>+<ADJ>*}
+            Baseline NP:
+                {<PROPN|NOUN|ADJ>*<PROPN|NOUN>+<ADJ>*}
+
         TODO: new grammar (({.*}{HYPH}{.*}){NOUN}*)|(({VBG}|{VBN})?{ADJ}*{NOUN}+) Keyphrase-Vectorizers paper ()
                         r'(({.*}-.*-{.*}){NN}*)|(({VBG}|{VBN})?{JJ}*{NN}+)'
             WORKS! in KeyphraseVectorizer
                         '((<.*>-+<.*>)<NN>*)|((<VBG|VBN>)?<JJ>*<NN>+)'
-        TODO: SIFRank grammar '<NN.*|JJ>*<NN.*>'  ,  NN = NOUN, JJ = ADJ
-        TODO: Automatic Extraction of Relevant Keyphrases for the Study of Issue Competition
+
+            SIFRank grammar '<NN.*|JJ>*<NN.*>'  ,  NN = NOUN, JJ = ADJ
+
+            Automatic Extraction of Relevant Keyphrases for the Study of Issue Competition
                 (<NOUN>+<ADJ>*<PREP>*)?<NOUN>+<ADJ>*
 
-        ""
+            UKE-CCRank
 
-        Consider this pattern:  (({.*}{HYPH}{.*}){NOUN}*)|(({VBG}|{VBN})?{ADJ}*{NOUN}+) and write it in RegexpParser syntax
+                GRAMMAR1 = NP:
+                    {<NN.*|JJ>*<NN.*>}  # Adjective(s)(optional) + Noun(s)
 
-        ChatGPT
-        To write the pattern (({.*}{HYPH}{.*}){NOUN}*)|(({VBG}|{VBN})?{ADJ}*{NOUN}+) in RegexpParser syntax, you can follow these steps:
+                GRAMMAR2 = NP:
+                    {<JJ|VBG>*<NN.*>{0,3}}  # Adjective(s)(optional) + Noun(s)
 
-        Replace the curly braces {} with square brackets [].
-
-        Remove the vertical bars | and wrap each part of the pattern in parentheses.
-
-        Add the appropriate regular expression syntax for each part of the pattern.
-
-        Using these steps, the pattern can be written in RegexpParser syntax as follows:
-
-        python
-        Copy code
-        pattern = r'(({.*}HYPH{.*})?|({VBG}|{VBN})?{JJ}*{NN}+)'
-        Here, we replaced the first set of curly braces {} with square brackets [], and added ? to make the hyphen and the surrounding curly braces optional. We also wrapped the entire first part of the pattern in parentheses, to match the grouping in the original pattern.
-
-        For the second part of the pattern, we also wrapped it in parentheses and added the appropriate regular expression syntax. We used {VBG}|{VBN} to match either a gerund or a past participle, {JJ}* to match any number of adjectives, and {NN}+ to match one or more nouns.
-
-        Note that the RegexpParser syntax uses regular expressions to define patterns for chunking text into noun phrases, verb phrases, etc. You can use this pattern with the RegexpParser class in NLTK to extract noun phrases or other structures from text that match this pattern.
-
-
+                GRAMMAR3 = NP:
+                    {<NN.*|JJ|VBG|VBN>*<NN.*>}  # Adjective(s)(optional) + Noun(s)
         """
         cache_pos_tags = kwargs.get("cache_pos_tags", False)
         self._pos_tag_doc(

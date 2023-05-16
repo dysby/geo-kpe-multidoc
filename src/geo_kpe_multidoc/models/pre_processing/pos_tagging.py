@@ -44,7 +44,7 @@ class POS_tagger(ABC):
 
     @abstractmethod
     def pos_tag_text_sents_words(
-        self, text: str = "", use_cache: bool = False, id: int = 0
+        self, text: str = "", use_cache: bool = False, dataset: str = "", id: str = ""
     ) -> Tuple[List[List[Tuple[str, str]]], List[str], List[List[str]]]:
         """
         POS tag a document and return it's result in Tuple form, with the first element being a List of sentences with each
@@ -85,27 +85,27 @@ class POS_tagger_spacy(POS_tagger):
         )
 
     def pos_tag_text_sents_words(
-        self, text: str = "", use_cache: bool = False, id: str = ""
+        self,
+        text: str = "",
+        use_cache: bool = False,
+        dataset: str = "",
+        doc_id: str = "",
     ) -> Tuple[List[List[Tuple[str, str]]], List[str], List[List[str]]]:
-        logger.debug(f"Cache:{use_cache} Id:{id}")
+        logger.debug(f"Cache:{use_cache} Id:{doc_id}")
 
         # only bypass spacy PoS tagging, other transformations are not skipped (e.g. joining NOUN HYP NOUN).
         if use_cache:
             cache_file_path = path.join(
                 GEO_KPE_MULTIDOC_CACHE_PATH,
                 "POS_CACHE",
-                f"{self.name}-{id}-PoS.cache",
+                f"{self.name}-{dataset}-{doc_id}-PoS.cache",
             )
             if path.exists(cache_file_path):
-                doc = joblib.load(cache_file_path)
+                (tagged_text, doc_sents, doc_word_sents) = joblib.load(cache_file_path)
                 logger.debug(f"Load POS tags from cache {cache_file_path}")
-            else:
-                doc = self.tagger(text)
-                Path(cache_file_path).parent.mkdir(exist_ok=True, parents=True)
-                joblib.dump(doc, cache_file_path)
-                logger.info(f"Save {id} POS tags in {cache_file_path}")
-        else:
-            doc = self.tagger(text)
+                return (tagged_text, doc_sents, doc_word_sents)
+
+        doc = self.tagger(text)
 
         tagged_text = []
         doc_word_sents = []
@@ -167,13 +167,11 @@ class POS_tagger_spacy(POS_tagger):
                 tagged_text.append(tagged_text_s)
                 doc_word_sents.append(doc_word_sents_s)
 
-        return (tagged_text, list(doc.sents), doc_word_sents)
+        doc_sents = list(doc.sents)
 
-    def _save_on_cache(self, tagged_text, doc_id: str = "") -> None:
-        logger.info(f"Caching PoS Tags for Document {doc_id}")
-        joblib.dump(
-            tagged_text,
-            path.join(
-                GEO_KPE_MULTIDOC_CACHE_PATH, "POS_CACHE", f"{self.name}-{id}-PoS.cache"
-            ),
-        )
+        if use_cache:
+            Path(cache_file_path).parent.mkdir(exist_ok=True, parents=True)
+            joblib.dump((tagged_text, doc_sents, doc_word_sents), cache_file_path)
+            logger.info(f"Save {doc_id} POS tags in {cache_file_path}")
+
+        return (tagged_text, doc_sents, doc_word_sents)
