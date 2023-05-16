@@ -91,9 +91,9 @@ class BaseKPModel:
             doc.raw_text, use_cache, doc.dataset, doc.id
         )
 
-        doc.doc_sentences = [
-            sent.text for sent in doc.doc_sentences if sent.text.strip()
-        ]
+        # doc.doc_sentences = [
+        #     sent.text for sent in doc.doc_sentences if sent.text.strip()
+        # ]
 
     def extract_candidates(self, tagged_doc, grammar, **kwargs) -> List[str]:
         """

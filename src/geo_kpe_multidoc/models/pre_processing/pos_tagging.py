@@ -167,7 +167,7 @@ class POS_tagger_spacy(POS_tagger):
                 tagged_text.append(tagged_text_s)
                 doc_word_sents.append(doc_word_sents_s)
 
-        doc_sents = list(doc.sents)
+        doc_sents = [sent.text for sent in doc.sents if sent.text.strip()]
 
         if use_cache:
             Path(cache_file_path).parent.mkdir(exist_ok=True, parents=True)
