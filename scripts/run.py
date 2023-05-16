@@ -6,6 +6,7 @@ from datetime import datetime
 from os import path
 from time import time
 
+import joblib
 import torch
 from loguru import logger
 from matplotlib import pyplot as plt
@@ -13,7 +14,11 @@ from nltk.stem import PorterStemmer
 from pandas import DataFrame
 from sentence_transformers import SentenceTransformer
 
-from geo_kpe_multidoc import GEO_KPE_MULTIDOC_CACHE_PATH, GEO_KPE_MULTIDOC_DATA_PATH
+from geo_kpe_multidoc import (
+    GEO_KPE_MULTIDOC_CACHE_PATH,
+    GEO_KPE_MULTIDOC_DATA_PATH,
+    GEO_KPE_MULTIDOC_OUTPUT_PATH,
+)
 from geo_kpe_multidoc.datasets.datasets import DATASETS, load_data
 from geo_kpe_multidoc.evaluation.evaluation_tools import (
     evaluate_kp_extraction,
@@ -181,14 +186,13 @@ def parse_args():
     return parser.parse_args()
 
 
-def save(results: DataFrame, fig: plt.Figure, args):
-    from geo_kpe_multidoc import GEO_KPE_MULTIDOC_OUTPUT_PATH
+def save(dataset_kpe: DataFrame, performance_metrics: DataFrame, fig: plt.Figure, args):
+    t = datetime.now().strftime(r"%Y%m%d-%H%M")
+    filename = "-".join(["kpe", args.experiment_name, t]) + ".csv"
+    dataset_kpe.to_csv(path.join(GEO_KPE_MULTIDOC_OUTPUT_PATH, filename))
 
-    t = datetime.now()
-    filename = (
-        "-".join(["results", args.experiment_name, t.strftime(r"%Y%m%d-%H%M")]) + ".csv"
-    )
-    results.to_csv(path.join(GEO_KPE_MULTIDOC_OUTPUT_PATH, filename))
+    filename = "-".join(["results", args.experiment_name, t]) + ".csv"
+    performance_metrics.to_csv(path.join(GEO_KPE_MULTIDOC_OUTPUT_PATH, filename))
 
     filename = filename[:-3] + "txt"
     with open(
@@ -391,20 +395,16 @@ def main():
     else:
         model_results = postprocess_res_labels(model_results, stemmer, lemmer)
         true_labels = postprocess_dataset_labels(true_labels, stemmer, lemmer)
-        import joblib
 
-        joblib.dump(
-            (model_results, true_labels),
-            path.join(GEO_KPE_MULTIDOC_CACHE_PATH, "debug-predict-gold.pkl"),
-        )
-
+    dataset_kpe = model_scores_to_dataframe(model_results, true_labels)
     fig = plot_score_distribuitions_with_gold(
-        results=model_scores_to_dataframe(model_results, true_labels),
+        results=dataset_kpe,
         title=args.experiment_name,
+        xlim=(0, 1),
     )
 
-    results = evaluate_kp_extraction(model_results, true_labels)
-    save(results, fig, args)
+    performance_metrics = evaluate_kp_extraction(model_results, true_labels)
+    save(dataset_kpe, performance_metrics, fig, args)
 
 
 if __name__ == "__main__":
