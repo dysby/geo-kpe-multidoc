@@ -40,6 +40,12 @@ class EmbedRank(BaseKPModel):
     """
     Simple class to encapsulate EmbedRank functionality. Uses
     the KeyBert backend to retrieve models
+
+    cand_mode:
+        {mentions}?{no_context}+            - candidate embeddings from non contextualized form
+        {global_attention}+{dilated_(n)}?   - get embeddings using longformer global attention in all doc tokens where a candidate is present.
+                                            If dilated mode is selected a sparse pattern is used, considering global attention on every n position.
+        mean_in_n_out_context               - add non contextualized form embedding to mentions embeddings and do the average as candidade embedding.
     """
 
     def __init__(self, model, tagger):
@@ -155,11 +161,11 @@ class EmbedRank(BaseKPModel):
 
         return doc_embeddings["sentence_embedding"].detach().cpu().numpy()
 
-    def _search_mentions(self, doc, candidate):
+    def _search_mentions(self, candidate_mentions, token_ids):
         mentions = []
         # TODO: mention counts for mean_in_n_out_context
         # mentions_counts = []
-        for mention in doc.candidate_mentions[candidate]:
+        for mention in candidate_mentions:
             if isinstance(self.model, BaseEmbedder):
                 # original tokenization by KeyBert/SentenceTransformer
                 tokenized_candidate = tokenize_hf(mention, self.model)
@@ -169,7 +175,7 @@ class EmbedRank(BaseKPModel):
 
             filt_ids = filter_special_tokens(tokenized_candidate["input_ids"])
 
-            mentions += find_occurrences(filt_ids, doc.token_ids)
+            mentions += find_occurrences(filt_ids, token_ids)
             # mentions_counts.append(len(mentions))
 
         # mentions_counts = mentions_counts[:1] + [
@@ -177,10 +183,58 @@ class EmbedRank(BaseKPModel):
         # ]
         return mentions  # , mentions_counts
 
-    def _embedding_in_context(self, doc: Document, cand_mode: str = ""):
+    def _embedding_in_n_out_context(self, doc: Document):
         for candidate in doc.candidate_set:
-            # mentions, mentions_counts = self._search_mentions(doc, candidate)
-            mentions = self._search_mentions(doc, candidate)
+            candidate_mentions_embeddings = []
+            for mention in doc.candidate_mentions[candidate]:
+                mentions = self._search_mentions([mention], doc.token_ids)
+
+                if isinstance(self.model, BaseEmbedder):
+                    mention_out_of_context_embedding = self.model.embed(mention)
+                else:
+                    mention_out_of_context_embedding = (
+                        self.model.encode(mention, device=self.device)[
+                            "sentence_embedding"
+                        ]
+                        .detach()
+                        .cpu()
+                        .numpy()
+                    )
+
+                if len(mentions) == 0:
+                    # backoff procedure, if mention is not found.
+                    candidate_mentions_embeddings.append(
+                        mention_out_of_context_embedding
+                    )
+                else:
+                    _, embed_dim = doc.token_embeddings.size()
+                    embds = torch.empty(size=(len(mentions), embed_dim))
+                    for i, occurrence in enumerate(mentions):
+                        embds[i] = torch.mean(
+                            doc.token_embeddings[occurrence, :], dim=0
+                        )
+                    mention_in_of_context_embedding = np.mean(embds, 0)
+
+                    candidate_mentions_embeddings.append(
+                        np.mean(
+                            [
+                                mention_out_of_context_embedding,
+                                mention_in_of_context_embedding,
+                            ]
+                        )
+                    )
+
+            doc.candidate_set_embed.append(np.mean(candidate_mentions_embeddings, 0))
+
+    def _embedding_in_context(self, doc: Document, cand_mode: str = ""):
+        # if "mean_in_n_out_context" in cand_mode:
+        #     self._embedding_in_n_out_context(doc)
+        #     return
+
+        for candidate in doc.candidate_set:
+            mentions = self._search_mentions(
+                doc.candidate_mentions[candidate], doc.token_ids
+            )
 
             # backoff procedure, if mentions not found.
             if len(mentions) == 0:
@@ -216,27 +270,25 @@ class EmbedRank(BaseKPModel):
                 for i, occurrence in enumerate(mentions):
                     embds[i] = torch.mean(doc.token_embeddings[occurrence, :], dim=0)
 
-                doc.candidate_set_embed.append(torch.mean(embds, dim=0).numpy())
+                embds = embds.numpy()
+                if "mean_in_n_out_context" in cand_mode:
+                    for mention in doc.candidate_mentions[candidate]:
+                        if isinstance(self.model, BaseEmbedder):
+                            mention_out_of_context_embedding = self.model.embed(mention)
+                        else:
+                            mention_out_of_context_embedding = (
+                                self.model.encode(mention, device=self.device)[
+                                    "sentence_embedding"
+                                ]
+                                .detach()
+                                .cpu()
+                                .numpy()
+                            )
+                        embds = np.concatenate(
+                            [embds, [mention_out_of_context_embedding]]
+                        )
 
-                #         if "mean_in_context" in cand_mode:
-                # # get out of context embedding for the original mention form of his candidate
-                # mention_index = [
-                #     idx for idx, v in enumerate(mentions_counts) if i <= v
-                # ]
-                # # We know that we are processing the ith mention form of the candidate
-                # mention = doc.candidate_mentions[candidate][mention_index]
-                # if isinstance(self.model, BaseEmbedder):
-                #     no_context_embedding = self.model.embed(mention)
-                # else:
-                #     no_context_embedding = (
-                #         self.model.encode(mention, device=self.device)[
-                #             "sentence_embedding"
-                #         ]
-                #         .detach()
-                #         .cpu()
-                #         .numpy()
-                #     )
-                # embds[i] = torch.mean([embds[i], no_context_embedding])
+                doc.candidate_set_embed.append(np.mean(embds, 0))
 
     def _embedding_out_context(self, doc: Document, cand_mode: str = ""):
         logger.debug(f"Getting candidate embeddings without context.")
@@ -295,7 +347,7 @@ class EmbedRank(BaseKPModel):
         if "no_context" in cand_mode:
             self._embedding_out_context(doc, cand_mode)
         else:
-            self._embedding_in_context(doc)
+            self._embedding_in_context(doc, cand_mode)
 
         if "z_score" in post_processing:
             # TODO: Why z_score_normalization by space split?
@@ -307,7 +359,9 @@ class EmbedRank(BaseKPModel):
         mentions = []
         for candidate in doc.candidate_set:
             # mentions_positions, _ = self._search_mentions(doc, candidate)
-            mentions_positions = self._search_mentions(doc, candidate)
+            mentions_positions = self._search_mentions(
+                doc.candidate_mentions[candidate], doc.token_ids
+            )
             if len(mentions_positions) > 0:
                 # candidate mentions where found in document token_ids
                 mentions.extend(mentions_positions)
@@ -329,21 +383,15 @@ class EmbedRank(BaseKPModel):
 
         len(candidate.split(" ")) <= 5 avoid too long candidate phrases
 
-        Parameters
-        ----------
-                min_len: minimum candidate length (chars)
-
-        TODO: why not use aggregate candidades in stem form?
-        DONE: why not lowercase candidates? lemmatize returns lowercase candidates
-        DONE: candidate mentions should not be lemmatized, maybe lowercased (document will be embed in lowercase form),
-                otherwise mentions are not found in document. Do not change original mention form.
-                Model tokenizer is responsible for case handling.
-
-            Baseline NP:
+        Baseline
+            NP:
                 {<PROPN|NOUN|ADJ>*<PROPN|NOUN>+<ADJ>*}
 
-        TODO: new grammar (({.*}{HYPH}{.*}){NOUN}*)|(({VBG}|{VBN})?{ADJ}*{NOUN}+) Keyphrase-Vectorizers paper ()
+        TODO: new grammar
+
+            (({.*}{HYPH}{.*}){NOUN}*)|(({VBG}|{VBN})?{ADJ}*{NOUN}+) Keyphrase-Vectorizers paper ()
                         r'(({.*}-.*-{.*}){NN}*)|(({VBG}|{VBN})?{JJ}*{NN}+)'
+
             WORKS! in KeyphraseVectorizer
                         '((<.*>-+<.*>)<NN>*)|((<VBG|VBN>)?<JJ>*<NN>+)'
 
@@ -362,6 +410,12 @@ class EmbedRank(BaseKPModel):
 
                 GRAMMAR3 = NP:
                     {<NN.*|JJ|VBG|VBN>*<NN.*>}  # Adjective(s)(optional) + Noun(s)
+
+        Parameters
+        ----------
+                min_len: minimum candidate length (chars)
+
+
         """
         cache_pos_tags = kwargs.get("cache_pos_tags", False)
         self._pos_tag_doc(

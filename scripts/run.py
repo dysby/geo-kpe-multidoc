@@ -399,7 +399,7 @@ def main():
     dataset_kpe = model_scores_to_dataframe(model_results, true_labels)
     fig = plot_score_distribuitions_with_gold(
         results=dataset_kpe,
-        title=args.experiment_name,
+        title=args.experiment_name.replace("-", " "),
         xlim=(0, 1),
     )
 
