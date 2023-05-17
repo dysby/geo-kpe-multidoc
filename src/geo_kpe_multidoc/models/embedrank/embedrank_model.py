@@ -1,5 +1,5 @@
 import os
-from itertools import chain
+from itertools import chain, pairwise
 from operator import itemgetter
 from pathlib import Path
 from time import time
@@ -157,6 +157,8 @@ class EmbedRank(BaseKPModel):
 
     def _search_mentions(self, doc, candidate):
         mentions = []
+        # TODO: mention counts for mean_in_n_out_context
+        # mentions_counts = []
         for mention in doc.candidate_mentions[candidate]:
             if isinstance(self.model, BaseEmbedder):
                 # original tokenization by KeyBert/SentenceTransformer
@@ -168,10 +170,16 @@ class EmbedRank(BaseKPModel):
             filt_ids = filter_special_tokens(tokenized_candidate["input_ids"])
 
             mentions += find_occurrences(filt_ids, doc.token_ids)
-        return mentions
+            # mentions_counts.append(len(mentions))
 
-    def _embedding_in_context(self, doc: Document):
+        # mentions_counts = mentions_counts[:1] + [
+        #     y - x for x, y in pairwise(mentions_counts)
+        # ]
+        return mentions  # , mentions_counts
+
+    def _embedding_in_context(self, doc: Document, cand_mode: str = ""):
         for candidate in doc.candidate_set:
+            # mentions, mentions_counts = self._search_mentions(doc, candidate)
             mentions = self._search_mentions(doc, candidate)
 
             # backoff procedure, if mentions not found.
@@ -209,6 +217,26 @@ class EmbedRank(BaseKPModel):
                     embds[i] = torch.mean(doc.token_embeddings[occurrence, :], dim=0)
 
                 doc.candidate_set_embed.append(torch.mean(embds, dim=0).numpy())
+
+                #         if "mean_in_context" in cand_mode:
+                # # get out of context embedding for the original mention form of his candidate
+                # mention_index = [
+                #     idx for idx, v in enumerate(mentions_counts) if i <= v
+                # ]
+                # # We know that we are processing the ith mention form of the candidate
+                # mention = doc.candidate_mentions[candidate][mention_index]
+                # if isinstance(self.model, BaseEmbedder):
+                #     no_context_embedding = self.model.embed(mention)
+                # else:
+                #     no_context_embedding = (
+                #         self.model.encode(mention, device=self.device)[
+                #             "sentence_embedding"
+                #         ]
+                #         .detach()
+                #         .cpu()
+                #         .numpy()
+                #     )
+                # embds[i] = torch.mean([embds[i], no_context_embedding])
 
     def _embedding_out_context(self, doc: Document, cand_mode: str = ""):
         logger.debug(f"Getting candidate embeddings without context.")
@@ -275,9 +303,10 @@ class EmbedRank(BaseKPModel):
                 doc.candidate_set_embed, doc.raw_text, self.model
             )
 
-    def _set_global_attention(self, doc: Document):
+    def _set_global_attention_on_candidates(self, doc: Document):
         mentions = []
         for candidate in doc.candidate_set:
+            # mentions_positions, _ = self._search_mentions(doc, candidate)
             mentions_positions = self._search_mentions(doc, candidate)
             if len(mentions_positions) > 0:
                 # candidate mentions where found in document token_ids
@@ -424,25 +453,36 @@ class EmbedRank(BaseKPModel):
             if cached:
                 return cached
 
-        if cand_mode == "global_attention":
-            # set attention mask size
-            if isinstance(self.model, BaseEmbedder):
-                # original tokenization by KeyBert/SentenceTransformer
-                tokenized_doc = tokenize_hf(doc.raw_text, self.model)
+        # Set Global Attention CLS token for all modes
+        if isinstance(self.model, BaseEmbedder):
+            # original tokenization by KeyBert/SentenceTransformer
+            tokenized_doc = tokenize_hf(doc.raw_text, self.model)
+        else:
+            # tokenize via local SentenceEmbedder Class
+            tokenized_doc = self.model.tokenize(
+                doc.raw_text,
+                padding=True,
+                pad_to_multiple_of=self.model.attention_window,
+            )
+        doc.token_ids = tokenized_doc["input_ids"].squeeze().tolist()
+        doc.global_attention_mask = torch.zeros(tokenized_doc["input_ids"].shape)
+        doc.global_attention_mask[:, 0] = 1  # CLS token
+
+        if "global_attention" in cand_mode:
+            if "dilated" in cand_mode:
+                dilation = int("".join(filter(str.isdigit, cand_mode)))
+                input_size = doc.global_attention_mask.size(1)
+                indices = torch.arange(0, input_size, dilation)
+                doc.global_attention_mask.index_fill_(1, indices, 1)
             else:
-                # tokenize via local SentenceEmbedder Class
-                tokenized_doc = self.model.tokenize(
-                    doc.raw_text,
-                    padding=True,
-                    pad_to_multiple_of=self.model.attention_window,
-                )
-            doc.token_ids = tokenized_doc["input_ids"].squeeze().tolist()
-            doc.global_attention_mask = torch.zeros(tokenized_doc["input_ids"].shape)
-            doc.global_attention_mask[:, 0] = 1  # CLS token
-            self._set_global_attention(doc)
+                self._set_global_attention_on_candidates(doc)
+
+        output_attentions = "attention_rank" in cand_mode
 
         t = time()
-        doc.doc_embed = self._embed_doc(doc, stemmer, doc_mode, post_processing)
+        doc.doc_embed = self._embed_doc(
+            doc, stemmer, doc_mode, post_processing, output_attentions=output_attentions
+        )
         logger.info(f"Embed Doc in {time() -  t:.2f}s")
 
         t = time()

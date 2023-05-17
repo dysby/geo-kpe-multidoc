@@ -40,7 +40,9 @@ class SentenceEmbedder:
             **kwargs,
         )
 
-    def encode(self, sentence, global_attention_mask=None, device=None):
+    def encode(
+        self, sentence, global_attention_mask=None, output_attentions=False, device=None
+    ):
         # Tokenize sentences
         encoded_input = self.tokenizer(
             sentence,
@@ -72,7 +74,9 @@ class SentenceEmbedder:
 
         # Compute token embeddings
         with torch.no_grad():
-            model_output = self.model(**encoded_input)
+            model_output = self.model(
+                **encoded_input, output_attentions=output_attentions
+            )
 
         # Perform pooling. In this case, mean pooling
         sentence_embedding = mean_pooling(model_output, encoded_input["attention_mask"])
@@ -83,6 +87,9 @@ class SentenceEmbedder:
                 "input_ids": encoded_input["input_ids"],
                 "attention_mask": encoded_input["attention_mask"],
                 "sentence_embedding": sentence_embedding.squeeze(),
+                # Output includes attention weights when output_attentions=True
+                # Size(batch_size, num_heads, sequence_length, sequence_length)
+                "attentions": model_output[-1] if output_attentions else None,
             }
         )
 

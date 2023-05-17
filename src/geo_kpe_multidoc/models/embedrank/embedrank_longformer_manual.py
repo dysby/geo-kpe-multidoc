@@ -38,6 +38,7 @@ class EmbedRankManual(EmbedRank):
         stemmer: Callable = None,
         doc_mode: str = "",
         post_processing: List[str] = [],
+        output_attentions=False,
     ) -> np.ndarray:
         """
         Method that embeds the document, having several modes according to usage.
@@ -47,10 +48,14 @@ class EmbedRankManual(EmbedRank):
             doc.raw_text,
             global_attention_mask=doc.global_attention_mask,
             device=self.device,
+            output_attentions=output_attentions,
         )
 
         doc.token_ids = doc_embeddings["input_ids"].squeeze().tolist()
         doc.token_embeddings = doc_embeddings["token_embeddings"].detach().cpu()
         doc.attention_mask = doc_embeddings["attention_mask"].detach().cpu()
+        doc.attentions = (
+            doc_embeddings["attentions"].detach.cpu() if output_attentions else None
+        )
 
         return doc_embeddings["sentence_embedding"].detach().cpu().numpy()

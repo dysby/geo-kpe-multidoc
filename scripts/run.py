@@ -80,7 +80,7 @@ def parse_args():
         default="",
         type=str,
         # required=True,
-        help="The method for candidate mode (?).",
+        help="The method for candidate mode (no_context, mentions_no_context, global_attention, global_attention_dilated_nnn, attention_rank).",
     )
     parser.add_argument(
         "--embed_model",
