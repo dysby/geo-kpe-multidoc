@@ -135,6 +135,7 @@ class EmbedRank(BaseKPModel):
         stemmer: Callable = None,
         doc_mode: str = "",
         post_processing: List[str] = [],
+        output_attentions=None,
     ) -> np.ndarray:
         """
         Method that embeds the document, having several modes according to usage.
