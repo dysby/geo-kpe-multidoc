@@ -443,6 +443,8 @@ def extract_keyphrases_topics(
                     "score_per_document": score_per_document,
                     "candidate_document_matrix": candidate_document_matrix,
                     "gold_kp": gold_kp,
+                    "documents_embeddings": documents_embeddings,
+                    "candidate_embeddings": candidate_embeddings,
                 },
                 filename,
             )

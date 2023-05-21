@@ -391,7 +391,7 @@ def main():
     assert stemmer != None
     # Transform keyphrases, thru stemming, for KPE evaluation.
     if not stemmer:
-        logger.critical("KPE Evaluation usualy need stemmer!")
+        logger.critical("KPE Evaluation usually need stemmer!")
     else:
         model_results = postprocess_res_labels(model_results, stemmer, lemmer)
         true_labels = postprocess_dataset_labels(true_labels, stemmer, lemmer)
