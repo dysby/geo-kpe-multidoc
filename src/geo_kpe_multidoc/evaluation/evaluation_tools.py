@@ -439,6 +439,8 @@ def extract_keyphrases_topics(
 
             joblib.dump(
                 {
+                    "dataset": dataset.name,
+                    "topic": topic_id,
                     "top_n_scores": top_n_scores,
                     "score_per_document": score_per_document,
                     "candidate_document_matrix": candidate_document_matrix,
@@ -464,11 +466,12 @@ def model_scores_to_dataframe(model_results, true_labels) -> pd.DataFrame:
         ):
             candidates_score, _candidates = candidate_scores
 
+            # TODO: Uniform score value class
             rows = [
                 {
                     "doc": i,
                     "candidate": candidate,
-                    "score": score.item(),
+                    "score": score.item() if isinstance(score, np.ndarray) else score,
                     "in_gold": candidate in doc_gold_kp,
                 }
                 for candidate, score in candidates_score

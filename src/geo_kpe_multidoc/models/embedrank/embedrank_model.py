@@ -629,6 +629,7 @@ class EmbedRank(BaseKPModel):
             # TODO: Not same format as cosine_similarity
             logger.error("TODO: Not same format as cosine_similarity")
         else:
+            # TODO: convert ndarray to list. To be uniform with MDKPERank.
             doc_sim = cosine_similarity(candidate_set_embed, doc_embed.reshape(1, -1))
 
         candidate_score = sorted(

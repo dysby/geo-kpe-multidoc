@@ -1,0 +1,109 @@
+---
+title: "Experiment SemEval2010"
+format: pdf
+editor: visual
+jupyter: python3
+---
+
+```{python}
+#| echo: false
+
+
+files = ["results-SemEval2010-EmbedRank-Longformer-4096-128-global-attention-20230520-1525.pdf",
+"results-SemEval2010-EmbedRank-Longformer-4096-512-global-attention-20230520-1216.pdf",
+"results-SemEval2010-EmbedRank-Longformer-4096-128-global-attention-dilated-128-20230520-0847.pdf",
+"results-SemEval2010-EmbedRank-Longformer-4096-128-mean_in_n_out_context-20230520-0546.pdf",
+"results-SemEval2010-EmbedRank-Longformer-4096-128-20230520-0006.pdf",
+"results-SemEval2010-EmbedRank-Longformer-4096-128-mentions-no-context-20230519-2101.pdf",
+"results-SemEval2010-EmbedRank-Sbert-mentions-no-context-20230519-1531.pdf",
+          ]
+
+import os
+import joblib
+import pandas as pd
+import matplotlib.pyplot as plt
+import math
+
+
+from geo_kpe_multidoc import (GEO_KPE_MULTIDOC_CACHE_PATH,
+                              GEO_KPE_MULTIDOC_OUTPUT_PATH)
+
+from pdf2image import convert_from_path
+from IPython.display import display
+
+images = []
+results = pd.DataFrame()
+
+for f in files:
+    image = convert_from_path(os.path.join(GEO_KPE_MULTIDOC_OUTPUT_PATH, f))
+    images.append(image[0])
+    # display(images[0].resize(( 384, 288)))
+
+    r = pd.read_csv(os.path.join(GEO_KPE_MULTIDOC_OUTPUT_PATH, f[:-3] + "csv"))
+    # r.index = [f.split("/")[-1]]
+    r.index = ["-".join(f.split("-")[1:-2])]
+
+    results = pd.concat([results, r])
+```
+
+
+\tiny 
+```{python}
+#| echo: false
+#| label: tbl-summary
+#| tbl-cap: Performance metrics
+
+styles = [
+    {'selector': 'table', 'props': [('font-size', '8pt')]},
+    {'selector': 'th', 'props': [('font-size', '8pt')]},
+    {'selector': 'td', 'props': [('font-size', '8pt')]}
+]
+
+s = results[["Precision", "Recall", "F1", "MAP", "nDCG","F1_5", "F1_10", "F1_15"]].style.format('{:,.2%}').set_table_styles(styles).highlight_max()
+
+s
+
+# props='color:white;background-color:darkblue'
+
+# summary_styler = df.agg(["sum", "mean"]).style \
+#                    .format(precision=3) \
+#                    .relabel_index(["Sum", "Average"])
+# df.style.format(precision=1).concat(summary_styler)
+
+```
+
+## Candidate score distributions
+
+```{python}
+#| echo: false
+
+# for img in images:
+#   display(img.resize(( 384, 288)))
+spacing = 0
+pdf_width = 8.5 - 2 #(assuming 1-inch margins on each side)
+available_width = pdf_width - 2 * spacing
+
+# Divide the available width equally among the three images:
+image_width = available_width / 2
+
+# Calculate the corresponding desired height to maintain the aspect ratio:
+desired_height = image_width * (288 / 384)
+
+fig, axes = plt.subplots(math.ceil(len(images) / 3), 3, figsize= (28, 8*math.ceil(len(images) / 3)) )
+
+# loop over images
+for ax, img in zip(axes.ravel(), images):
+    ax.imshow(img,  )
+    ax.set_axis_off()
+
+#plt.subplots_adjust(right=0.4)
+plt.tight_layout()
+plt.show()
+```
+
+## Experiments
+
+```{python}
+#| echo: false
+print( *(f[:-4] for f in files), sep="\n")
+```
