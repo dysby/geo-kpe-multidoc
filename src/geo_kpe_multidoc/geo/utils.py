@@ -175,21 +175,28 @@ def geo_associations(
     return (moran_i, geary_c, getis_g)
 
 
-def _score_w_geo_association_I(df: pd.DataFrame, S, N, I, lambda_=1, gamma=1):
-    df["score_w_geo_association_I"] = (
-        df[S] * lambda_ * (df[N] - (df[N] * gamma * df[I]))
-    )
-    return df
+def _score_w_geo_association_I(
+    df: pd.DataFrame, S: str, N: str, I: str = "moran_i", lambda_=1, gamma=1
+):
+    # df["score_w_geo_association_I"] = (
+    score_w_geo_association_I = df[S] * lambda_ * (df[N] - (df[N] * gamma * df[I]))
+    return score_w_geo_association_I
 
 
-def _score_w_geo_association_C(df: pd.DataFrame, S, N, C, lambda_=1, gamma=1):
-    df["score_w_geo_association_C"] = df[S] * lambda_ * df[N] / (gamma * df[C])
-    return df
+def _score_w_geo_association_C(
+    df: pd.DataFrame, S: str, N: str, C: str = "geary_c", lambda_=1, gamma=1
+):
+    # df["score_w_geo_association_C"] = df[S] * lambda_ * df[N] / (gamma * df[C])
+    score_w_geo_association_C = df[S] * lambda_ * df[N] / (gamma * df[C])
+    return score_w_geo_association_C
 
 
-def _score_w_geo_association_G(df: pd.DataFrame, S, N, G, lambda_=1, gamma=1):
-    df["score_w_geo_association_G"] = df[S] * lambda_ * (df[N] * gamma) * df[G]
-    return df
+def _score_w_geo_association_G(
+    df: pd.DataFrame, S: str, N: str, G: str = "getis_g", lambda_=1, gamma=1
+):
+    # df["score_w_geo_association_G"] = df[S] * lambda_ * (df[N] * gamma) * df[G]
+    score_w_geo_association_G = df[S] * lambda_ * (df[N] * gamma) * df[G]
+    return score_w_geo_association_G
 
 
 def scores_weight_matrix(
