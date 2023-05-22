@@ -14,6 +14,9 @@ from geo_kpe_multidoc import GEO_KPE_MULTIDOC_CACHE_PATH
 from geo_kpe_multidoc.datasets.datasets import KPEDataset
 from geo_kpe_multidoc.document import Document
 from geo_kpe_multidoc.models.backend.select_backend import select_backend
+from geo_kpe_multidoc.models.candidate_extract.candidate_extract_model import (
+    KPECandidateExtractionModel,
+)
 from geo_kpe_multidoc.models.pre_processing.pos_tagging import POS_tagger
 from geo_kpe_multidoc.models.pre_processing.pre_processing_utils import (
     remove_punctuation,
@@ -64,16 +67,16 @@ class BaseKPModel:
     Simple abstract class to encapsulate all KP models
     """
 
-    def __init__(self, model):
+    def __init__(self, model, tagger):
         if model != "":
             self.model = select_backend(model)
         self.name = "{}_{}".format(
             str(self.__str__).split()[3], re.sub("-", "_", model)
         )
 
-        self.grammar = ""
+        self.candidate_selection_model = KPECandidateExtractionModel(tagger=tagger)
+
         self.counter = 0
-        self.tagger: POS_tagger = None
 
     def pre_process(self, txt: str = "", **kwargs) -> str:
         """
@@ -83,23 +86,13 @@ class BaseKPModel:
         return remove_whitespaces(txt)[1:]
 
     def _pos_tag_doc(self, doc: Document, stemming, use_cache, **kwargs) -> None:
-        (
-            doc.tagged_text,
-            doc.doc_sentences,
-            doc.doc_sentences_words,
-        ) = self.tagger.pos_tag_text_sents_words(
-            doc.raw_text, use_cache, doc.dataset, doc.id
-        )
-
+        self.candidate_selection_model._pos_tag_doc(doc, use_cache)
         # doc.doc_sentences = [
         #     sent.text for sent in doc.doc_sentences if sent.text.strip()
         # ]
 
-    def extract_candidates(self, tagged_doc, grammar, **kwargs) -> List[str]:
-        """
-        Abract method to extract all candidates
-        """
-        raise NotImplemented
+    def extract_candidates(self, doc, min_len, lemmer, **kwargs) -> List[str]:
+        self.candidate_selection_model(doc, min_len, lemmer, **kwargs)
 
     def top_n_candidates(
         self, doc, candidate_list, top_n, min_len, **kwargs
@@ -122,7 +115,7 @@ class BaseKPModel:
         Concrete method that extracts key-phrases from a given document, with optional arguments
         relevant to its specific functionality
         """
-        self.extract_candidates(doc, min_len, self.grammar, lemmer, **kwargs)
+        self.extract_candidates(doc, min_len, lemmer, **kwargs)
 
         top_n, candidate_set = self.top_n_candidates(
             doc, top_n, min_len, stemmer, **kwargs
@@ -154,3 +147,32 @@ class BaseKPModel:
 
         """
         raise NotImplemented
+
+
+class ExtractionEvaluator(BaseKPModel):
+    def __init__(self, model, tagger):
+        self.candidate_selection_model = KPECandidateExtractionModel(tagger=tagger)
+        self.counter = 0
+
+    def extract_kp_from_doc(
+        self,
+        doc: Document,
+        top_n,
+        min_len,
+        stemmer: Optional[StemmerI] = None,
+        lemmer: Optional[Callable] = None,
+        **kwargs,
+    ) -> Tuple[List[Tuple], List[str]]:
+        """
+        Shallow Model for Candidate Extraction Evalutation
+        """
+        self.extract_candidates(doc, min_len, lemmer, **kwargs)
+
+        top_n = len(doc.candidate_set) if top_n == -1 else top_n
+
+        top_n_scores = [(candidate, 0.5) for candidate in doc.candidate_set[:top_n]]
+
+        logger.info(f"Document #{self.counter} processed")
+        self.counter += 1
+
+        return (top_n_scores, doc.candidate_set)

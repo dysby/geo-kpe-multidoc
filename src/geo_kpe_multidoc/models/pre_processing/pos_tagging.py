@@ -55,7 +55,7 @@ class POS_tagger(ABC):
 
 class POS_tagger_spacy(POS_tagger):
     """
-    Concrete data class for POS tagging using spacy
+    POS tagging using spacy
     """
 
     def __init__(self, model, exclude=["ner", "lemmatizer"]):

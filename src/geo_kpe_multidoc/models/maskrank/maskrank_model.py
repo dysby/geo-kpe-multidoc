@@ -34,18 +34,8 @@ class MaskRank(BaseKPModel):
     """
 
     def __init__(self, model, tagger):
-        super().__init__(model)
-        self.tagger = POS_tagger_spacy(tagger)
-        self.grammar = """  NP: 
-        {<PROPN|NOUN|ADJ>*<PROPN|NOUN>+<ADJ>*}"""
+        super().__init__(model, tagger)
         self.counter = 0
-
-    def update_tagger(self, dataset: str = "") -> None:
-        self.tagger = (
-            POS_tagger_spacy(choose_tagger(dataset))
-            if choose_tagger(dataset) != self.tagger.name
-            else self.tagger
-        )
 
     def extract_kp_from_corpus(
         self,
@@ -62,7 +52,6 @@ class MaskRank(BaseKPModel):
         relevant to its specific functionality
         """
         self.counter = 0
-        self.update_tagger(dataset)
 
         stemmer = PorterStemmer() if stemming else None
         lemmer = choose_lemmatizer(dataset) if lemmatize else None
@@ -168,38 +157,6 @@ class MaskRank(BaseKPModel):
                 doc.candidate_set_embed.append(self.model.embed(masked_doc))
         else:
             RuntimeError("cand_mode not set!")
-
-    def extract_candidates(
-        self,
-        doc: Document,
-        min_len: int = 5,
-        grammar: str = "",
-        lemmer: Callable = None,
-        **kwargs,
-    ):
-        """
-        Method that uses Regex patterns on POS tags to extract unique candidates from a tagged document and
-        stores the sentences each candidate occurs in
-        """
-
-        use_cache = kwargs.get("cache_pos_tags", False)
-        if use_cache:
-            logger.warning("POS Tag Cache in maskrank not implemented")
-        candidate_set = set()
-
-        parser = RegexpParser(grammar)
-        np_trees = list(parser.parse_sents(doc.tagged_text))
-
-        for i in range(len(np_trees)):
-            temp_cand_set = []
-            for subtree in np_trees[i].subtrees(filter=lambda t: t.label() == "NP"):
-                temp_cand_set.append(" ".join(word for word, tag in subtree.leaves()))
-
-            for candidate in temp_cand_set:
-                if len(candidate) > min_len:
-                    candidate_set.add(candidate)
-
-        doc.candidate_set = list(candidate_set)
 
     def embed_n_candidates(
         self, doc: Document, min_len: int, stemmer: Optional[StemmerI] = None, **kwargs

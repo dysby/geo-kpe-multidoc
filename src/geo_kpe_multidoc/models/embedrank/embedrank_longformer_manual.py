@@ -5,6 +5,9 @@ import torch
 from loguru import logger
 
 from geo_kpe_multidoc.document import Document
+from geo_kpe_multidoc.models.candidate_extract.candidate_extract_model import (
+    KPECandidateExtractionModel,
+)
 from geo_kpe_multidoc.models.embedrank.embedrank_model import EmbedRank
 from geo_kpe_multidoc.models.pre_processing.pos_tagging import POS_tagger_spacy
 from geo_kpe_multidoc.models.sentence_embedder import SentenceEmbedder
@@ -17,9 +20,8 @@ class EmbedRankManual(EmbedRank):
     """
 
     def __init__(self, model, tokenizer, tagger, device=None, name=""):
-        self.tagger = POS_tagger_spacy(tagger)
-        self.grammar = """  NP: 
-        {<PROPN|NOUN|ADJ>*<PROPN|NOUN>+<ADJ>*}"""
+        # TODO: init super class
+        self.candidate_selection_model = KPECandidateExtractionModel(tagger=tagger)
         self.counter = 0
 
         if device is None:

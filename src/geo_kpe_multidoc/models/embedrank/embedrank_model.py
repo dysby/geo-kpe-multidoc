@@ -49,18 +49,8 @@ class EmbedRank(BaseKPModel):
     """
 
     def __init__(self, model, tagger):
-        super().__init__(model)
-        self.tagger = POS_tagger_spacy(tagger)
-        self.grammar = """  NP: 
-        {<PROPN|NOUN|ADJ>*<PROPN|NOUN>+<ADJ>*}"""
+        super().__init__(model, tagger)
         self.counter = 0
-
-    def update_tagger(self, dataset: str = "") -> None:
-        self.tagger = (
-            POS_tagger_spacy(choose_tagger(dataset))
-            if choose_tagger(dataset) != self.tagger.name
-            else self.tagger
-        )
 
     # def extract_mdkpe_embeds(
     #     self, doc: Document, top_n, min_len, stemmer=None, lemmer=None, **kwargs
@@ -97,7 +87,6 @@ class EmbedRank(BaseKPModel):
         relevant to its specific functionality
         """
         self.counter = 0
-        self.update_tagger(dataset)
 
         stemmer = PorterStemmer() if stemming else None
         lemmer = choose_lemmatizer(dataset) if lemmatize else None
@@ -369,121 +358,6 @@ class EmbedRank(BaseKPModel):
         mentions = tuple(set(chain(*mentions)))
         logger.debug(f"Global Attention in {len(mentions)} tokens")
         doc.global_attention_mask[:, mentions] = 1
-
-    def extract_candidates(
-        self,
-        doc: Document,
-        min_len: int = 5,
-        grammar: str = None,
-        lemmer_lang: str = None,
-        **kwargs,
-    ):
-        """
-        Method that uses Regex patterns on POS tags to extract unique candidates from a tagged document
-        and stores the sentences each candidate occurs in.
-
-        len(candidate.split(" ")) <= 5 avoid too long candidate phrases
-
-        Baseline
-            NP:
-                {<PROPN|NOUN|ADJ>*<PROPN|NOUN>+<ADJ>*}
-
-        TODO: new grammar
-
-            (({.*}{HYPH}{.*}){NOUN}*)|(({VBG}|{VBN})?{ADJ}*{NOUN}+) Keyphrase-Vectorizers paper ()
-                        r'(({.*}-.*-{.*}){NN}*)|(({VBG}|{VBN})?{JJ}*{NN}+)'
-
-            WORKS! in KeyphraseVectorizer
-                        '((<.*>-+<.*>)<NN>*)|((<VBG|VBN>)?<JJ>*<NN>+)'
-
-            SIFRank grammar '<NN.*|JJ>*<NN.*>'  ,  NN = NOUN, JJ = ADJ
-
-            Automatic Extraction of Relevant Keyphrases for the Study of Issue Competition
-                (<NOUN>+<ADJ>*<PREP>*)?<NOUN>+<ADJ>*
-
-            UKE-CCRank
-
-                GRAMMAR1 = NP:
-                    {<NN.*|JJ>*<NN.*>}  # Adjective(s)(optional) + Noun(s)
-
-                GRAMMAR2 = NP:
-                    {<JJ|VBG>*<NN.*>{0,3}}  # Adjective(s)(optional) + Noun(s)
-
-                GRAMMAR3 = NP:
-                    {<NN.*|JJ|VBG|VBN>*<NN.*>}  # Adjective(s)(optional) + Noun(s)
-
-        Parameters
-        ----------
-                min_len: minimum candidate length (chars)
-
-
-        """
-        cache_pos_tags = kwargs.get("cache_pos_tags", False)
-        self._pos_tag_doc(
-            doc=doc,
-            stemming=None,
-            use_cache=cache_pos_tags,
-        )
-
-        grammar = self.grammar if not grammar else grammar
-
-        doc.candidate_set = set()
-        doc.candidate_mentions = {}
-
-        parser = RegexpParser(grammar)
-
-        # grammar by pos_ or by tag_?
-        # here use use pos_, KeyphraseVectorizers use tag_
-        # A choice between using a coarse-grained tag set that is consistent across languages (.pos),
-        # or a fine-grained tag set (.tag) that is specific to a particular treebank, and hence a particular language.
-
-        np_trees = list(parser.parse_sents(doc.tagged_text))
-
-        for i in range(len(np_trees)):
-            # TODO: validate that candidates in correct form, meaning  " ".join is ok?
-            temp_cand_set = []
-            for subtree in np_trees[i].subtrees(filter=lambda t: t.label() == "NP"):
-                temp_cand_set.append(" ".join(word for word, tag in subtree.leaves()))
-
-            # TODO: how to deal with `re-election campain`? join in line above will result in `re - election campain`.
-            #       Then the model will nevel find this candidate mentions because the original form is lost.
-            #       This is a hack, to handle `-` and `.` in the middle of a candidate.
-            #       Check from `pos_tag_text_sents_words` where `-` are joined rto surrounding nouns.
-
-            for candidate in temp_cand_set:
-                # candidate max number of words is 5 because longer candidates may be overfitting
-                # HACK: DEBUG
-                # if candidate in [
-                #     "cane crops",
-                #     "mile band",
-                #     "casualty",
-                #     "Pounds",
-                #     "Non - Marine Association",
-                #     "Texas border",
-                #     "Roberts",
-                # ]:
-                #     pass
-
-                if len(candidate) > min_len and len(candidate.split(" ")) <= 5:
-                    # TODO: 'we insurer':{'US INSURERS'} but 'eastern us': {'eastern US'} ...
-                    l_candidate = (
-                        lemmatize(candidate, lemmer_lang) if lemmer_lang else candidate
-                    )
-                    doc.candidate_set.add(l_candidate)
-
-                    # Candidate mentions was a list of candidate forms,
-                    # it should be a set (no repetitions), when embedding candidate the mentions
-                    # will be searched and all occorrences will count.
-                    # DONE: keep candidate mentions in lower form. Document is embedded in lower case.
-                    # DONE: candidate forms are kept in original form. The tokenizer of the model is
-                    # responsible handling text case.
-                    doc.candidate_mentions.setdefault(l_candidate, set()).add(
-                        candidate  # candidate.lower()
-                    )
-
-        doc.candidate_set = sorted(list(doc.candidate_set), key=len, reverse=True)
-
-        return doc.candidate_set, doc.candidate_mentions
 
     def embed_candidates(
         self, doc: Document, stemmer, **kwargs

@@ -32,6 +32,7 @@ from geo_kpe_multidoc.evaluation.evaluation_tools import (
 from geo_kpe_multidoc.evaluation.report import plot_score_distribuitions_with_gold
 from geo_kpe_multidoc.models import EmbedRank, FusionModel, MaskRank, MDKPERank
 from geo_kpe_multidoc.models.backend._longmodels import to_longformer_t_v4
+from geo_kpe_multidoc.models.base_KP_model import ExtractionEvaluator
 from geo_kpe_multidoc.models.embedrank.embedrank_longformer_manual import (
     EmbedRankManual,
 )
@@ -93,7 +94,14 @@ def parse_args():
         default="EmbedRank",
         type=str,
         help="The Ranking Model [EmbedRank, EmbedRankManual, MaskRank, and FusionRank], MDKPERank",
-        choices=["EmbedRank", "EmbedRankManual", "MaskRank", "FusionRank", "MDKPERank"],
+        choices=[
+            "EmbedRank",
+            "EmbedRankManual",
+            "MaskRank",
+            "FusionRank",
+            "MDKPERank",
+            "ExtractionEvaluator",
+        ],
     )
     parser.add_argument(
         "--doc_limit",
@@ -326,6 +334,8 @@ def main():
         else:
             ranker = EmbedRank(BACKEND_MODEL_NAME, TAGGER_NAME)
             kpe_model = MDKPERank(ranker)
+    elif args.rank_model == "ExtractionEvaluator":
+        kpe_model = ExtractionEvaluator(BACKEND_MODEL_NAME, TAGGER_NAME)
     elif args.rank_model == "FusionRank":
         kpe_model = FusionModel(
             [
