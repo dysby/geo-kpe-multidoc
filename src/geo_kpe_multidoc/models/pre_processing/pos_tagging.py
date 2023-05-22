@@ -84,6 +84,34 @@ class POS_tagger_spacy(POS_tagger):
             list(doc.sents),
         )
 
+    def pos_tag_text_sents_words_simple(
+        self,
+        text: str = "",
+        use_cache: bool = False,
+        dataset: str = "",
+        doc_id: str = "",
+    ) -> Tuple[List[List[Tuple[str, str]]], List[str], List[List[str]]]:
+        logger.debug(f"Cache:{use_cache} Id:{doc_id}")
+
+        doc = self.tagger(text)
+
+        tagged_text = []
+        doc_word_sents = []
+        doc_sents = []
+
+        for sent in doc.sents:
+            tagged_text_s = []
+            doc_word_sents_s = []
+            for token in sent:
+                tagged_text_s.append((token.text, token.pos_))
+                doc_word_sents_s.append(token.text)
+
+            tagged_text.append(tagged_text_s)
+            doc_word_sents.append(doc_word_sents_s)
+            doc_sents.append(sent.text)
+
+        return (tagged_text, doc_sents, doc_word_sents)
+
     def pos_tag_text_sents_words(
         self,
         text: str = "",

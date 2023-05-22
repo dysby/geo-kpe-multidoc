@@ -2,11 +2,10 @@ import re
 import string
 from typing import Callable, List, Tuple, Union
 
-import simplemma
 import torch
 from keybert.backend._base import BaseEmbedder
 from nltk.corpus import stopwords
-from simplemma import text_lemmatizer
+from simplemma import simplemma, text_lemmatizer
 
 from .stopwords import ENGLISH_STOP_WORDS
 
@@ -115,12 +114,18 @@ def lemmatize(text: Union[str, List], lang: str) -> Union[str, List]:
     #             for line in text
     #         ]
     #     return " ".join([w for w in text_lemmatizer(text, lang) if w != "."]).lower()
+    # if isinstance(text, List):
+    #     return [
+    #         " ".join([w for w in text_lemmatizer(line, lang) if w != "."]).lower()
+    #         for line in text
+    #     ]
+    # return " ".join([w for w in text_lemmatizer(text, lang) if w != "."]).lower()
     if isinstance(text, List):
         return [
-            " ".join([w for w in text_lemmatizer(line, lang) if w != "."]).lower()
+            " ".join([simplemma.lemmatize(w, lang) for w in line.split()]).lower()
             for line in text
         ]
-    return " ".join([w for w in text_lemmatizer(text, lang) if w != "."]).lower()
+    return " ".join([simplemma.lemmatize(w, lang) for w in text.split()]).lower()
 
 
 def filter_special_tokens(input_ids: torch.Tensor) -> List[int]:

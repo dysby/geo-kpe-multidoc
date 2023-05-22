@@ -59,7 +59,8 @@ def postprocess_res_labels(
                                 " ".join(
                                     [
                                         stemmer.stem(w)
-                                        for w in simplemma.simple_tokenizer(kp)
+                                        for w in kp.split()
+                                        # for w in simplemma.simple_tokenizer(kp)
                                     ]
                                 ).lower(),
                                 score,
@@ -71,7 +72,8 @@ def postprocess_res_labels(
                             " ".join(
                                 [
                                     stemmer.stem(w)
-                                    for w in simplemma.simple_tokenizer(kp)
+                                    for w in kp.split()
+                                    # for w in simplemma.simple_tokenizer(kp)
                                 ]
                             ).lower()
                             for kp in doc[1]
@@ -106,7 +108,9 @@ def postprocess_dataset_labels(
                     kp = lemmatize(kp, lemmer)
                 if stemmer:
                     kp = " ".join(
-                        [stemmer.stem(w) for w in simplemma.simple_tokenizer(kp)]
+                        # [stemmer.stem(w) for w in simplemma.simple_tokenizer(kp)]
+                        stemmer.stem(w)
+                        for w in kp.split()
                     )
                 doc_results.append(kp.lower())
             res[dataset].append(doc_results)

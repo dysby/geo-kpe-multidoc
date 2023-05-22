@@ -6,10 +6,6 @@ from loguru import logger
 from nltk import RegexpParser
 
 from geo_kpe_multidoc.document import Document
-from geo_kpe_multidoc.models.pre_processing.language_mapping import (
-    choose_lemmatizer,
-    choose_tagger,
-)
 from geo_kpe_multidoc.models.pre_processing.pos_tagging import POS_tagger_spacy
 from geo_kpe_multidoc.models.pre_processing.pre_processing_utils import lemmatize
 
@@ -62,14 +58,14 @@ class KPECandidateExtractionModel:
         lemmer_lang: str = None,
         **kwargs,
     ):
-        self._extract_candidates(doc, min_len, grammar, lemmer_lang, **kwargs)
+        self._extract_candidates_simple(doc, min_len, grammar, lemmer_lang, **kwargs)
 
     def _pos_tag_doc(self, doc: Document, stemming, use_cache, **kwargs) -> None:
         (
             doc.tagged_text,
             doc.doc_sentences,
             doc.doc_sentences_words,
-        ) = self.tagger.pos_tag_text_sents_words(
+        ) = self.tagger.pos_tag_text_sents_words_simple(
             doc.raw_text, use_cache, doc.dataset, doc.id
         )
 
@@ -89,11 +85,17 @@ class KPECandidateExtractionModel:
                         del sent[i - 1]
         return tagged_doc
 
-    def _extract_candidates_simple(self, doc: Document, **kwargs) -> List[str]:
+    def _extract_candidates_simple(
+        self,
+        doc: Document,
+        min_len: int = 5,
+        grammar: str = None,
+        lemmer_lang: str = None,
+        **kwargs,
+    ) -> List[str]:
         """
         Method that uses Regex patterns on POS tags to extract unique candidates from a tagged document
         """
-
         use_cache = kwargs.get("pos_tag_memory", False)
         self._pos_tag_doc(
             doc=doc,
@@ -101,7 +103,7 @@ class KPECandidateExtractionModel:
             use_cache=use_cache,
         )
 
-        doc.candidate_set = set()
+        candidate_set = set()
         doc.candidate_mentions = {}
 
         np_trees = self.parser.parse_sents(doc.tagged_text)
@@ -113,9 +115,9 @@ class KPECandidateExtractionModel:
                     if tag in self.single_word_grammar:
                         candidate_set.add(word)
 
-        candidate_set = {kp for kp in candidate_set if len(kp.split()) <= 7}
+        candidate_set = {kp.lower() for kp in candidate_set if len(kp.split()) <= 7}
 
-        doc.candidate_set = sorted(list(doc.candidate_set), key=len, reverse=True)
+        doc.candidate_set = sorted(candidate_set, key=len, reverse=True)
 
         return doc.candidate_set, doc.candidate_mentions
 
@@ -219,7 +221,7 @@ class KPECandidateExtractionModel:
 
                     doc.candidate_mentions.setdefault(l_candidate, set()).add(candidate)
 
-        doc.candidate_set = sorted(list(doc.candidate_set), key=len, reverse=True)
+        doc.candidate_set = sorted(doc.candidate_set, key=len, reverse=True)
 
         return doc.candidate_set, doc.candidate_mentions
 
