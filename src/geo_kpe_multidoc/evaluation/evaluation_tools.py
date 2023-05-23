@@ -151,7 +151,7 @@ def evaluate_kp_extraction_base(
             results_kp[f"F1_{k}"] = []
 
         for i in range(len(model_results[dataset])):
-            top_kp = model_results[dataset][i][0]
+            top_kp = [kp for kp, _ in model_results[dataset][i][0]]
             len_top_kp = float(len(top_kp))
 
             candidates = model_results[dataset][i][1]
