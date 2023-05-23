@@ -22,6 +22,7 @@ from geo_kpe_multidoc import (
 from geo_kpe_multidoc.datasets.datasets import DATASETS, load_data
 from geo_kpe_multidoc.evaluation.evaluation_tools import (
     evaluate_kp_extraction,
+    evaluate_kp_extraction_base,
     extract_keyphrases_docs,
     extract_keyphrases_topics,
     model_scores_to_dataframe,
@@ -391,8 +392,6 @@ def main():
         n_docs_limit=args.doc_limit,
         **options,
     )
-    end = time()
-    logger.info("Processing time: {}".format(end - start))
 
     # model_results["dataset_name"][(doc1_top_n, doc1_candidates), (doc2...)]
     assert stemmer != None
@@ -413,8 +412,12 @@ def main():
         xlim=(0, 1),
     )
 
+    performance_metrics = evaluate_kp_extraction_base(model_results, true_labels)
     performance_metrics = evaluate_kp_extraction(model_results, true_labels)
     save(dataset_kpe, performance_metrics, fig, args)
+
+    end = time()
+    logger.info("Processing time: {}".format(end - start))
 
 
 if __name__ == "__main__":
