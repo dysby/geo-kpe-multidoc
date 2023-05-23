@@ -59,6 +59,9 @@ class POS_tagger_spacy(POS_tagger):
     """
 
     def __init__(self, model, exclude=["ner", "lemmatizer"]):
+        is_using_gpu = spacy.prefer_gpu()
+        if is_using_gpu:
+            logger.info("Loading Spacy pipeline with GPU")
         self.tagger = spacy.load(model, exclude=exclude)
         self.name = model
 
