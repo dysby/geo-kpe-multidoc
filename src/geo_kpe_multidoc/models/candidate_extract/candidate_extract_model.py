@@ -111,12 +111,14 @@ class KPECandidateExtractionModel:
         for tree in np_trees:
             for subtree in tree.subtrees(filter=lambda t: t.label() == "NP"):
                 candidate_set.add(" ".join(word for word, tag in subtree.leaves()))
-                for word, tag in subtree.leaves():
-                    if tag in self.single_word_grammar:
-                        candidate_set.add(word)
+                # TODO: add unigram candidates
+                # for word, tag in subtree.leaves():
+                #     if tag in self.single_word_grammar:
+                #         candidate_set.add(word)
 
         # candidate_set = {kp.lower() for kp in candidate_set if len(kp.split()) <= 7}
         # TODO: limit candidate size
+        # TODO: lemmatize and save mentions
         candidate_set = {kp.lower() for kp in candidate_set}
 
         doc.candidate_set = sorted(candidate_set, key=len, reverse=True)
