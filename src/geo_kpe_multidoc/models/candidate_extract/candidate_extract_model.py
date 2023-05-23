@@ -115,7 +115,9 @@ class KPECandidateExtractionModel:
                     if tag in self.single_word_grammar:
                         candidate_set.add(word)
 
-        candidate_set = {kp.lower() for kp in candidate_set if len(kp.split()) <= 7}
+        # candidate_set = {kp.lower() for kp in candidate_set if len(kp.split()) <= 7}
+        # TODO: limit candidate size
+        candidate_set = {kp.lower() for kp in candidate_set}
 
         doc.candidate_set = sorted(candidate_set, key=len, reverse=True)
 

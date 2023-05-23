@@ -394,9 +394,6 @@ def main():
     end = time()
     logger.info("Processing time: {}".format(end - start))
 
-    # output_one_top_cands_geo(data.ids, model_results, true_labels)
-    output_one_top_cands(data.ids, model_results, true_labels)
-
     # model_results["dataset_name"][(doc1_top_n, doc1_candidates), (doc2...)]
     assert stemmer != None
     # Transform keyphrases, thru stemming, for KPE evaluation.
@@ -405,6 +402,9 @@ def main():
     else:
         model_results = postprocess_res_labels(model_results, stemmer, lemmer)
         true_labels = postprocess_dataset_labels(true_labels, stemmer, lemmer)
+
+    # output_one_top_cands_geo(data.ids, model_results, true_labels)
+    output_one_top_cands(data.ids, model_results, true_labels)
 
     dataset_kpe = model_scores_to_dataframe(model_results, true_labels)
     fig = plot_score_distribuitions_with_gold(

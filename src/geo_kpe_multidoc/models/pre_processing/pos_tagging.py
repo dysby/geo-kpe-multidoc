@@ -100,15 +100,34 @@ class POS_tagger_spacy(POS_tagger):
         doc_sents = []
 
         for sent in doc.sents:
-            tagged_text_s = []
-            doc_word_sents_s = []
-            for token in sent:
-                tagged_text_s.append((token.text, token.pos_))
-                doc_word_sents_s.append(token.text)
+            # if "budget based algorithm" in sent.text:
+            #     pass
+            if sent.text.strip():
+                tagged_text_s = []
+                doc_word_sents_s = []
+                for token in sent:
+                    tagged_text_s.append((token.text, token.pos_))
+                    doc_word_sents_s.append(token.text)
 
-            tagged_text.append(tagged_text_s)
-            doc_word_sents.append(doc_word_sents_s)
-            doc_sents.append(sent.text)
+                for i in range(1, len(doc_word_sents_s) - 1):
+                    if i + 1 < len(doc_word_sents_s):
+                        if doc_word_sents_s[i] == "-":
+                            tagged_text_s[i] = (
+                                f"{doc_word_sents_s[i-1]}-{doc_word_sents_s[i+1]}",
+                                "NOUN",
+                            )
+                            del tagged_text_s[i + 1]
+                            del tagged_text_s[i - 1]
+
+                            doc_word_sents_s[
+                                i
+                            ] = f"{doc_word_sents_s[i-1]}-{doc_word_sents_s[i+1]}"
+                            del doc_word_sents_s[i + 1]
+                            del doc_word_sents_s[i - 1]
+
+                tagged_text.append(tagged_text_s)
+                doc_word_sents.append(doc_word_sents_s)
+                doc_sents.append(sent.text)
 
         return (tagged_text, doc_sents, doc_word_sents)
 
