@@ -103,25 +103,47 @@ class KPECandidateExtractionModel:
             use_cache=use_cache,
         )
 
-        candidate_set = set()
+        doc.candidate_set = set()
         doc.candidate_mentions = {}
 
         np_trees = self.parser.parse_sents(doc.tagged_text)
 
         for tree in np_trees:
-            for subtree in tree.subtrees(filter=lambda t: t.label() == "NP"):
-                candidate_set.add(" ".join(word for word, tag in subtree.leaves()))
-                # TODO: add unigram candidates
-                # for word, tag in subtree.leaves():
-                #     if tag in self.single_word_grammar:
-                #         candidate_set.add(word)
+            temp_cand_set = [
+                " ".join(word for word, tag in subtree.leaves())
+                for subtree in tree.subtrees(filter=lambda t: t.label() == "NP")
+            ]
+            # for subtree in tree.subtrees(filter=lambda t: t.label() == "NP"):
+            #     candidate_set.add(" ".join(word for word, tag in subtree.leaves()))
+            # TODO: add unigram candidates
+            # for word, tag in subtree.leaves():
+            #     if tag in self.single_word_grammar:
+            #         candidate_set.add(word)
+
+            # TODO: Join hyphen nouns
+            # TODO: Join " ." nouns
+            temp_cand_set = [
+                candidate.replace(" - ", "-").replace(" .", ".")
+                for candidate in temp_cand_set
+            ]
+
+            for candidate in temp_cand_set:
+                # TODO: Remove min_len and max words
+                #   if len(candidate) > min_len and len(candidate.split(" ")) <= 5:
+                # TODO: 'we insurer':{'US INSURERS'} but 'eastern us': {'eastern US'} ...
+                l_candidate = (
+                    lemmatize(candidate, lemmer_lang) if lemmer_lang else candidate
+                )
+                doc.candidate_set.add(l_candidate)
+
+                doc.candidate_mentions.setdefault(l_candidate, set()).add(candidate)
 
         # candidate_set = {kp.lower() for kp in candidate_set if len(kp.split()) <= 7}
         # TODO: limit candidate size
         # TODO: lemmatize and save mentions
-        candidate_set = {kp.lower() for kp in candidate_set}
+        # candidate_set = {kp.lower() for kp in candidate_set}
 
-        doc.candidate_set = sorted(candidate_set, key=len, reverse=True)
+        doc.candidate_set = sorted(doc.candidate_set, key=len, reverse=True)
 
         return doc.candidate_set, doc.candidate_mentions
 

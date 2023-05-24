@@ -7,12 +7,14 @@ from os import path
 from time import time
 
 import joblib
+import pandas as pd
 import torch
 from loguru import logger
 from matplotlib import pyplot as plt
 from nltk.stem import PorterStemmer
 from pandas import DataFrame
 from sentence_transformers import SentenceTransformer
+from tabulate import tabulate
 
 from geo_kpe_multidoc import (
     GEO_KPE_MULTIDOC_CACHE_PATH,
@@ -413,11 +415,14 @@ def main():
     )
 
     performance_metrics = evaluate_kp_extraction_base(model_results, true_labels)
-    performance_metrics = evaluate_kp_extraction(model_results, true_labels)
+    performance_metrics = pd.concat(
+        [performance_metrics, evaluate_kp_extraction(model_results, true_labels)]
+    )
+    print(tabulate(performance_metrics, headers="keys", floatfmt=".2%"))
     save(dataset_kpe, performance_metrics, fig, args)
 
     end = time()
-    logger.info("Processing time: {}".format(end - start))
+    logger.info(f"Processing time: {end - start:.1f}")
 
 
 if __name__ == "__main__":

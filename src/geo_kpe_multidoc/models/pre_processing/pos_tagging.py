@@ -89,10 +89,12 @@ class POS_tagger_spacy(POS_tagger):
 
     def pos_tag_text_sents_words_simple(
         self,
-        text: str = "",
+        text: str,
         use_cache: bool = False,
         dataset: str = "",
         doc_id: str = "",
+        join_hyphen=False,
+        join_hyphen_only_valid_pos=False,
     ) -> Tuple[List[List[Tuple[str, str]]], List[str], List[List[str]]]:
         logger.debug(f"Cache:{use_cache} Id:{doc_id}")
 
@@ -112,27 +114,72 @@ class POS_tagger_spacy(POS_tagger):
                     tagged_text_s.append((token.text, token.pos_))
                     doc_word_sents_s.append(token.text)
 
-                for i in range(1, len(doc_word_sents_s) - 1):
-                    if i + 1 < len(doc_word_sents_s):
-                        if doc_word_sents_s[i] == "-":
-                            tagged_text_s[i] = (
-                                f"{doc_word_sents_s[i-1]}-{doc_word_sents_s[i+1]}",
-                                "NOUN",
-                            )
-                            del tagged_text_s[i + 1]
-                            del tagged_text_s[i - 1]
-
-                            doc_word_sents_s[
-                                i
-                            ] = f"{doc_word_sents_s[i-1]}-{doc_word_sents_s[i+1]}"
-                            del doc_word_sents_s[i + 1]
-                            del doc_word_sents_s[i - 1]
+                if join_hyphen_only_valid_pos or join_hyphen:
+                    self._join_tokens_by_hyphen(
+                        tagged_text_s, doc_word_sents_s, pos=join_hyphen_only_valid_pos
+                    )
 
                 tagged_text.append(tagged_text_s)
                 doc_word_sents.append(doc_word_sents_s)
                 doc_sents.append(sent.text)
 
         return (tagged_text, doc_sents, doc_word_sents)
+
+    def _join_tokens_by_hyphen(self, tagged_text_s, doc_word_sents_s, pos=False):
+        def _pos():
+            for i in range(1, len(doc_word_sents_s) - 1):
+                if i + 1 < len(doc_word_sents_s):
+                    if doc_word_sents_s[i] == "-" and tagged_text_s[i][1] in [
+                        "NOUN",
+                        "ADJ",
+                        "PROPN",
+                    ]:
+                        tagged_text_s[i] = (
+                            f"{doc_word_sents_s[i-1]}-{doc_word_sents_s[i+1]}",
+                            "NOUN",
+                        )
+                        del tagged_text_s[i + 1]
+                        del tagged_text_s[i - 1]
+
+                        doc_word_sents_s[
+                            i
+                        ] = f"{doc_word_sents_s[i-1]}-{doc_word_sents_s[i+1]}"
+                        del doc_word_sents_s[i + 1]
+                        del doc_word_sents_s[i - 1]
+                    elif doc_word_sents_s[i] == "." and tagged_text_s[i][1] in [
+                        "NOUN",
+                        "ADJ",
+                        "PROPN",
+                    ]:
+                        # join `.` with last token and keep the same tag.
+                        tagged_text_s[i] = (
+                            f"{doc_word_sents_s[i-1]}.",
+                            tagged_text_s[i][1],
+                        )
+                        del tagged_text_s[i - 1]
+
+                        doc_word_sents_s[i] = f"{doc_word_sents_s[i-1]}."
+                        del doc_word_sents_s[i - 1]
+
+        if pos:
+            _pos()
+            return
+
+        for i in range(1, len(doc_word_sents_s) - 1):
+            if i + 1 < len(doc_word_sents_s):
+                if doc_word_sents_s[i] == "-":
+                    tagged_text_s[i] = (
+                        f"{doc_word_sents_s[i-1]}-{doc_word_sents_s[i+1]}",
+                        "NOUN",
+                    )
+                    del tagged_text_s[i + 1]
+                    del tagged_text_s[i - 1]
+
+                    doc_word_sents_s[
+                        i
+                    ] = f"{doc_word_sents_s[i-1]}-{doc_word_sents_s[i+1]}"
+                    del doc_word_sents_s[i + 1]
+                    del doc_word_sents_s[i - 1]
 
     def pos_tag_text_sents_words(
         self,

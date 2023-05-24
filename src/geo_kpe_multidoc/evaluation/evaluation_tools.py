@@ -1,8 +1,7 @@
 import gc
-import json
 import os
 from itertools import islice, zip_longest
-from os import path, write
+from os import path
 from pathlib import Path
 from time import gmtime, strftime
 from typing import Callable, Dict, List, Tuple, Union
@@ -12,7 +11,6 @@ import numpy as np
 import pandas as pd
 import simplemma
 from loguru import logger
-from nltk.stem import PorterStemmer
 from nltk.stem.api import StemmerI
 from tabulate import tabulate
 from tqdm import tqdm
@@ -128,7 +126,8 @@ def evaluate_kp_extraction_base(
     """
     Function that evaluates the model result in each dataset it ran on, considering the true labels of said dataset.
     """
-
+    results = pd.DataFrame()
+    results.index.name = "Dataset"
     stamp = ""
     if "doc_mode" in kwargs and "cand_mode" in kwargs:
         stamp = f'{strftime("%Y_%m_%d %H_%M", gmtime())} {kwargs["doc_mode"]} {kwargs["cand_mode"]} {model_name}'
@@ -237,13 +236,24 @@ def evaluate_kp_extraction_base(
                 res_dic[name] = {}
                 for measure in dic:
                     res_dic[name][measure] = dic[measure]
-
+        row = (
+            pd.concat(
+                [
+                    pd.DataFrame(results_c).mean(axis=0),
+                    pd.DataFrame(results_kp).mean(axis=0),
+                ]
+            )
+            .to_frame()
+            .T
+        )
+        row.index = pd.Index([f"{dataset}_base_eval"])
+        results = pd.concat([results, row])
     # if save:
     #     with open(f"{RESULT_DIR}/raw/{stamp} raw.txt", "a") as f:
     #         f.write(res.rstrip())
 
     print(res)
-    return
+    return results
 
 
 def evaluate_kp_extraction(
@@ -326,7 +336,6 @@ def evaluate_kp_extraction(
         row.index = pd.Index([dataset])
         results = pd.concat([results, row])
 
-    print(tabulate(results, headers="keys"))
     return results
 
 
