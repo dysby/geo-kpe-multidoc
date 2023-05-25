@@ -14,14 +14,11 @@ from geo_kpe_multidoc import GEO_KPE_MULTIDOC_CACHE_PATH
 from geo_kpe_multidoc.datasets.datasets import KPEDataset
 from geo_kpe_multidoc.document import Document
 from geo_kpe_multidoc.models.backend.select_backend import select_backend
-from geo_kpe_multidoc.models.candidate_extract.candidate_extract_model import (
-    KPECandidateExtractionModel,
-)
+from geo_kpe_multidoc.models.candidate_extract.candidate_extract_model import \
+    KPECandidateExtractionModel
 from geo_kpe_multidoc.models.pre_processing.pos_tagging import POS_tagger
 from geo_kpe_multidoc.models.pre_processing.pre_processing_utils import (
-    remove_punctuation,
-    remove_whitespaces,
-)
+    remove_punctuation, remove_whitespaces)
 
 KPEScore = Tuple[str, float]
 
@@ -76,7 +73,7 @@ class BaseKPModel:
 
         self.candidate_selection_model = KPECandidateExtractionModel(tagger=tagger)
 
-        self.counter = 0
+        self.counter = 1
 
     def pre_process(self, txt: str = "", **kwargs) -> str:
         """
@@ -92,7 +89,9 @@ class BaseKPModel:
         # ]
 
     def extract_candidates(self, doc, min_len, lemmer, **kwargs) -> List[str]:
-        self.candidate_selection_model(doc, min_len, lemmer, **kwargs)
+        self.candidate_selection_model(
+            doc=doc, min_len=min_len, lemmer_lang=lemmer, **kwargs
+        )
 
     def top_n_candidates(
         self, doc, candidate_list, top_n, min_len, **kwargs
@@ -152,7 +151,7 @@ class BaseKPModel:
 class ExtractionEvaluator(BaseKPModel):
     def __init__(self, model, tagger):
         self.candidate_selection_model = KPECandidateExtractionModel(tagger=tagger)
-        self.counter = 0
+        self.counter = 1
 
     def extract_kp_from_doc(
         self,

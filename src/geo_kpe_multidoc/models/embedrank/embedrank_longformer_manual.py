@@ -22,7 +22,7 @@ class EmbedRankManual(EmbedRank):
     def __init__(self, model, tokenizer, tagger, device=None, name=""):
         # TODO: init super class
         self.candidate_selection_model = KPECandidateExtractionModel(tagger=tagger)
-        self.counter = 0
+        self.counter = 1
 
         if device is None:
             device = "cuda" if torch.cuda.is_available() else "cpu"
