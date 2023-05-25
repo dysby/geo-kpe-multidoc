@@ -4,24 +4,13 @@ from time import time
 from typing import Callable, List, Optional, Set, Tuple
 
 import numpy as np
-import torch
 from loguru import logger
-from nltk import RegexpParser
 from nltk.stem import PorterStemmer
 from nltk.stem.api import StemmerI
 from sklearn.metrics.pairwise import cosine_similarity
 
 from geo_kpe_multidoc.document import Document
 from geo_kpe_multidoc.models.base_KP_model import BaseKPModel
-from geo_kpe_multidoc.models.pre_processing.language_mapping import (
-    choose_lemmatizer,
-    choose_tagger,
-)
-from geo_kpe_multidoc.models.pre_processing.pos_tagging import POS_tagger_spacy
-from geo_kpe_multidoc.models.pre_processing.pre_processing_utils import (
-    remove_punctuation,
-    remove_whitespaces,
-)
 
 
 class MaskRank(BaseKPModel):

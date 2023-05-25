@@ -26,6 +26,7 @@ DATASETS = {
         "zip_file": "110-PT-BN-KP.zip",
         "language": "pt",
         "tagger": "pt_core_news_lg",
+        # TODO: why pt_core_news_lg not trf?
     },
     "500N-KPCrowd": {
         "zip_file": "500N-KPCrowd-v1.1.zip",

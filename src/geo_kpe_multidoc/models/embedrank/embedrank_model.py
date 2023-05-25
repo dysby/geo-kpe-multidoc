@@ -12,28 +12,19 @@ import torch
 from keybert._mmr import mmr
 from keybert.backend._base import BaseEmbedder
 from loguru import logger
-from nltk import RegexpParser
-from nltk.stem import PorterStemmer
 from nltk.stem.api import StemmerI
 from sklearn.metrics.pairwise import cosine_similarity
 
 from geo_kpe_multidoc import GEO_KPE_MULTIDOC_CACHE_PATH
 from geo_kpe_multidoc.document import Document
 from geo_kpe_multidoc.models.base_KP_model import BaseKPModel, find_occurrences
-from geo_kpe_multidoc.models.pre_processing.language_mapping import (
-    choose_lemmatizer,
-    choose_tagger,
-)
-from geo_kpe_multidoc.models.pre_processing.pos_tagging import POS_tagger_spacy
 from geo_kpe_multidoc.models.pre_processing.post_processing_utils import (
     z_score_normalization,
 )
 from geo_kpe_multidoc.models.pre_processing.pre_processing_utils import (
     filter_special_tokens,
-    lemmatize,
     tokenize_hf,
 )
-from geo_kpe_multidoc.utils.IO import read_from_file
 
 
 class EmbedRank(BaseKPModel):
@@ -51,52 +42,6 @@ class EmbedRank(BaseKPModel):
     def __init__(self, model, tagger):
         super().__init__(model, tagger)
         self.counter = 0
-
-    def extract_kp_from_corpus(
-        self,
-        corpus,
-        dataset: str = "DUC",
-        top_n: int = 15,
-        min_len: int = 5,
-        stemming: bool = False,
-        lemmatize: bool = False,
-        **kwargs,
-    ) -> List[List[Tuple]]:
-        """
-        Concrete method that extracts key-phrases from a list of given documents, with optional arguments
-        relevant to its specific functionality
-        """
-        self.counter = 0
-
-        stemmer = PorterStemmer() if stemming else None
-        lemmer = choose_lemmatizer(dataset) if lemmatize else None
-
-        return [
-            self.extract_kp_from_doc(doc, top_n, min_len, stemmer, lemmer, **kwargs)
-            for doc, _ in corpus
-        ]
-
-    def embed_sents_words(self, doc, stemmer: Optional[StemmerI] = None, memory=False):
-        """
-        Embed each word in the sentence by it self
-        Non-conterxtualized embedding.
-        Embed_sent_words (Use only on non-contextualized candicate embedding mode, not used).
-        TODO: validate, not used, we always want contexttualized embeddings of the candidades.
-        TODO: correct cache/memory usage
-        """
-        if not memory:
-            # self.doc_sents_words_embed = []
-            doc.doc_sents_words_embed = [
-                self.model.embed(stemmer.stem(word)) for word in doc.doc_sent_words
-            ]
-            # for i in range(len(self.doc_sents_words)):
-            #     self.doc_sents_words_embed.append(
-            #         self.embed(stemmer.stem(doc.doc_sents_words[i]))
-            #         if stemmer
-            #         else model.embed(doc.doc_sents_words[i])
-            #     )
-        else:
-            doc.doc_sents_words_embed = read_from_file(f"{memory}/{doc.id}")
 
     def _embed_doc(
         self,
@@ -480,23 +425,22 @@ class EmbedRank(BaseKPModel):
                 top_n=valid_top_n,
                 diversity=mmr_diversity,
             )
-            # TODO: Not same format as cosine_similarity
-            logger.error("TODO: Not same format as cosine_similarity")
+            candidate_score = doc_sim
         else:
             # TODO: convert ndarray to list. To be uniform with MDKPERank.
             doc_sim = cosine_similarity(candidate_set_embed, doc_embed.reshape(1, -1))
 
-        candidate_score = sorted(
-            [
-                (candidate, candidate_doc_sim)
-                for (candidate, candidate_doc_sim) in zip(candidate_set, doc_sim)
-            ],
-            # [(candidate_set[i], doc_sim[i][0]) for i in range(len(doc_sim))],
-            reverse=True,
-            key=itemgetter(1),
-        )
+            candidate_score = sorted(
+                [
+                    (candidate, candidate_doc_sim)
+                    for (candidate, candidate_doc_sim) in zip(candidate_set, doc_sim)
+                ],
+                # [(candidate_set[i], doc_sim[i][0]) for i in range(len(doc_sim))],
+                reverse=True,
+                key=itemgetter(1),
+            )
 
-        return candidate_score[:top_n], [candidate[0] for candidate in candidate_score]
+        return candidate_score[:top_n], candidate_set
 
     def top_n_candidates(
         self,
@@ -510,9 +454,9 @@ class EmbedRank(BaseKPModel):
         cand_mode = kwargs.get("cand_mode", "")
         post_processing = kwargs.get("post_processing", [""])
         # TODO: remove? use_cache = kwargs.get("embed_memory", False)
-        if cand_mode != "" and cand_mode != "AvgContext":
-            logger.error(f"Getting Embeddings for word sentence (not used?)")
-            # self.embed_sents_words(doc, stemmer, use_cache)
+        # if cand_mode != "" and cand_mode != "AvgContext":
+        #     logger.error(f"Getting Embeddings for word sentence (not used?)")
+        #     self.embed_sents_words(doc, stemmer, use_cache)
 
         self.embed_candidates(doc, stemmer, **kwargs)
 

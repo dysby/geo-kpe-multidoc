@@ -1,10 +1,14 @@
+from os import path
+from pathlib import Path
 from typing import Callable, List, Set, Tuple
 
+import joblib
 import numpy as np
 import tqdm
 from loguru import logger
 from nltk import RegexpParser
 
+from geo_kpe_multidoc import GEO_KPE_MULTIDOC_CACHE_PATH
 from geo_kpe_multidoc.document import Document
 from geo_kpe_multidoc.models.pre_processing.pos_tagging import POS_tagger_spacy
 from geo_kpe_multidoc.models.pre_processing.pre_processing_utils import lemmatize
@@ -88,7 +92,7 @@ class KPECandidateExtractionModel:
     def _extract_candidates_simple(
         self,
         doc: Document,
-        min_len: int = 0,
+        min_len: int = 4,
         grammar: str = None,
         lemmer_lang: str = None,
         **kwargs,
@@ -96,6 +100,17 @@ class KPECandidateExtractionModel:
         """
         Method that uses Regex patterns on POS tags to extract unique candidates from a tagged document
         """
+
+        cache_candidate_selection = kwargs.get("cache_candidate_selection", False)
+        if cache_candidate_selection:
+            doc.candidate_set, doc.candidate_mentions = self._read_cache(
+                doc.dataset, doc.id
+            )
+            if len(doc.candidate_set) > 0 and (
+                len(doc.candidate_set) == len(doc.candidate_mentions)
+            ):
+                return doc.candidate_set, doc.candidate_mentions
+
         use_cache = kwargs.get("pos_tag_memory", False)
         self._pos_tag_doc(
             doc=doc,
@@ -144,6 +159,11 @@ class KPECandidateExtractionModel:
         # candidate_set = {kp.lower() for kp in candidate_set}
 
         doc.candidate_set = sorted(doc.candidate_set, key=len, reverse=True)
+
+        if cache_candidate_selection:
+            self._save_cache(
+                doc.dataset, doc.doc_id, doc.candidate_set, doc.candidate_mentions
+            )
 
         return doc.candidate_set, doc.candidate_mentions
 
@@ -194,6 +214,7 @@ class KPECandidateExtractionModel:
                 min_len: minimum candidate length (chars)
         """
         cache_pos_tags = kwargs.get("cache_pos_tags", False)
+
         self._pos_tag_doc(
             doc=doc,
             stemming=None,
@@ -309,3 +330,24 @@ class KPECandidateExtractionModel:
                     candidate_set.add(candidate)
 
         doc.candidate_set = list(candidate_set)
+
+    def _read_cache(self, dataset, doc_id) -> Tuple[set, dict]:
+        cache_file_path = path.join(
+            GEO_KPE_MULTIDOC_CACHE_PATH,
+            "candidates" f"{dataset}-{doc_id}-candidates.cache",
+        )
+        if path.exists(cache_file_path):
+            (candidate_set, candidate_mentions) = joblib.load(cache_file_path)
+            logger.debug(f"Load Candidates and Mentions from cache {cache_file_path}")
+            return (candidate_set, candidate_mentions)
+        else:
+            return (set(), {})
+
+    def _save_cache(self, dataset, doc_id, candidate_set, candidate_mentions):
+        cache_file_path = path.join(
+            GEO_KPE_MULTIDOC_CACHE_PATH,
+            "candidates" f"{dataset}-{doc_id}-candidates.cache",
+        )
+        Path(cache_file_path).parent.mkdir(exist_ok=True, parents=True)
+        joblib.dump((candidate_set, candidate_mentions), cache_file_path)
+        logger.info(f"Save {doc_id} Keyphrase Candidates in {cache_file_path}")
