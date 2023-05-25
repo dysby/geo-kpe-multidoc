@@ -142,10 +142,12 @@ class KPECandidateExtractionModel:
 
             # TODO: Join hyphen nouns
             # TODO: Join " ." nouns
-            temp_cand_set = [
-                candidate.replace(" - ", "-").replace(" .", ".")
-                for candidate in temp_cand_set
-            ]
+            debug_hypen = False
+            if debug_hypen:
+                temp_cand_set = [
+                    candidate.replace(" - ", "-").replace(" .", ".")
+                    for candidate in temp_cand_set
+                ]
 
             for candidate in temp_cand_set:
                 # TODO: Remove min_len and max words

@@ -122,10 +122,14 @@ def lemmatize(text: Union[str, List], lang: str) -> Union[str, List]:
     # return " ".join([w for w in text_lemmatizer(text, lang) if w != "."]).lower()
     if isinstance(text, List):
         return [
-            " ".join([simplemma.lemmatize(w, lang) for w in line.split()]).lower()
+            " ".join(
+                [simplemma.lemmatize(w, lang, greedy=True) for w in line.split()]
+            ).lower()
             for line in text
         ]
-    return " ".join([simplemma.lemmatize(w, lang) for w in text.split()]).lower()
+    return " ".join(
+        [simplemma.lemmatize(w, lang, greedy=True) for w in text.split()]
+    ).lower()
 
 
 def filter_special_tokens(input_ids: torch.Tensor) -> List[int]:
