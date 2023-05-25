@@ -108,10 +108,16 @@ def parse_args():
     )
     parser.add_argument(
         "--doc_limit",
-        default="-1",
+        default=-1,
         type=int,
         help="Max number of documents to process from Dataset.",
     )
+    parser.add_argument(
+        "--doc_name",
+        type=str,
+        help="Doc ID to test from Dataset.",
+    )
+
     parser.add_argument(
         "--top_n",
         default="-1",
@@ -382,6 +388,8 @@ def main():
     logger.info(f"KP extraction for {len(data)} examples.")
     logger.info(f"Options: {options}")
 
+    n_docs_limit = args.doc_name if args.doc_name else args.doc_limit
+
     # -------------------------------------------------
     # --------------- Run Experiment ------------------
     # -------------------------------------------------
@@ -391,7 +399,7 @@ def main():
         top_n=args.top_n,
         min_len=5,
         lemmer=lemmer,
-        n_docs_limit=args.doc_limit,
+        n_docs_limit=n_docs_limit,
         **options,
     )
 

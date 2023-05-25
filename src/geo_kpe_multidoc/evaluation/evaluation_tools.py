@@ -454,7 +454,10 @@ def extract_keyphrases_docs(
     preprocessing = kwargs.get("preprocessing", [])
     cache_results = kwargs.get("cache_results", False)
 
-    if n_docs_limit == -1:
+    if isinstance(n_docs_limit, str):
+        loader = [dataset[dataset.ids.index(n_docs_limit)]]
+        n_docs_limit = 1
+    elif n_docs_limit == -1:
         loader = dataset
     else:
         loader = islice(dataset, n_docs_limit)

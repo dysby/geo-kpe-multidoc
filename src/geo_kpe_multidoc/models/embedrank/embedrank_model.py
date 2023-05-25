@@ -52,26 +52,6 @@ class EmbedRank(BaseKPModel):
         super().__init__(model, tagger)
         self.counter = 0
 
-    # def extract_mdkpe_embeds(
-    #     self, doc: Document, top_n, min_len, stemmer=None, lemmer=None, **kwargs
-    # ) -> Tuple[Document, List[np.ndarray], List[str]]:
-    #     use_cache = kwargs.get("pos_tag_memory", False)
-
-    #     self.pos_tag_doc(
-    #         doc=doc,
-    #         stemming=None,
-    #         use_cache=use_cache,
-    #     )
-    #     self.extract_candidates(doc, min_len, self.grammar, lemmer)
-
-    #     cand_embeds, candidate_set = self.embed_n_candidates(doc, stemmer, **kwargs)
-
-    #     logger.info(f"Document #{self.counter} processed")
-    #     self.counter += 1
-    #     torch.cuda.empty_cache()
-
-    #     return (doc, cand_embeds, candidate_set)
-
     def extract_kp_from_corpus(
         self,
         corpus,

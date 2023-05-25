@@ -88,7 +88,7 @@ class KPECandidateExtractionModel:
     def _extract_candidates_simple(
         self,
         doc: Document,
-        min_len: int = 5,
+        min_len: int = 0,
         grammar: str = None,
         lemmer_lang: str = None,
         **kwargs,
@@ -129,14 +129,14 @@ class KPECandidateExtractionModel:
 
             for candidate in temp_cand_set:
                 # TODO: Remove min_len and max words
-                #   if len(candidate) > min_len and len(candidate.split(" ")) <= 5:
-                # TODO: 'we insurer':{'US INSURERS'} but 'eastern us': {'eastern US'} ...
-                l_candidate = (
-                    lemmatize(candidate, lemmer_lang) if lemmer_lang else candidate
-                )
-                doc.candidate_set.add(l_candidate)
+                if len(candidate) > min_len:  # and len(candidate.split(" ")) <= 5:
+                    # TODO: 'we insurer':{'US INSURERS'} but 'eastern us': {'eastern US'} ...
+                    l_candidate = (
+                        lemmatize(candidate, lemmer_lang) if lemmer_lang else candidate
+                    )
+                    doc.candidate_set.add(l_candidate)
 
-                doc.candidate_mentions.setdefault(l_candidate, set()).add(candidate)
+                    doc.candidate_mentions.setdefault(l_candidate, set()).add(candidate)
 
         # candidate_set = {kp.lower() for kp in candidate_set if len(kp.split()) <= 7}
         # TODO: limit candidate size
