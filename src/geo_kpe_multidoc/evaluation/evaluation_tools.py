@@ -440,7 +440,7 @@ def extract_keyphrases_docs(
     dataset: KPEDataset,
     model: Union[EmbedRank, MaskRank, EmbedRankManual],
     top_n=20,
-    min_len=5,
+    min_len=0,
     lemmer=None,
     n_docs_limit=-1,
     **kwargs,

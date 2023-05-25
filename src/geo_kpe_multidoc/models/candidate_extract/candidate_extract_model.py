@@ -70,7 +70,12 @@ class KPECandidateExtractionModel:
             doc.doc_sentences,
             doc.doc_sentences_words,
         ) = self.tagger.pos_tag_text_sents_words_simple(
-            doc.raw_text, use_cache, doc.dataset, doc.id
+            doc.raw_text,
+            use_cache,
+            doc.dataset,
+            doc.id,
+            join_hyphen=False,
+            join_hyphen_only_valid_pos=False,
         )
 
     def __pos_tag_doc(
@@ -92,7 +97,7 @@ class KPECandidateExtractionModel:
     def _extract_candidates_simple(
         self,
         doc: Document,
-        min_len: int = 4,
+        min_len: int = 0,
         grammar: str = None,
         lemmer_lang: str = None,
         **kwargs,

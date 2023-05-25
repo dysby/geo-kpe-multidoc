@@ -164,6 +164,11 @@ def parse_args():
         help="Save/Load doc POS Tagging in cache directory.",
     )
     parser.add_argument(
+        "--cache_candidate_selection",
+        action="store_true",
+        help="Save/Load doc Candidat in cache directoryy.",
+    )
+    parser.add_argument(
         "--cache_embeddings",
         action="store_true",
         help="Save/Load doc and candidates embeddings in cache directory.",
@@ -178,6 +183,11 @@ def parse_args():
         type=int,
         default=512,
         help="Longformer: sliding chunk Attention Window size",
+    )
+    parser.add_argument(
+        "--min_len",
+        type=int,
+        help="Candidate keyphrase minimum length",
     )
     parser.add_argument(
         "--longformer_only_copy_to_max_position",
@@ -246,6 +256,9 @@ def _args_to_options(args):
         # options["use_cache"] = True
         # options["pos_tag_cache"] = True
 
+    if args.cache_candidate_selection:
+        options["cache_candidate_selection"] = True
+
     if args.cache_embeddings:
         options["cache_embeddings"] = True
 
@@ -254,6 +267,9 @@ def _args_to_options(args):
 
     if args.candidate_mode:
         options["cand_mode"] = args.candidate_mode
+
+    if args.min_len:
+        options["min_len"] = args.min_len
 
     return options
 
@@ -397,7 +413,6 @@ def main():
         data,
         kpe_model,
         top_n=args.top_n,
-        min_len=5,
         lemmer=lemmer,
         n_docs_limit=n_docs_limit,
         **options,
