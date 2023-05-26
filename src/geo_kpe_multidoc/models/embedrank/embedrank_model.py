@@ -90,7 +90,9 @@ class EmbedRank(BaseKPModel):
 
             filt_ids = filter_special_tokens(tokenized_candidate["input_ids"])
 
-            mentions += find_occurrences(filt_ids, token_ids)
+            # Should not be Empty after filter
+            if filt_ids:
+                mentions += find_occurrences(filt_ids, token_ids)
             # mentions_counts.append(len(mentions))
 
         # mentions_counts = mentions_counts[:1] + [
