@@ -5,12 +5,9 @@ from typing import List, Tuple
 
 import joblib
 import spacy
-import torch
 from loguru import logger
 
 from geo_kpe_multidoc import GEO_KPE_MULTIDOC_CACHE_PATH
-from geo_kpe_multidoc.document import Document
-from geo_kpe_multidoc.utils.IO import read_from_file, write_to_file
 
 
 class POS_tagger(ABC):

@@ -54,6 +54,11 @@ class KPECandidateExtractionModel:
         self.parser = RegexpParser(self.grammar)
         self.single_word_grammar = {"PROPN", "NOUN", "ADJ"}
 
+        self.join_hyphen_in_candidate = False
+        # Or use in POS Tagging class (pos_tagging.py)
+        self.join_hyphen_pos = False
+        self.join_hyphen_pos_valid = False
+
     def __call__(
         self,
         doc: Document,
@@ -74,8 +79,8 @@ class KPECandidateExtractionModel:
             use_cache,
             doc.dataset,
             doc.id,
-            join_hyphen=False,
-            join_hyphen_only_valid_pos=False,
+            join_hyphen=self.join_hyphen_pos,
+            join_hyphen_only_valid_pos=self.join_hyphen_pos_valid,
         )
 
     def __pos_tag_doc(
@@ -142,8 +147,7 @@ class KPECandidateExtractionModel:
 
             # TODO: Join hyphen nouns
             # TODO: Join " ." nouns
-            debug_hypen = False
-            if debug_hypen:
+            if self.join_hyphen_in_candidate:
                 temp_cand_set = [
                     candidate.replace(" - ", "-").replace(" .", ".")
                     for candidate in temp_cand_set

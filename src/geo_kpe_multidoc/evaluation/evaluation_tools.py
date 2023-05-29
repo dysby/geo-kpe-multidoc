@@ -102,8 +102,8 @@ def postprocess_dataset_labels(
         for i in range(len(corpus_true_labels[dataset])):
             doc_results = []
             for kp in corpus_true_labels[dataset][i]:
-                if lemmer:
-                    kp = lemmatize(kp, lemmer)
+                # if lemmer:
+                #     kp = lemmatize(kp, lemmer)
                 if stemmer:
                     kp = " ".join(
                         # [stemmer.stem(w) for w in simplemma.simple_tokenizer(kp)]

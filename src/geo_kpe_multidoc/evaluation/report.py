@@ -1,12 +1,37 @@
-import itertools
 import os
 from datetime import datetime
+from itertools import chain, zip_longest
 
 import matplotlib.pyplot as plt
 import pandas as pd
 import seaborn as sb
+from tabulate import tabulate
 
 from geo_kpe_multidoc import GEO_KPE_MULTIDOC_OUTPUT_PATH
+
+
+def diff_greedy(doc_idx):
+    kpe = pd.DataFrame()
+    kpe_lemma = pd.DataFrame()
+    kpe_greedy = pd.DataFrame()
+    print(
+        tabulate(
+            [
+                (c1, c2, c3)
+                for c1, c2, c3 in zip_longest(
+                    kpe[(kpe.doc == doc_idx) & (kpe.in_gold == True)]["candidate"],
+                    kpe_lemma[(kpe_lemma.doc == doc_idx) & (kpe_lemma.in_gold == True)][
+                        "candidate"
+                    ],
+                    kpe_greedy[
+                        (kpe_greedy.doc == doc_idx) & (kpe_greedy.in_gold == True)
+                    ]["candidate"],
+                    fillvalue="-",
+                )
+            ],
+            headers=["base", "lemma", "greedy"],
+        )
+    )
 
 
 def plot_score_distribuitions_with_gold(
@@ -123,7 +148,7 @@ def add_gold_label(df, gold):
     Mutate dataframe `df` adding a label column if candidate is in the gold set.
     """
     gold_idx = pd.MultiIndex.from_tuples(
-        itertools.chain.from_iterable(
+        chain.from_iterable(
             df.index[
                 df.index.isin([topic], level=0) & df.index.isin(gold[topic], level=1)
             ]
@@ -133,7 +158,7 @@ def add_gold_label(df, gold):
     )
 
     not_gold_idx = pd.MultiIndex.from_tuples(
-        itertools.chain.from_iterable(
+        chain.from_iterable(
             df.index[
                 df.index.isin([topic], level=0) & ~df.index.isin(gold[topic], level=1)
             ]
