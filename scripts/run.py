@@ -145,7 +145,7 @@ def parse_args():
         choices=["weighted", "harmonic"],
     )
     parser.add_argument(
-        "--stemming", action="store_true", help="bool flag to use stemming"
+        "--no_stemming", action="store_true", help="bool flag to use stemming"
     )
     parser.add_argument(
         "--lemmatization", action="store_true", help="boolean flag to use lemmatization"
@@ -390,7 +390,7 @@ def main():
     else:
         extract_eval = extract_keyphrases_docs
 
-    stemmer = PorterStemmer() if args.stemming else None
+    stemmer = None if args.no_stemming else PorterStemmer()
     lemmer = DATASETS[ds_name].get("language") if args.lemmatization else None
 
     if not lemmer:
