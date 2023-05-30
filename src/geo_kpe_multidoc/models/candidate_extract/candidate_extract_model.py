@@ -158,7 +158,9 @@ class KPECandidateExtractionModel:
                 if len(candidate) > min_len:  # and len(candidate.split(" ")) <= 5:
                     # TODO: 'we insurer':{'US INSURERS'} but 'eastern us': {'eastern US'} ...
                     l_candidate = (
-                        lemmatize(candidate, lemmer_lang) if lemmer_lang else candidate
+                        lemmatize(candidate, lemmer_lang)
+                        if lemmer_lang
+                        else candidate.lower()
                     )
                     doc.candidate_set.add(l_candidate)
 
