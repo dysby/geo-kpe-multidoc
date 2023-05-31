@@ -25,6 +25,7 @@ from geo_kpe_multidoc.models.pre_processing.pre_processing_utils import (
     filter_special_tokens,
     tokenize_hf,
 )
+from geo_kpe_multidoc.models.sentence_embedder import LongformerSentenceEmbedder
 
 
 class EmbedRank(BaseKPModel):
@@ -309,17 +310,23 @@ class EmbedRank(BaseKPModel):
             if cached:
                 return cached
 
+        # TODO: simplify subclassing tokenization
         # Set Global Attention CLS token for all modes
         if isinstance(self.model, BaseEmbedder):
             # original tokenization by KeyBert/SentenceTransformer
             tokenized_doc = tokenize_hf(doc.raw_text, self.model)
-        else:
+        elif isinstance(self.model, LongformerSentenceEmbedder):
             # tokenize via local SentenceEmbedder Class
             tokenized_doc = self.model.tokenize(
                 doc.raw_text,
                 padding=True,
                 pad_to_multiple_of=self.model.attention_window,
             )
+        else:
+            # BIGBIRD
+            # tokenize via local SentenceEmbedder Class
+            tokenized_doc = self.model.tokenize(doc.raw_text)
+
         doc.token_ids = tokenized_doc["input_ids"].squeeze().tolist()
         doc.global_attention_mask = torch.zeros(tokenized_doc["input_ids"].shape)
         doc.global_attention_mask[:, 0] = 1  # CLS token
