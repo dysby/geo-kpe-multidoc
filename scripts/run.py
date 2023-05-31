@@ -35,6 +35,9 @@ from geo_kpe_multidoc.evaluation.evaluation_tools import (
 from geo_kpe_multidoc.evaluation.report import plot_score_distribuitions_with_gold
 from geo_kpe_multidoc.models import EmbedRank, FusionModel, MaskRank, MDKPERank
 from geo_kpe_multidoc.models.backend._longmodels import to_longformer_t_v4
+from geo_kpe_multidoc.models.backend.roberta2longformer.roberta2bigbird import (
+    convert_roberta_to_bigbird,
+)
 from geo_kpe_multidoc.models.base_KP_model import ExtractionEvaluator
 from geo_kpe_multidoc.models.embedrank.embedrank_longformer_manual import (
     EmbedRankManual,
@@ -90,7 +93,7 @@ def parse_args():
         "--embed_model",
         type=str,
         help="Defines the embedding model to use",
-        default="longformer-paraphrase-multilingual-mpnet-base-v2",
+        default="paraphrase-multilingual-mpnet-base-v2",
     )
     parser.add_argument(
         "--rank_model",
@@ -323,6 +326,28 @@ def generateLongformerRanker(backend_model_name, tagger_name, args):
     return kpe_model
 
 
+def generateBigBirdRanker(backend_model_name, tagger_name, args):
+    # Generate BigBird from Sentence Transformer
+    new_max_pos = args.longformer_max_length
+
+    base_name = backend_model_name.split("/")[-1]
+
+    model_name = f"bigbird_{base_name}_{new_max_pos}"
+
+    sbert = SentenceTransformer(backend_model_name)
+
+    bigbird_model, bigbird_tokenizer = convert_roberta_to_bigbird(
+        sbert._modules["0"].auto_model, sbert.tokenizer, new_max_pos
+    )
+
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+    kpe_model = EmbedRankManual(
+        bigbird_model, bigbird_tokenizer, tagger_name, device=device, name=model_name
+    )
+    return kpe_model
+
+
 def main():
     args = parse_args()
 
@@ -345,9 +370,16 @@ def main():
     )
 
     if args.rank_model == "EmbedRank":
-        kpe_model = EmbedRank(BACKEND_MODEL_NAME, TAGGER_NAME)
-    elif args.rank_model == "EmbedRankManual":
-        kpe_model = generateLongformerRanker(BACKEND_MODEL_NAME, TAGGER_NAME, args)
+        if "[longformer]" in BACKEND_MODEL_NAME:
+            kpe_model = generateLongformerRanker(
+                BACKEND_MODEL_NAME.replace("[longformer]", ""), TAGGER_NAME, args
+            )
+        elif "[bigbird]" in BACKEND_MODEL_NAME:
+            kpe_model = generateLongformerRanker(
+                BACKEND_MODEL_NAME.replace("[bigbird]", ""), TAGGER_NAME, args
+            )
+        else:
+            kpe_model = EmbedRank(BACKEND_MODEL_NAME, TAGGER_NAME)
     elif args.rank_model == "MaskRank":
         kpe_model = MaskRank(BACKEND_MODEL_NAME, TAGGER_NAME)
     elif args.rank_model == "MDKPERank":
@@ -372,9 +404,7 @@ def main():
         )
     else:
         # raise ValueError("Model selection must be one of [EmbedRank, MaskRank].")
-        logger.critical(
-            "Model selection must be one of [EmbedRank, MaskRank, MDKPERank]."
-        )
+        logger.critical("Unknown KPE Model type.")
         sys.exit(-1)
 
     # TODO: Test grammar
