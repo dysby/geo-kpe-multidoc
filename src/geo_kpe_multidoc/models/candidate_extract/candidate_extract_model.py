@@ -121,7 +121,7 @@ class KPECandidateExtractionModel:
             ):
                 return doc.candidate_set, doc.candidate_mentions
 
-        use_cache = kwargs.get("pos_tag_memory", False)
+        use_cache = kwargs.get("cache_pos_tags", False)
         self._pos_tag_doc(
             doc=doc,
             stemming=None,

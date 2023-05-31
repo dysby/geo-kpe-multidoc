@@ -252,7 +252,7 @@ def evaluate_kp_extraction_base(
     #     with open(f"{RESULT_DIR}/raw/{stamp} raw.txt", "a") as f:
     #         f.write(res.rstrip())
 
-    print(res)
+    # print(res)
     return results
 
 

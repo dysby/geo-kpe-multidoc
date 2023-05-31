@@ -1,5 +1,5 @@
 from collections import OrderedDict
-from typing import Dict, List, Union
+from typing import Dict, List, Protocol, Union
 
 import torch
 from transformers import AutoModel, AutoTokenizer, LongformerModel
@@ -17,7 +17,17 @@ def mean_pooling(model_output, attention_mask):
     return sum_embeddings / sum_mask
 
 
-class SentenceEmbedder:
+class SentenceEmbedder(Protocol):
+    def tokenize(self, sentence: Union[str, List[str]], **kwargs) -> Dict:
+        """Tokenize the sentence"""
+
+    def encode(
+        self, sentence, global_attention_mask=None, output_attentions=False, device=None
+    ):
+        """Encode the sentence"""
+
+
+class LongformerSentenceEmbedder:
     def __init__(self, model: AutoModel, tokenizer: AutoTokenizer) -> None:
         self.model = model
         self.model.eval()
@@ -68,6 +78,66 @@ class SentenceEmbedder:
             global_attention_mask = torch.zeros_like(encoded_input["attention_mask"])
             global_attention_mask[:, 0] = 1  # CLS token
             encoded_input["global_attention_mask"] = global_attention_mask
+
+        if device:
+            encoded_input = batch_to_device(encoded_input, device)
+
+        # Compute token embeddings
+        with torch.no_grad():
+            model_output = self.model(
+                **encoded_input, output_attentions=output_attentions
+            )
+
+        # Perform pooling. In this case, mean pooling
+        sentence_embedding = mean_pooling(model_output, encoded_input["attention_mask"])
+        output = OrderedDict(
+            {
+                # TODO: remove batch dimension?
+                "token_embeddings": model_output[0].squeeze(),
+                "input_ids": encoded_input["input_ids"],
+                "attention_mask": encoded_input["attention_mask"],
+                "sentence_embedding": sentence_embedding.squeeze(),
+                # Output includes attention weights when output_attentions=True
+                # Size(batch_size, num_heads, sequence_length, sequence_length)
+                "attentions": model_output[-1] if output_attentions else None,
+            }
+        )
+
+        return output
+
+
+class BigBirdSentenceEmbedder:
+    def __init__(self, model: AutoModel, tokenizer: AutoTokenizer) -> None:
+        self.model = model
+        self.model.eval()
+        self.tokenizer = tokenizer
+        self.max_length = tokenizer.model_max_length
+
+    def tokenize(self, sentence: Union[str, List[str]], **kwargs) -> Dict:
+        # for global_attention
+        padding = kwargs.pop("padding", False)
+
+        return self.tokenizer(
+            sentence,
+            padding=padding,
+            truncation=True,
+            max_length=self.max_length,
+            return_tensors="pt",
+            **kwargs,
+        )
+
+    def encode(
+        self, sentence, global_attention_mask=None, output_attentions=False, device=None
+    ):
+        # Tokenize sentences
+        encoded_input = self.tokenizer(
+            sentence,
+            padding="max_length",
+            truncation=True,
+            max_length=self.max_length,
+            return_tensors="pt",
+            return_attention_mask=True,
+        )
 
         if device:
             encoded_input = batch_to_device(encoded_input, device)

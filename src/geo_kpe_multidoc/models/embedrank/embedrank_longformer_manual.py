@@ -3,6 +3,12 @@ from typing import Callable, List
 import numpy as np
 import torch
 from loguru import logger
+from transformers import (
+    BigBirdModel,
+    LongformerModel,
+    PreTrainedModel,
+    PreTrainedTokenizerBase,
+)
 
 from geo_kpe_multidoc.document import Document
 from geo_kpe_multidoc.models.candidate_extract.candidate_extract_model import (
@@ -10,7 +16,11 @@ from geo_kpe_multidoc.models.candidate_extract.candidate_extract_model import (
 )
 from geo_kpe_multidoc.models.embedrank.embedrank_model import EmbedRank
 from geo_kpe_multidoc.models.pre_processing.pos_tagging import POS_tagger_spacy
-from geo_kpe_multidoc.models.sentence_embedder import SentenceEmbedder
+from geo_kpe_multidoc.models.sentence_embedder import (
+    BigBirdSentenceEmbedder,
+    LongformerSentenceEmbedder,
+    SentenceEmbedder,
+)
 
 
 class EmbedRankManual(EmbedRank):
@@ -19,7 +29,14 @@ class EmbedRankManual(EmbedRank):
     the KeyBert backend to retrieve models
     """
 
-    def __init__(self, model, tokenizer, tagger, device=None, name=""):
+    def __init__(
+        self,
+        model: PreTrainedModel,
+        tokenizer: PreTrainedTokenizerBase,
+        tagger: POS_tagger_spacy,
+        device=None,
+        name="",
+    ):
         # TODO: init super class
         self.candidate_selection_model = KPECandidateExtractionModel(tagger=tagger)
         self.counter = 1
@@ -35,7 +52,14 @@ class EmbedRankManual(EmbedRank):
         model.to(device)
         self.device = device
 
-        self.model = SentenceEmbedder(model, tokenizer)
+        if isinstance(model, BigBirdModel):
+            self.model: SentenceEmbedder = BigBirdSentenceEmbedder(model, tokenizer)
+        elif isinstance(model, LongformerModel):
+            self.model: SentenceEmbedder = LongformerSentenceEmbedder(model, tokenizer)
+        else:
+            raise ValueError(
+                f'Model of type "{model.__class__}" not supported for SentenceEmbedder.'
+            )
         self.name = f"EmbedRankManual_{name}"
 
     def _embed_doc(
