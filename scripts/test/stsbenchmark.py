@@ -60,9 +60,13 @@ bigbird_model, bigbird_tokenizer = convert_roberta_to_bigbird(
     sbert._modules["0"].auto_model, sbert.tokenizer, 4096
 )
 
+# with TemporaryDirectory() as temp_dir:
+#     bigbird_tokenizer.save_pretrained(temp_dir)
+
 with TemporaryDirectory() as temp_dir:
     bigbird_model.save_pretrained(temp_dir)
-    bigbird_tokenizer.save_pretrained(temp_dir)
+    sbert.tokenizer.model_max_length = 4096
+    sbert.tokenizer.save_pretrained(temp_dir)
     model = SentenceTransformer(temp_dir)
 
 test_evaluator = EmbeddingSimilarityEvaluator.from_input_examples(
