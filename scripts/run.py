@@ -375,7 +375,7 @@ def main():
                 BACKEND_MODEL_NAME.replace("[longformer]", ""), TAGGER_NAME, args
             )
         elif "[bigbird]" in BACKEND_MODEL_NAME:
-            kpe_model = generateLongformerRanker(
+            kpe_model = generateBigBirdRanker(
                 BACKEND_MODEL_NAME.replace("[bigbird]", ""), TAGGER_NAME, args
             )
         else:
