@@ -1,11 +1,18 @@
 import csv
 import gzip
+import os
+from tempfile import TemporaryDirectory
 
 from sentence_transformers import SentenceTransformer
 from sentence_transformers.evaluation import EmbeddingSimilarityEvaluator
 from sentence_transformers.readers import InputExample
 
-sts_dataset_path = "/home/helder/doc/mecd/thesis/data/stsbenchmark.tsv.gz"
+from geo_kpe_multidoc import GEO_KPE_MULTIDOC_DATA_PATH, GEO_KPE_MULTIDOC_OUTPUT_PATH
+from geo_kpe_multidoc.models.backend.roberta2longformer.roberta2bigbird import (
+    convert_roberta_to_bigbird,
+)
+
+sts_dataset_path = os.path.join(GEO_KPE_MULTIDOC_DATA_PATH, "stsbenchmark.tsv.gz")
 
 train_samples = []
 dev_samples = []
@@ -45,10 +52,21 @@ from transformers import AutoTokenizer, LongformerModel
 #     test_samples, name="sts-longformer", show_progress_bar=True
 # )
 
-model_path = "allenai/longformer-base-4096"
-model = SentenceTransformer(model_path)
-test_evaluator = EmbeddingSimilarityEvaluator.from_input_examples(
-    test_samples, name="sts-allenai-longformer", show_progress_bar=True
+sbert = SentenceTransformer(
+    "sentence-transformers/paraphrase-multilingual-mpnet-base-v2"
 )
 
-test_evaluator(model, output_path="/home/helder/doc/mecd/thesis/outputs")
+bigbird_model, bigbird_tokenizer = convert_roberta_to_bigbird(
+    sbert._modules["0"].auto_model, sbert.tokenizer, 4096
+)
+
+with TemporaryDirectory() as temp_dir:
+    bigbird_model.save_pretrained(temp_dir)
+    bigbird_tokenizer.save_pretrained(temp_dir)
+    model = SentenceTransformer(temp_dir)
+
+test_evaluator = EmbeddingSimilarityEvaluator.from_input_examples(
+    test_samples, name="sts-bigbird", show_progress_bar=True
+)
+
+test_evaluator(model, output_path=GEO_KPE_MULTIDOC_OUTPUT_PATH)
