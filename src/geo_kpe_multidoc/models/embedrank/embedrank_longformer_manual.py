@@ -6,6 +6,7 @@ from loguru import logger
 from transformers import (
     BigBirdModel,
     LongformerModel,
+    NystromformerModel,
     PreTrainedModel,
     PreTrainedTokenizerBase,
 )
@@ -19,6 +20,7 @@ from geo_kpe_multidoc.models.pre_processing.pos_tagging import POS_tagger_spacy
 from geo_kpe_multidoc.models.sentence_embedder import (
     BigBirdSentenceEmbedder,
     LongformerSentenceEmbedder,
+    NystromformerSentenceEmbedder,
     SentenceEmbedder,
 )
 
@@ -52,14 +54,18 @@ class EmbedRankManual(EmbedRank):
         model.to(device)
         self.device = device
 
-        if isinstance(model, BigBirdModel):
-            self.model: SentenceEmbedder = BigBirdSentenceEmbedder(model, tokenizer)
-        elif isinstance(model, LongformerModel):
-            self.model: SentenceEmbedder = LongformerSentenceEmbedder(model, tokenizer)
+        if isinstance(model, LongformerModel):
+            embedder_cls = LongformerSentenceEmbedder
+        elif isinstance(model, BigBirdModel):
+            embedder_cls = BigBirdSentenceEmbedder
+        elif isinstance(model, NystromformerModel):
+            embedder_cls = NystromformerSentenceEmbedder
         else:
             raise ValueError(
-                f'Model of type "{model.__class__}" not supported for SentenceEmbedder.'
+                f'Model of type "{model.__class__.__name__}" not supported for SentenceEmbedder.'
             )
+
+        self.model: SentenceEmbedder = embedder_cls(model, tokenizer)
         self.name = f"EmbedRankManual_{name}"
 
     def _embed_doc(

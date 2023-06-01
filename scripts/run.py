@@ -38,7 +38,10 @@ from geo_kpe_multidoc.models.backend._longmodels import to_longformer_t_v4
 from geo_kpe_multidoc.models.backend.roberta2longformer.roberta2bigbird import (
     convert_roberta_to_bigbird,
 )
-from geo_kpe_multidoc.models.base_KP_model import ExtractionEvaluator
+from geo_kpe_multidoc.models.backend.roberta2longformer.roberta2nyströmformer import (
+    convert_roberta_to_nystromformer,
+)
+from geo_kpe_multidoc.models.base_KP_model import BaseKPModel, ExtractionEvaluator
 from geo_kpe_multidoc.models.embedrank.embedrank_longformer_manual import (
     EmbedRankManual,
 )
@@ -348,27 +351,29 @@ def generateBigBirdRanker(backend_model_name, tagger_name, args):
     return kpe_model
 
 
-def main():
-    args = parse_args()
+def generateNystromformerRanker(backend_model_name, tagger_name, args):
+    # Generate Nystromformer from Sentence Transformer
+    new_max_pos = args.longformer_max_length
 
-    start = time()
-    logger.info("Warmup")
-    logger.info("Loading models")
+    base_name = backend_model_name.split("/")[-1]
 
-    # "longformer-paraphrase-multilingual-mpnet-base-v2"
-    BACKEND_MODEL_NAME = args.embed_model
+    model_name = f"nystromformer_{base_name}_{new_max_pos}"
 
-    ds_name = args.dataset_name
-    if ds_name not in DATASETS.keys():
-        logger.critical(
-            f"Dataset {ds_name} is not supported. Select one of {list(DATASETS.keys())}"
-        )
-        sys.exit(-1)
+    sbert = SentenceTransformer(backend_model_name)
 
-    TAGGER_NAME = (
-        args.tagger_name if args.tagger_name else DATASETS[ds_name].get("tagger")
+    bigbird_model, bigbird_tokenizer = convert_roberta_to_nystromformer(
+        sbert._modules["0"].auto_model, sbert.tokenizer, new_max_pos
     )
 
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+    kpe_model = EmbedRankManual(
+        bigbird_model, bigbird_tokenizer, tagger_name, device=device, name=model_name
+    )
+    return kpe_model
+
+
+def kpe_model_factory(args, BACKEND_MODEL_NAME, TAGGER_NAME) -> BaseKPModel:
     if args.rank_model == "EmbedRank":
         if "[longformer]" in BACKEND_MODEL_NAME:
             kpe_model = generateLongformerRanker(
@@ -377,6 +382,10 @@ def main():
         elif "[bigbird]" in BACKEND_MODEL_NAME:
             kpe_model = generateBigBirdRanker(
                 BACKEND_MODEL_NAME.replace("[bigbird]", ""), TAGGER_NAME, args
+            )
+        elif "[nystromformer]" in BACKEND_MODEL_NAME:
+            kpe_model = generateNystromformerRanker(
+                BACKEND_MODEL_NAME.replace("[nystromformer]", ""), TAGGER_NAME, args
             )
         else:
             kpe_model = EmbedRank(BACKEND_MODEL_NAME, TAGGER_NAME)
@@ -407,11 +416,31 @@ def main():
         logger.critical("Unknown KPE Model type.")
         sys.exit(-1)
 
-    # TODO: Test grammar
-    # original NP:
-    #    {<PROPN|NOUN|ADJ>*<PROPN|NOUN>+<ADJ>*}
-    # test     NP:
-    #     ((<.*>-+<.*>)<NN>*)|((<VBG|VBN>)?<JJ>*<NN>+)"""
+    return kpe_model
+
+
+def main():
+    args = parse_args()
+
+    start = time()
+    logger.info("Warmup")
+    logger.info("Loading models")
+
+    # "longformer-paraphrase-multilingual-mpnet-base-v2"
+    BACKEND_MODEL_NAME = args.embed_model
+
+    ds_name = args.dataset_name
+    if ds_name not in DATASETS.keys():
+        logger.critical(
+            f"Dataset {ds_name} is not supported. Select one of {list(DATASETS.keys())}"
+        )
+        sys.exit(-1)
+
+    TAGGER_NAME = (
+        args.tagger_name if args.tagger_name else DATASETS[ds_name].get("tagger")
+    )
+
+    kpe_model = kpe_model_factory(args, BACKEND_MODEL_NAME, TAGGER_NAME)
 
     if isinstance(kpe_model, MDKPERank):
         extract_eval = extract_keyphrases_topics

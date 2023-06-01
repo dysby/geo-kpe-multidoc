@@ -44,6 +44,31 @@ def extract_kp_from_corpus(
 class KPECandidateExtractionModel:
     """
     Keyphrase Candidate identification by grammar pos tag parsing
+
+        Baseline
+            NP:
+                {<PROPN|NOUN|ADJ>*<PROPN|NOUN>+<ADJ>*}
+
+        TODO: new grammar
+            WORKS! in KeyphraseVectorizer
+                        '((<.*>-+<.*>)<NN>*)|((<VBG|VBN>)?<JJ>*<NN>+)'
+
+            SIFRank grammar '<NN.*|JJ>*<NN.*>'  ,  NN = NOUN, JJ = ADJ
+
+            Automatic Extraction of Relevant Keyphrases for the Study of Issue Competition
+                (<NOUN>+<ADJ>*<PREP>*)?<NOUN>+<ADJ>*
+
+            UKE-CCRank
+
+                GRAMMAR1 = NP:
+                    {<NN.*|JJ>*<NN.*>}  # Adjective(s)(optional) + Noun(s)
+
+                GRAMMAR2 = NP:
+                    {<JJ|VBG>*<NN.*>{0,3}}  # Adjective(s)(optional) + Noun(s)
+
+                GRAMMAR3 = NP:
+                    {<NN.*|JJ|VBG|VBN>*<NN.*>}  # Adjective(s)(optional) + Noun(s)
+
     """
 
     def __init__(self, tagger, grammar=None):
@@ -194,33 +219,7 @@ class KPECandidateExtractionModel:
 
         len(candidate.split(" ")) <= 5 avoid too long candidate phrases
 
-        Baseline
-            NP:
-                {<PROPN|NOUN|ADJ>*<PROPN|NOUN>+<ADJ>*}
 
-        TODO: new grammar
-
-            (({.*}{HYPH}{.*}){NOUN}*)|(({VBG}|{VBN})?{ADJ}*{NOUN}+) Keyphrase-Vectorizers paper ()
-                        r'(({.*}-.*-{.*}){NN}*)|(({VBG}|{VBN})?{JJ}*{NN}+)'
-
-            WORKS! in KeyphraseVectorizer
-                        '((<.*>-+<.*>)<NN>*)|((<VBG|VBN>)?<JJ>*<NN>+)'
-
-            SIFRank grammar '<NN.*|JJ>*<NN.*>'  ,  NN = NOUN, JJ = ADJ
-
-            Automatic Extraction of Relevant Keyphrases for the Study of Issue Competition
-                (<NOUN>+<ADJ>*<PREP>*)?<NOUN>+<ADJ>*
-
-            UKE-CCRank
-
-                GRAMMAR1 = NP:
-                    {<NN.*|JJ>*<NN.*>}  # Adjective(s)(optional) + Noun(s)
-
-                GRAMMAR2 = NP:
-                    {<JJ|VBG>*<NN.*>{0,3}}  # Adjective(s)(optional) + Noun(s)
-
-                GRAMMAR3 = NP:
-                    {<NN.*|JJ|VBG|VBN>*<NN.*>}  # Adjective(s)(optional) + Noun(s)
 
         Parameters
         ----------

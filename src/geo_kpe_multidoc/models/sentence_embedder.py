@@ -166,6 +166,11 @@ class BigBirdSentenceEmbedder:
         return output
 
 
+class NystromformerSentenceEmbedder(BigBirdSentenceEmbedder):
+    def __init__(self, model: AutoModel, tokenizer: AutoTokenizer) -> None:
+        super().__init__(model, tokenizer)
+
+
 def batch_to_device(batch, target_device: torch.device):
     """
     copy from sentence_transformers
