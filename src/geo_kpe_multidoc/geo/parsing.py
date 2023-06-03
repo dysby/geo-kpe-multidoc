@@ -20,7 +20,8 @@ def geo_parse_MKDUC01():
             try:
                 res = {
                     doc_group: {
-                        doc_id: str(parser.geoparse(text))
+                        # parse and store only the geo location entities
+                        doc_id: parser.geoparse_doc(text)["geolocated_ents"]
                         for doc_id, text in docs[doc_group]["documents"].items()
                     }
                 }
