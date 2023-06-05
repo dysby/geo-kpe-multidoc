@@ -5,11 +5,18 @@ from tempfile import TemporaryDirectory
 
 from sentence_transformers import SentenceTransformer
 from sentence_transformers.evaluation import EmbeddingSimilarityEvaluator
+from sentence_transformers.models.Pooling import Pooling
 from sentence_transformers.readers import InputExample
 
 from geo_kpe_multidoc import GEO_KPE_MULTIDOC_DATA_PATH, GEO_KPE_MULTIDOC_OUTPUT_PATH
 from geo_kpe_multidoc.models.backend.roberta2longformer.roberta2bigbird import (
     convert_roberta_to_bigbird,
+)
+from geo_kpe_multidoc.models.backend.roberta2longformer.roberta2longformer import (
+    convert_roberta_to_longformer,
+)
+from geo_kpe_multidoc.models.backend.roberta2longformer.roberta2nyströmformer import (
+    convert_roberta_to_nystromformer,
 )
 
 sts_dataset_path = os.path.join(GEO_KPE_MULTIDOC_DATA_PATH, "stsbenchmark.tsv.gz")
@@ -35,7 +42,7 @@ with gzip.open(sts_dataset_path, "rt", encoding="utf8") as fIn:
 # model_save_path = "paraphrase-multilingual-mpnet-base-v2"
 # model = SentenceTransformer(model_save_path)
 
-from transformers import AutoTokenizer, LongformerModel
+from transformers import AutoModel, AutoTokenizer
 
 # model_path = "/home/helder/doc/mecd/thesis/models/longformer-xlm-robterta"
 # # model_path = "/home/helder/doc/mecd/thesis/models/longformer-paraphrase-multilingual-mpnet-base-v2"
@@ -52,25 +59,37 @@ from transformers import AutoTokenizer, LongformerModel
 #     test_samples, name="sts-longformer", show_progress_bar=True
 # )
 
-sbert = SentenceTransformer(
+base_model = AutoModel.from_pretrained(
+    "sentence-transformers/paraphrase-multilingual-mpnet-base-v2"
+)
+base_tokenizer = AutoTokenizer.from_pretrained(
     "sentence-transformers/paraphrase-multilingual-mpnet-base-v2"
 )
 
-bigbird_model, bigbird_tokenizer = convert_roberta_to_bigbird(
-    sbert._modules["0"].auto_model, sbert.tokenizer, 4096
+# new_model, new_tokenizer = convert_roberta_to_bigbird(base_model, base_tokenizer, 4096)
+new_model, new_tokenizer = convert_roberta_to_longformer(
+    base_model, base_tokenizer, 4096, 128
 )
-
-# with TemporaryDirectory() as temp_dir:
-#     bigbird_tokenizer.save_pretrained(temp_dir)
+# new_model, new_tokenizer = convert_roberta_to_nystromformer(
+#     base_model, base_tokenizer, 4096
+# )
 
 with TemporaryDirectory() as temp_dir:
-    bigbird_model.save_pretrained(temp_dir)
-    sbert.tokenizer.model_max_length = 4096
-    sbert.tokenizer.save_pretrained(temp_dir)
+    new_model.save_pretrained(temp_dir)
+    base_tokenizer.model_max_length = 4096
+    base_tokenizer.save_pretrained(temp_dir)
     model = SentenceTransformer(temp_dir)
 
+    model.tokenizer.enable_padding(length=4096, pad_to_multiple_of=128)  # longformer
+    # model.tokenizer.enable_padding(length=4096, pad_to_multiple_of=64)  # bigbird
+    # model.tokenizer.enable_padding(length=4096, pad_to_multiple_of=64)  # bigbird
+    model.tokenizer.enable_truncation(max_length=4096, strategy="longest_first")
+
+    # test_samples, name="sbert", show_progress_bar=True
+    # test_samples, name="nystromformer", show_progress_bar=True
+    # test_samples, name="", show_progress_bar=True
 test_evaluator = EmbeddingSimilarityEvaluator.from_input_examples(
-    test_samples, name="sts-bigbird", show_progress_bar=True
+    test_samples, name="longformer", show_progress_bar=True
 )
 
 test_evaluator(model, output_path=GEO_KPE_MULTIDOC_OUTPUT_PATH)
