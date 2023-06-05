@@ -4,9 +4,11 @@ import sys
 import textwrap
 from datetime import datetime
 from os import path
+from pathlib import Path
 from time import time
 
 import joblib
+import mlflow
 import pandas as pd
 import torch
 from loguru import logger
@@ -64,7 +66,12 @@ def parse_args():
         """
         ),
     )
-
+    parser.add_argument(
+        "--experiment_name",
+        default="run",
+        type=str,
+        help="Name to save experiment results.",
+    )
     parser.add_argument(
         "--dataset_name",
         type=str,
@@ -72,32 +79,17 @@ def parse_args():
         help="The input dataset name",
     )
     parser.add_argument(
-        "--doc_embed_mode",
-        default="mean",
-        type=str,
-        # required=True,
-        help="The method for doc embedding.",
+        "--doc_limit",
+        default=-1,
+        type=int,
+        help="Max number of documents to process from Dataset.",
     )
     parser.add_argument(
-        "--doc_mode",
-        default="",
+        "--doc_name",
         type=str,
-        # required=True,
-        help="The method for doc mode (?).",
+        help="Doc ID to test from Dataset.",
     )
-    parser.add_argument(
-        "--candidate_mode",
-        default="",
-        type=str,
-        # required=True,
-        help="The method for candidate mode (no_context, mentions_no_context, global_attention, global_attention_dilated_nnn, attention_rank).",
-    )
-    parser.add_argument(
-        "--embed_model",
-        type=str,
-        help="Defines the embedding model to use",
-        default="paraphrase-multilingual-mpnet-base-v2",
-    )
+
     parser.add_argument(
         "--rank_model",
         default="EmbedRank",
@@ -113,28 +105,70 @@ def parse_args():
         ],
     )
     parser.add_argument(
-        "--doc_limit",
-        default=-1,
-        type=int,
-        help="Max number of documents to process from Dataset.",
+        "--embed_model",
+        type=str,
+        help="Defines the embedding model to use",
+        default="paraphrase-multilingual-mpnet-base-v2",
     )
     parser.add_argument(
-        "--doc_name",
-        type=str,
-        help="Doc ID to test from Dataset.",
+        "--longformer_max_length",
+        type=int,
+        default=4096,
+        help="longformer: max length of the new model",
     )
-
+    parser.add_argument(
+        "--longformer_attention_window",
+        type=int,
+        default=512,
+        help="Longformer: sliding chunk Attention Window size",
+    )
+    parser.add_argument(
+        "--longformer_only_copy_to_max_position",
+        type=int,
+        help="Longformer: only copy first positions of Pretrained Model position embedding weights",
+    )
+    parser.add_argument(
+        "--candidate_mode",
+        default="",
+        type=str,
+        # required=True,
+        help="The method for candidate mode (no_context, mentions_no_context, global_attention, global_attention_dilated_nnn, attention_rank).",
+    )
+    parser.add_argument(
+        "--min_len",
+        type=int,
+        help="Candidate keyphrase minimum length",
+    )
     parser.add_argument(
         "--top_n",
         default="-1",
         type=int,
         help="Keep only Top N candidates",
     )
+
     parser.add_argument(
-        "--experiment_name",
-        default="run",
+        "--no_stemming", action="store_true", help="bool flag to use stemming"
+    )
+    parser.add_argument(
+        "--lemmatization", action="store_true", help="boolean flag to use lemmatization"
+    )
+    parser.add_argument(
+        "--embedrank_mmr", action="store_true", help="boolean flag to use EmbedRank MMR"
+    )
+    parser.add_argument(
+        "--embedrank_diversity",
+        type=float,
+        help="EmbedRank MMR diversity parameter value.",
+    )
+    parser.add_argument(
+        "--preprocessing",
+        action="store_true",
+        help="Preprocess text documents by removing pontuation",
+    )
+    parser.add_argument(
+        "--tagger_name",
         type=str,
-        help="Name to save experiment results.",
+        help="Explicit use this Spacy tagger",
     )
     parser.add_argument(
         "--weights",
@@ -149,20 +183,6 @@ def parse_args():
         help="Fusion model ensembling mode",
         # choices=[el.value for el in EnsembleMode],
         choices=["weighted", "harmonic"],
-    )
-    parser.add_argument(
-        "--no_stemming", action="store_true", help="bool flag to use stemming"
-    )
-    parser.add_argument(
-        "--lemmatization", action="store_true", help="boolean flag to use lemmatization"
-    )
-    parser.add_argument(
-        "--embedrank_mmr", action="store_true", help="boolean flag to use EmbedRank MMR"
-    )
-    parser.add_argument(
-        "--embedrank_diversity",
-        type=float,
-        help="EmbedRank MMR diversity parameter value.",
     )
     parser.add_argument(
         "--cache_pos_tags",
@@ -183,38 +203,6 @@ def parse_args():
         "--cache_results",
         action="store_true",
         help="Save KPE Model outputs (top N per doc) to cache directory.",
-    )
-    parser.add_argument(
-        "--longformer_attention_window",
-        type=int,
-        default=512,
-        help="Longformer: sliding chunk Attention Window size",
-    )
-    parser.add_argument(
-        "--min_len",
-        type=int,
-        help="Candidate keyphrase minimum length",
-    )
-    parser.add_argument(
-        "--longformer_only_copy_to_max_position",
-        type=int,
-        help="Longformer: only copy first positions of Pretrained Model position embedding weights",
-    )
-    parser.add_argument(
-        "--longformer_max_length",
-        type=int,
-        default=4096,
-        help="longformer: max length of the new model",
-    )
-    parser.add_argument(
-        "--preprocessing",
-        action="store_true",
-        help="Preprocess text documents by removing pontuation",
-    )
-    parser.add_argument(
-        "--tagger_name",
-        type=str,
-        help="Explicit use this Spacy tagger",
     )
     return parser.parse_args()
 
@@ -450,6 +438,9 @@ def main():
         extract_eval = extract_keyphrases_docs
 
     stemmer = None if args.no_stemming else PorterStemmer()
+    assert stemmer != None
+    if not stemmer:
+        logger.critical("KPE Evaluation usually need stemmer!")
     lemmer = DATASETS[ds_name].get("language") if args.lemmatization else None
 
     if not lemmer:
@@ -468,39 +459,63 @@ def main():
     # -------------------------------------------------
     # --------------- Run Experiment ------------------
     # -------------------------------------------------
-    model_results, true_labels = extract_eval(
-        data,
-        kpe_model,
-        top_n=args.top_n,
-        lemmer=lemmer,
-        n_docs_limit=n_docs_limit,
-        **options,
+
+    mlflow.set_tracking_uri(
+        Path(GEO_KPE_MULTIDOC_OUTPUT_PATH).joinpath("mlruns").as_uri()
     )
 
-    # model_results["dataset_name"][(doc1_top_n, doc1_candidates), (doc2...)]
-    assert stemmer != None
-    # Transform keyphrases, thru stemming, for KPE evaluation.
-    if not stemmer:
-        logger.critical("KPE Evaluation usually need stemmer!")
-    else:
-        model_results = postprocess_res_labels(model_results, stemmer, lemmer)
-        true_labels = postprocess_dataset_labels(true_labels, stemmer, lemmer)
+    tags = {
+        "dataset": args.dataset_name,
+        "embed_model": args.embed_model,
+        "rank_model": args.rank_model,
+    }
 
-    # output_one_top_cands_geo(data.ids, model_results, true_labels)
-    output_one_top_cands(data.ids, model_results, true_labels)
+    with mlflow.start_run(run_name=args.experiment_name, tags=tags):
+        for parameter, value in vars(args).items():
+            mlflow.log_param(parameter, value)
 
-    dataset_kpe = model_scores_to_dataframe(model_results, true_labels)
-    fig = plot_score_distribuitions_with_gold(
-        results=dataset_kpe,
-        title=args.experiment_name.replace("-", " "),
-        xlim=(0, 1),
-    )
+        model_results, true_labels = extract_eval(
+            data,
+            kpe_model,
+            top_n=args.top_n,
+            lemmer=lemmer,
+            n_docs_limit=n_docs_limit,
+            **options,
+        )
 
-    performance_metrics = evaluate_kp_extraction_base(model_results, true_labels)
-    performance_metrics = pd.concat(
-        [performance_metrics, evaluate_kp_extraction(model_results, true_labels)]
-    )
+        if stemmer:
+            model_results = postprocess_res_labels(model_results, stemmer, lemmer)
+            true_labels = postprocess_dataset_labels(true_labels, stemmer, lemmer)
+
+        # output_one_top_cands_geo(data.ids, model_results, true_labels)
+        kpe_for_doc = output_one_top_cands(data.ids, model_results, true_labels)
+
+        dataset_kpe = model_scores_to_dataframe(model_results, true_labels)
+        fig = plot_score_distribuitions_with_gold(
+            results=dataset_kpe,
+            title=args.experiment_name.replace("-", " "),
+            xlim=(0, 1),
+        )
+
+        mlflow.log_figure(fig, artifact_file="score_distribution.png")
+
+        performance_metrics = evaluate_kp_extraction_base(model_results, true_labels)
+        performance_metrics = pd.concat(
+            [performance_metrics, evaluate_kp_extraction(model_results, true_labels)]
+        )
+        mlflow.log_text(kpe_for_doc, artifact_file="first-doc-extraction-sample.txt")
+
+        metric_names = [
+            "_base_" + value for value in performance_metrics.iloc[0].index.values
+        ]
+        metrics = performance_metrics.iloc[0]
+        metrics.index = metric_names
+        mlflow.log_metrics(metrics.to_dict())
+        metrics = performance_metrics.iloc[1]
+        mlflow.log_metrics(metrics.to_dict())
+
     print(tabulate(performance_metrics, headers="keys", floatfmt=".2%"))
+
     save(dataset_kpe, performance_metrics, fig, args)
 
     end = time()
