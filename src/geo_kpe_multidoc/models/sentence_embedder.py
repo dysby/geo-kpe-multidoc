@@ -50,13 +50,14 @@ def _text_length(text: Union[List[int], List[List[int]]]):
 
 class LongformerSentenceEmbedder:
     def __init__(self, model: AutoModel, tokenizer: AutoTokenizer) -> None:
-        self.model = model
-        self.model.eval()
         self.tokenizer = tokenizer
         self.max_length = tokenizer.model_max_length
         self.attention_window = int(
             model.encoder.layer[0].attention.self.one_sided_attn_window_size * 2
         )
+        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        self.model = model.to(self.device)
+        self.model.eval()
 
     def tokenize(self, sentence: Union[str, List[str]], **kwargs) -> Dict:
         # for global_attention
@@ -104,8 +105,8 @@ class LongformerSentenceEmbedder:
             global_attention_mask[:, 0] = 1  # CLS token
             encoded_input["global_attention_mask"] = global_attention_mask
 
-        if device:
-            encoded_input = batch_to_device(encoded_input, device)
+        device = device if device else self.device
+        encoded_input = batch_to_device(encoded_input, device)
 
         # Compute token embeddings
         with torch.no_grad():
@@ -265,10 +266,11 @@ class LongformerSentenceEmbedder:
 
 class BigBirdSentenceEmbedder:
     def __init__(self, model: AutoModel, tokenizer: AutoTokenizer) -> None:
-        self.model = model
-        self.model.eval()
         self.tokenizer = tokenizer
         self.max_length = tokenizer.model_max_length
+        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        self.model = model.to(self.device)
+        self.model.eval()
 
     def tokenize(self, sentence: Union[str, List[str]], **kwargs) -> Dict:
         # for global_attention

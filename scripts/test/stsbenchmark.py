@@ -29,13 +29,13 @@ from geo_kpe_multidoc.models.sentence_embedder import (
 
 @click.command()
 @click.option(
-    "--base_model",
+    "--base_model_name",
     prompt="Sentence Transformer model name",
     help="Sentence Transformer model name.",
     default="sentence-transformers/paraphrase-multilingual-mpnet-base-v2",
 )
 @click.option("--variant", default="original")
-def stsbenchmark(base_model, variant):
+def stsbenchmark(base_model_name, variant):
     sts_dataset_path = os.path.join(GEO_KPE_MULTIDOC_DATA_PATH, "stsbenchmark.tsv.gz")
 
     train_samples = []
@@ -56,8 +56,8 @@ def stsbenchmark(base_model, variant):
             else:
                 train_samples.append(inp_example)
 
-    base_model = AutoModel.from_pretrained(base_model)
-    base_tokenizer = AutoTokenizer.from_pretrained(base_model)
+    base_model = AutoModel.from_pretrained(base_model_name)
+    base_tokenizer = AutoTokenizer.from_pretrained(base_model_name)
 
     if variant == "longformer":
         new_model, new_tokenizer = convert_roberta_to_longformer(
