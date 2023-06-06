@@ -3,6 +3,7 @@ from typing import Dict, List, Protocol, Union
 
 import numpy as np
 import torch
+from loguru import logger
 from numpy import ndarray
 from tqdm.autonotebook import trange
 from transformers import AutoModel, AutoTokenizer, LongformerModel
@@ -199,7 +200,8 @@ class LongformerSentenceEmbedder:
             )
 
             if global_attention_mask is not None:
-                features["global_attention_mask"] = global_attention_mask
+                logger.critical("global_attention_mask cannot be used in batch")
+                # features["global_attention_mask"] = global_attention_mask
             elif global_attention_mask is None and isinstance(
                 self.model, LongformerModel
             ):
@@ -250,6 +252,8 @@ class LongformerSentenceEmbedder:
                         embeddings = embeddings.cpu()
 
                 all_embeddings.extend(embeddings)
+                # must reset global attention mask for another batch
+                global_attention_mask = None
 
         all_embeddings = [all_embeddings[idx] for idx in np.argsort(length_sorted_idx)]
 
