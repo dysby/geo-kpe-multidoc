@@ -207,8 +207,8 @@ class LongformerSentenceEmbedder:
                 global_attention_mask[:, 0] = 1  # CLS token
                 features["global_attention_mask"] = global_attention_mask
 
-            if device:
-                features = batch_to_device(features, device)
+            device = device if device else self.device
+            features = batch_to_device(features, device)
 
             with torch.no_grad():
                 out_features = self.model(**features)
@@ -298,8 +298,8 @@ class BigBirdSentenceEmbedder:
             return_attention_mask=True,
         )
 
-        if device:
-            encoded_input = batch_to_device(encoded_input, device)
+        device = device if device else self.device
+        encoded_input = batch_to_device(encoded_input, device)
 
         # Compute token embeddings
         with torch.no_grad():
@@ -388,8 +388,8 @@ class BigBirdSentenceEmbedder:
                 return_attention_mask=True,
             )
 
-            if device:
-                features = batch_to_device(features, device)
+            device = device if device else self.device
+            features = batch_to_device(features, device)
 
             with torch.no_grad():
                 out_features = self.model(**features)

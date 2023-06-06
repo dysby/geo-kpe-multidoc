@@ -30,7 +30,6 @@ from geo_kpe_multidoc.models.sentence_embedder import (
 @click.command()
 @click.option(
     "--base_model_name",
-    prompt="Sentence Transformer model name",
     help="Sentence Transformer model name.",
     default="sentence-transformers/paraphrase-multilingual-mpnet-base-v2",
 )
