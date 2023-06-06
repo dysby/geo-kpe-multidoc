@@ -1,7 +1,10 @@
 from collections import OrderedDict
 from typing import Dict, List, Protocol, Union
 
+import numpy as np
 import torch
+from numpy import ndarray
+from tqdm.autonotebook import trange
 from transformers import AutoModel, AutoTokenizer, LongformerModel
 
 
@@ -27,6 +30,24 @@ class SentenceEmbedder(Protocol):
         """Encode the sentence"""
 
 
+def _text_length(text: Union[List[int], List[List[int]]]):
+    """
+    Copy from SentenceTransformer
+    Help function to get the length for the input text. Text can be either
+    a list of ints (which means a single text as input), or a tuple of list of ints
+    (representing several text inputs to the model).
+    """
+
+    if isinstance(text, dict):  # {key: value} case
+        return len(next(iter(text.values())))
+    elif not hasattr(text, "__len__"):  # Object has no len() method
+        return 1
+    elif len(text) == 0 or isinstance(text[0], int):  # Empty string or list of ints
+        return len(text)
+    else:
+        return sum([len(t) for t in text])  # Sum of length of individual strings
+
+
 class LongformerSentenceEmbedder:
     def __init__(self, model: AutoModel, tokenizer: AutoTokenizer) -> None:
         self.model = model
@@ -50,8 +71,12 @@ class LongformerSentenceEmbedder:
             **kwargs,
         )
 
-    def encode(
-        self, sentence, global_attention_mask=None, output_attentions=False, device=None
+    def _encode(
+        self,
+        sentence,
+        global_attention_mask=None,
+        output_attentions=False,
+        device=None,
     ):
         # Tokenize sentences
         encoded_input = self.tokenizer(
@@ -105,6 +130,138 @@ class LongformerSentenceEmbedder:
 
         return output
 
+    def encode(
+        self,
+        sentences: Union[str, List[str]],
+        batch_size: int = 32,
+        show_progress_bar: bool = None,
+        output_value: str = "sentence_embedding",
+        convert_to_numpy: bool = True,
+        convert_to_tensor: bool = False,
+        device: str = None,
+        normalize_embeddings: bool = False,
+        global_attention_mask=None,
+    ) -> Union[List[torch.Tensor], ndarray, torch.Tensor]:
+        """
+        # Test STSbenchmark
+        # Copy from SentenceTransformer
+        Computes sentence embeddings
+
+        :param sentences: the sentences to embed
+        :param batch_size: the batch size used for the computation
+        :param show_progress_bar: Output a progress bar when encode sentences
+        :param output_value:  Default sentence_embedding, to get sentence embeddings. Can be set to token_embeddings to get wordpiece token embeddings. Set to None, to get all output values
+        :param convert_to_numpy: If true, the output is a list of numpy vectors. Else, it is a list of pytorch tensors.
+        :param convert_to_tensor: If true, you get one large tensor as return. Overwrites any setting from convert_to_numpy
+        :param device: Which torch.device to use for the computation
+        :param normalize_embeddings: If set to true, returned vectors will have length 1. In that case, the faster dot-product (util.dot_score) instead of cosine similarity can be used.
+
+        :return:
+           By default, a list of tensors is returned. If convert_to_tensor, a stacked tensor is returned. If convert_to_numpy, a numpy matrix is returned.
+        """
+        if show_progress_bar is None:
+            show_progress_bar = False
+
+        if convert_to_tensor:
+            convert_to_numpy = False
+
+        if output_value != "sentence_embedding":
+            convert_to_tensor = False
+            convert_to_numpy = False
+
+        input_was_string = False
+        if isinstance(sentences, str) or not hasattr(
+            sentences, "__len__"
+        ):  # Cast an individual sentence to a list with length 1
+            sentences = [sentences]
+            input_was_string = True
+
+        all_embeddings = []
+        length_sorted_idx = np.argsort([-_text_length(sen) for sen in sentences])
+        sentences_sorted = [sentences[idx] for idx in length_sorted_idx]
+
+        for start_index in trange(
+            0, len(sentences), batch_size, desc="Batches", disable=not show_progress_bar
+        ):
+            sentences_batch = sentences_sorted[start_index : start_index + batch_size]
+
+            # Tokenize sentences
+            features = self.tokenizer(
+                sentences_batch,
+                # padding="max_length",
+                padding=True,
+                pad_to_multiple_of=self.attention_window,
+                truncation=True,
+                max_length=self.max_length,
+                return_tensors="pt",
+                return_attention_mask=True,
+            )
+
+            if global_attention_mask is not None:
+                features["global_attention_mask"] = global_attention_mask
+            elif global_attention_mask is None and isinstance(
+                self.model, LongformerModel
+            ):
+                global_attention_mask = torch.zeros_like(features["attention_mask"])
+                global_attention_mask[:, 0] = 1  # CLS token
+                features["global_attention_mask"] = global_attention_mask
+
+            if device:
+                features = batch_to_device(features, device)
+
+            with torch.no_grad():
+                out_features = self.model(**features)
+
+                # Perform pooling. In this case, mean pooling
+                sentence_embeddings = mean_pooling(
+                    out_features, features["attention_mask"]
+                )
+
+                out_features["sentence_embedding"] = sentence_embeddings
+
+                if output_value == "token_embeddings":
+                    embeddings = []
+                    for token_emb, attention in zip(
+                        out_features[output_value], out_features["attention_mask"]
+                    ):
+                        last_mask_id = len(attention) - 1
+                        while last_mask_id > 0 and attention[last_mask_id].item() == 0:
+                            last_mask_id -= 1
+
+                        embeddings.append(token_emb[0 : last_mask_id + 1])
+                elif output_value is None:  # Return all outputs
+                    embeddings = []
+                    for sent_idx in range(len(out_features["sentence_embedding"])):
+                        row = {
+                            name: out_features[name][sent_idx] for name in out_features
+                        }
+                        embeddings.append(row)
+                else:  # Sentence embeddings
+                    embeddings = out_features[output_value]
+                    embeddings = embeddings.detach()
+                    if normalize_embeddings:
+                        embeddings = torch.nn.functional.normalize(
+                            embeddings, p=2, dim=1
+                        )
+
+                    # fixes for #522 and #487 to avoid oom problems on gpu with large datasets
+                    if convert_to_numpy:
+                        embeddings = embeddings.cpu()
+
+                all_embeddings.extend(embeddings)
+
+        all_embeddings = [all_embeddings[idx] for idx in np.argsort(length_sorted_idx)]
+
+        if convert_to_tensor:
+            all_embeddings = torch.stack(all_embeddings)
+        elif convert_to_numpy:
+            all_embeddings = np.asarray([emb.numpy() for emb in all_embeddings])
+
+        if input_was_string:
+            all_embeddings = all_embeddings[0]
+
+        return all_embeddings
+
 
 class BigBirdSentenceEmbedder:
     def __init__(self, model: AutoModel, tokenizer: AutoTokenizer) -> None:
@@ -126,7 +283,7 @@ class BigBirdSentenceEmbedder:
             **kwargs,
         )
 
-    def encode(
+    def _encode(
         self, sentence, global_attention_mask=None, output_attentions=False, device=None
     ):
         # Tokenize sentences
@@ -164,6 +321,126 @@ class BigBirdSentenceEmbedder:
         )
 
         return output
+
+    def encode(
+        self,
+        sentences: Union[str, List[str]],
+        batch_size: int = 32,
+        show_progress_bar: bool = None,
+        output_value: str = "sentence_embedding",
+        convert_to_numpy: bool = True,
+        convert_to_tensor: bool = False,
+        device: str = None,
+        normalize_embeddings: bool = False,
+    ) -> Union[List[torch.Tensor], ndarray, torch.Tensor]:
+        """
+        # Test STSbenchmark
+        # Copy from SentenceTransformer
+        Computes sentence embeddings
+
+        :param sentences: the sentences to embed
+        :param batch_size: the batch size used for the computation
+        :param show_progress_bar: Output a progress bar when encode sentences
+        :param output_value:  Default sentence_embedding, to get sentence embeddings. Can be set to token_embeddings to get wordpiece token embeddings. Set to None, to get all output values
+        :param convert_to_numpy: If true, the output is a list of numpy vectors. Else, it is a list of pytorch tensors.
+        :param convert_to_tensor: If true, you get one large tensor as return. Overwrites any setting from convert_to_numpy
+        :param device: Which torch.device to use for the computation
+        :param normalize_embeddings: If set to true, returned vectors will have length 1. In that case, the faster dot-product (util.dot_score) instead of cosine similarity can be used.
+
+        :return:
+           By default, a list of tensors is returned. If convert_to_tensor, a stacked tensor is returned. If convert_to_numpy, a numpy matrix is returned.
+        """
+        if show_progress_bar is None:
+            show_progress_bar = False
+
+        if convert_to_tensor:
+            convert_to_numpy = False
+
+        if output_value != "sentence_embedding":
+            convert_to_tensor = False
+            convert_to_numpy = False
+
+        input_was_string = False
+        if isinstance(sentences, str) or not hasattr(
+            sentences, "__len__"
+        ):  # Cast an individual sentence to a list with length 1
+            sentences = [sentences]
+            input_was_string = True
+
+        all_embeddings = []
+        length_sorted_idx = np.argsort([-_text_length(sen) for sen in sentences])
+        sentences_sorted = [sentences[idx] for idx in length_sorted_idx]
+
+        for start_index in trange(
+            0, len(sentences), batch_size, desc="Batches", disable=not show_progress_bar
+        ):
+            sentences_batch = sentences_sorted[start_index : start_index + batch_size]
+
+            # Tokenize sentences
+            features = self.tokenizer(
+                sentences_batch,
+                padding="max_length",
+                truncation=True,
+                max_length=self.max_length,
+                return_tensors="pt",
+                return_attention_mask=True,
+            )
+
+            if device:
+                features = batch_to_device(features, device)
+
+            with torch.no_grad():
+                out_features = self.model(**features)
+
+                # Perform pooling. In this case, mean pooling
+                sentence_embeddings = mean_pooling(
+                    out_features, features["attention_mask"]
+                )
+
+                out_features["sentence_embedding"] = sentence_embeddings
+
+                if output_value == "token_embeddings":
+                    embeddings = []
+                    for token_emb, attention in zip(
+                        out_features[output_value], out_features["attention_mask"]
+                    ):
+                        last_mask_id = len(attention) - 1
+                        while last_mask_id > 0 and attention[last_mask_id].item() == 0:
+                            last_mask_id -= 1
+
+                        embeddings.append(token_emb[0 : last_mask_id + 1])
+                elif output_value is None:  # Return all outputs
+                    embeddings = []
+                    for sent_idx in range(len(out_features["sentence_embedding"])):
+                        row = {
+                            name: out_features[name][sent_idx] for name in out_features
+                        }
+                        embeddings.append(row)
+                else:  # Sentence embeddings
+                    embeddings = out_features[output_value]
+                    embeddings = embeddings.detach()
+                    if normalize_embeddings:
+                        embeddings = torch.nn.functional.normalize(
+                            embeddings, p=2, dim=1
+                        )
+
+                    # fixes for #522 and #487 to avoid oom problems on gpu with large datasets
+                    if convert_to_numpy:
+                        embeddings = embeddings.cpu()
+
+                all_embeddings.extend(embeddings)
+
+        all_embeddings = [all_embeddings[idx] for idx in np.argsort(length_sorted_idx)]
+
+        if convert_to_tensor:
+            all_embeddings = torch.stack(all_embeddings)
+        elif convert_to_numpy:
+            all_embeddings = np.asarray([emb.numpy() for emb in all_embeddings])
+
+        if input_was_string:
+            all_embeddings = all_embeddings[0]
+
+        return all_embeddings
 
 
 class NystromformerSentenceEmbedder(BigBirdSentenceEmbedder):
