@@ -15,15 +15,17 @@ from nltk.stem.api import StemmerI
 from tabulate import tabulate
 from tqdm import tqdm
 
-from geo_kpe_multidoc import GEO_KPE_MULTIDOC_CACHE_PATH, GEO_KPE_MULTIDOC_OUTPUT_PATH
+from geo_kpe_multidoc import (GEO_KPE_MULTIDOC_CACHE_PATH,
+                              GEO_KPE_MULTIDOC_OUTPUT_PATH)
 from geo_kpe_multidoc.datasets import DATASETS, KPEDataset
 from geo_kpe_multidoc.document import Document
-from geo_kpe_multidoc.evaluation.metrics import MAP, f1_score, nDCG, precision, recall
+from geo_kpe_multidoc.evaluation.metrics import (MAP, f1_score, nDCG,
+                                                 precision, recall)
 from geo_kpe_multidoc.models import EmbedRank, MaskRank, MDKPERank
-from geo_kpe_multidoc.models.embedrank.embedrank_longformer_manual import (
-    EmbedRankManual,
-)
-from geo_kpe_multidoc.models.pre_processing.pre_processing_utils import lemmatize
+from geo_kpe_multidoc.models.embedrank.embedrank_longformer_manual import \
+    EmbedRankManual
+from geo_kpe_multidoc.models.pre_processing.pre_processing_utils import \
+    lemmatize
 from geo_kpe_multidoc.utils.IO import write_to_file
 
 
@@ -481,6 +483,17 @@ def extract_keyphrases_docs(
             )
         )
 
+        # TODO: remove preprocessing outside Document class
+        # TODO: refactor processing gold to function
+        if len(preprocessing) > 0:
+            processed_gold_kp = []
+            for kp in gold_kp:
+                for f in preprocessing:
+                    kp = f(kp)
+                processed_gold_kp.append(kp)
+            gold_kp = processed_gold_kp
+
+        # TODO: check if lemmatize should be also applied to gold
         if lemmer:
             gold_kp = lemmatize(gold_kp, lemmer)
 

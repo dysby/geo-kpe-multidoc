@@ -64,6 +64,10 @@ def remove_special_chars(text: str) -> str:
     return re.sub(r"[\"'`´()$£€\-_^|=/<>~]", " ", text)
 
 
+def remove_new_lines_and_tabs(text: str) -> str:
+    return re.sub(r"[\n\r\t]+", " ", text)
+
+
 def remove_whitespaces(text: str = "") -> str:
     """
     Quick snippet to remove whitespaces

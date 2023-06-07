@@ -48,6 +48,7 @@ from geo_kpe_multidoc.models.embedrank.embedrank_longformer_manual import (
     EmbedRankManual,
 )
 from geo_kpe_multidoc.models.pre_processing.pre_processing_utils import (
+    remove_new_lines_and_tabs,
     remove_special_chars,
     remove_whitespaces,
 )
@@ -257,7 +258,8 @@ def _args_to_options(args):
         options["cache_embeddings"] = True
 
     if args.preprocessing:
-        options["preprocess"] = [remove_special_chars, remove_whitespaces]
+        # options["preprocess"] = [remove_special_chars, remove_whitespaces]
+        options["preprocessing"] = [remove_new_lines_and_tabs, remove_whitespaces]
 
     if args.candidate_mode:
         options["cand_mode"] = args.candidate_mode
