@@ -13,6 +13,7 @@ from torch.utils.data import Dataset
 DATASETS = {
     # zip_file: str = Path to the zip file with docs and annoations.
     "DUC2001": {
+        # source: https://github.com/boudinfl/ake-datasets
         "zip_file": "DUC2001.zip",
         "language": "en",
         "tagger": "en_core_web_trf",

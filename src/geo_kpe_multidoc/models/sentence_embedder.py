@@ -21,16 +21,6 @@ def mean_pooling(model_output, attention_mask):
     return sum_embeddings / sum_mask
 
 
-class SentenceEmbedder(Protocol):
-    def tokenize(self, sentence: Union[str, List[str]], **kwargs) -> Dict:
-        """Tokenize the sentence"""
-
-    def encode(
-        self, sentence, global_attention_mask=None, output_attentions=False, device=None
-    ):
-        """Encode the sentence"""
-
-
 def _text_length(text: Union[List[int], List[List[int]]]):
     """
     Copy from SentenceTransformer
@@ -47,6 +37,16 @@ def _text_length(text: Union[List[int], List[List[int]]]):
         return len(text)
     else:
         return sum([len(t) for t in text])  # Sum of length of individual strings
+
+
+class SentenceEmbedder(Protocol):
+    def tokenize(self, sentence: Union[str, List[str]], **kwargs) -> Dict:
+        """Tokenize the sentence"""
+
+    def encode(
+        self, sentence, global_attention_mask=None, output_attentions=False, device=None
+    ):
+        """Encode the sentence"""
 
 
 class LongformerSentenceEmbedder:
@@ -73,7 +73,7 @@ class LongformerSentenceEmbedder:
             **kwargs,
         )
 
-    def _encode(
+    def encode(
         self,
         sentence,
         global_attention_mask=None,
@@ -132,7 +132,7 @@ class LongformerSentenceEmbedder:
 
         return output
 
-    def encode(
+    def encode_stsbenchmark(
         self,
         sentences: Union[str, List[str]],
         batch_size: int = 32,
@@ -289,7 +289,7 @@ class BigBirdSentenceEmbedder:
             **kwargs,
         )
 
-    def _encode(
+    def encode(
         self, sentence, global_attention_mask=None, output_attentions=False, device=None
     ):
         # Tokenize sentences
@@ -328,7 +328,7 @@ class BigBirdSentenceEmbedder:
 
         return output
 
-    def encode(
+    def encode_stsbenchmark(
         self,
         sentences: Union[str, List[str]],
         batch_size: int = 32,
