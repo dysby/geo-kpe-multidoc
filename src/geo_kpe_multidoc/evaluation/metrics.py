@@ -4,6 +4,27 @@ Evaluation Metrics implementations for string predictions and string true labels
 import numpy as np
 
 
+def get_score_full(candidates, references, maxDepth=15):
+    # from https://github.com/xnliang98/uke_ccrank/
+    # DOI:10.18653/v1/2021.emnlp-main.14
+    precision = []
+    recall = []
+    reference_set = set(references)
+    referencelen = len(reference_set)
+    true_positive = 0
+    for i in range(maxDepth):
+        if len(candidates) > i:
+            kp_pred = candidates[i]
+            if kp_pred in reference_set:
+                true_positive += 1
+            precision.append(true_positive / float(i + 1))
+            recall.append(true_positive / float(referencelen))
+        else:
+            precision.append(true_positive / float(len(candidates)))
+            recall.append(true_positive / float(referencelen))
+    return precision, recall
+
+
 def precision(predictions, true_label):
     p = set(predictions)
     t = set(true_label)
