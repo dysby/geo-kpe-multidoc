@@ -9,6 +9,8 @@ from zipfile import ZipFile
 from loguru import logger
 from torch.utils.data import Dataset
 
+from geo_kpe_multidoc import GEO_KPE_MULTIDOC_DATA_PATH
+
 # Datasets from https://github.com/LIAAD/KeywordExtractor-Datasets
 DATASETS = {
     # zip_file: str = Path to the zip file with docs and annoations.
@@ -191,6 +193,7 @@ def load_data(name, root_dir) -> KPEDataset:
         return ids, documents, keys
 
     zipfile = DATASETS[name].get("zip_file", None)
+    root_dir == root_dir if root_dir else GEO_KPE_MULTIDOC_DATA_PATH
     if zipfile:
         return KPEDataset(name, *_read_zip(path.join(root_dir, zipfile)))
     else:
