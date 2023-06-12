@@ -486,12 +486,12 @@ def extract_keyphrases_docs(
         if len(preprocessing) > 0:
             processed_gold_kp = []
             for kp in gold_kp:
-                for f in preprocessing:
-                    kp = f(kp)
+                for transformation in preprocessing:
+                    kp = transformation(kp)
                 processed_gold_kp.append(kp)
             gold_kp = processed_gold_kp
 
-        # TODO: check if lemmatize should be also applied to gold
+        # Decision: lemmatize is not applied to gold
         # if lemmer:
         #     gold_kp = lemmatize(gold_kp, lemmer)
 
