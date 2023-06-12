@@ -453,6 +453,45 @@ class NystromformerSentenceEmbedder(BigBirdSentenceEmbedder):
     def __init__(self, model: AutoModel, tokenizer: AutoTokenizer) -> None:
         super().__init__(model, tokenizer)
 
+    def encode(
+        self, sentence, global_attention_mask=None, output_attentions=False, device=None
+    ):
+        # Tokenize sentences
+        # Do dot pad (only supports batch size 1)
+        encoded_input = self.tokenizer(
+            sentence,
+            truncation=True,
+            max_length=self.max_length,
+            return_tensors="pt",
+            return_attention_mask=True,
+        )
+
+        device = device if device else self.device
+        encoded_input = batch_to_device(encoded_input, device)
+
+        # Compute token embeddings
+        with torch.no_grad():
+            model_output = self.model(
+                **encoded_input, output_attentions=output_attentions
+            )
+
+        # Perform pooling. In this case, mean pooling
+        sentence_embedding = mean_pooling(model_output, encoded_input["attention_mask"])
+        output = OrderedDict(
+            {
+                # TODO: remove batch dimension?
+                "token_embeddings": model_output[0].squeeze(),
+                "input_ids": encoded_input["input_ids"],
+                "attention_mask": encoded_input["attention_mask"],
+                "sentence_embedding": sentence_embedding.squeeze(),
+                # Output includes attention weights when output_attentions=True
+                # Size(batch_size, num_heads, sequence_length, sequence_length)
+                "attentions": model_output[-1] if output_attentions else None,
+            }
+        )
+
+        return output
+
     def encode_stsbenchmark(
         self,
         sentences: Union[str, List[str]],
@@ -510,7 +549,7 @@ class NystromformerSentenceEmbedder(BigBirdSentenceEmbedder):
             # Tokenize sentences
             features = self.tokenizer(
                 sentences_batch,
-                padding=False,
+                padding=True,
                 truncation=True,
                 max_length=self.max_length,
                 return_tensors="pt",
