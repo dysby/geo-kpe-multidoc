@@ -85,3 +85,15 @@ def stsbenchmark(base_model_name, variant):
 
 if __name__ == "__main__":
     stsbenchmark()
+
+"""
+import pandas as pd
+bigbird = pd.read_csv("similarity_evaluation_bigbird_results.csv")
+nystromformer = pd.read_csv("similarity_evaluation_nystromformer_results.csv")
+longformer = pd.read_csv("similarity_evaluation_longformer_results.csv")
+sbert = pd.read_csv("similarity_evaluation_sts-original_results.csv")
+sim = pd.concat([sbert, longformer, bigbird, nystromformer])
+sim = sim.drop(["epoch",  "steps"], axis=1)
+sim.index = ["sbert", "longformer", "bigbird", "nystromformer"]
+(sim*100).round(decimals=2)
+"""
