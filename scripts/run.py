@@ -516,7 +516,15 @@ def main():
         metrics = performance_metrics.iloc[1]
         mlflow.log_metrics(metrics.to_dict())
 
-    print(tabulate(performance_metrics, headers="keys", floatfmt=".2%"))
+    print(
+        tabulate(
+            performance_metrics[
+                ["Precision", "Recall", "F1", "MAP", "nDCG", "F1_5", "F1_10", "F1_15"]
+            ],
+            headers="keys",
+            floatfmt=".2%",
+        )
+    )
 
     save(dataset_kpe, performance_metrics, fig, args)
 

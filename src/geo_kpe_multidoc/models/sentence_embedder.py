@@ -85,14 +85,19 @@ class LongformerSentenceEmbedder:
             sentence,
             # padding="max_length",
             padding=True,
-            pad_to_multiple_of=self.attention_window,
+            # pad_to_multiple_of=self.attention_window,
             truncation=True,
-            max_length=self.max_length,
+            # max_length=self.max_length,
+            max_length=128,
             return_tensors="pt",
             return_attention_mask=True,
         )
 
         if global_attention_mask is not None:
+            if global_attention_mask.size(1) != encoded_input["attention_mask"].size(1):
+                global_attention_mask = global_attention_mask[
+                    :, : encoded_input["attention_mask"].size(1)
+                ]
             encoded_input["global_attention_mask"] = global_attention_mask
             # TODO: old longformer model attention handling
             # 0 masked
