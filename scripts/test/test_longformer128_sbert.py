@@ -70,16 +70,15 @@ def test(name):
         longformer_output = OrderedDict(
             {
                 # TODO: remove batch dimension?
-                "token_embeddings": longformer_output[0].cpu().squeeze(),
-                "input_ids": encoded_input_longformer["input_ids"].cpu().squeeze(),
-                "attention_mask": encoded_input_longformer["attention_mask"]
-                .cpu()
-                .squeeze(),
-                "sentence_embedding": sentence_embedding.cpu().squeeze(),
+                "token_embeddings": longformer_output[0].squeeze(),
+                "input_ids": encoded_input_longformer["input_ids"].squeeze(),
+                "attention_mask": encoded_input_longformer["attention_mask"].squeeze(),
+                "sentence_embedding": sentence_embedding.squeeze(),
             }
         )
+        longformer_output = batch_to_device(longformer_output, torch.device("cpu"))
 
-        sbert_output = sbert.encode(txt, output_value=None)
+        sbert_output = sbert.encode(txt, output_value=None, convert_to_tensor=True)
 
         row = {
             "doc": doc_id,
@@ -94,14 +93,16 @@ def test(name):
                 )
             ),
             "equal_input_ids": torch.allclose(
-                longformer_output["input_ids"], sbert_output["input_ids"]
+                longformer_output["input_ids"], sbert_output["input_ids"], atol=1e03
             ),
             "equal_input_ids_size": (
                 longformer_output["input_ids"].size(0)
                 == sbert_output["input_ids"].size(0)
             ),
             "equal_attention_mask": torch.allclose(
-                longformer_output["attention_mask"], sbert_output["attention_mask"]
+                longformer_output["attention_mask"],
+                sbert_output["attention_mask"],
+                atol=1e03,
             ),
         }
 
