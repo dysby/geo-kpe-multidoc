@@ -39,6 +39,12 @@ def test(name):
         attention_window,
     )
 
+    # longformer, tokenizer = to_longformer_t_v4(
+    #     SentenceTransformer("paraphrase-multilingual-mpnet-base-v2"),
+    #     max_length,
+    #     attention_window,
+    # )
+
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     longformer = longformer.to(device)
     longformer.eval()
@@ -51,19 +57,24 @@ def test(name):
 
         encoded_input_longformer = tokenizer(
             txt,
-            padding=True,
+            padding="max_length",
             truncation=True,
             max_length=128,
             return_tensors="pt",
             return_attention_mask=True,
         )
 
+        # Longformer
         global_attention_mask = torch.zeros_like(
             encoded_input_longformer["attention_mask"]
         )
-        global_attention_mask[:, :] = 1  # CLS token
-        # global_attention_mask[:, 0] = 1  # CLS token
+        global_attention_mask[:, 0] = 1  # CLS token
         encoded_input_longformer["global_attention_mask"] = global_attention_mask
+        # encoded_input_longformer["global_attention_mask"] = encoded_input_longformer["attention_mask"].detach().clone() #  All tokens with Global
+
+        # to_longformer_t_v4
+        # encoded_input_longformer["attention_mask"] = encoded_input_longformer["attention_mask"] + encoded_input_longformer["attention_mask"]
+        # encoded_input_longformer["attention_mask"][:, 0] = 2 # CLS token
 
         encoded_input_longformer = batch_to_device(encoded_input_longformer, device)
 
@@ -103,17 +114,23 @@ def test(name):
                     sbert_output["token_embeddings"],
                 )
             ),
+            "long_input_ids_size": longformer_output["input_ids"].size(0),
+            "sbert_input_ids_size": sbert_output["input_ids"].size(0),
             "equal_input_ids": torch.allclose(
-                longformer_output["input_ids"], sbert_output["input_ids"], atol=1e03
+                longformer_output["input_ids"][: sbert_output["input_ids"].size(0)],
+                sbert_output["input_ids"],
+                atol=1e-03,
             ),
             "equal_input_ids_size": (
                 longformer_output["input_ids"].size(0)
                 == sbert_output["input_ids"].size(0)
             ),
             "equal_attention_mask": torch.allclose(
-                longformer_output["attention_mask"],
+                longformer_output["attention_mask"][
+                    : sbert_output["input_ids"].size(0)
+                ],
                 sbert_output["attention_mask"],
-                atol=1e03,
+                atol=1e-03,
             ),
         }
 
