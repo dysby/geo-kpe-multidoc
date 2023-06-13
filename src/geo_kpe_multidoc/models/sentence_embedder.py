@@ -85,10 +85,10 @@ class LongformerSentenceEmbedder:
             sentence,
             # padding="max_length",
             padding=True,
-            # pad_to_multiple_of=self.attention_window,
+            pad_to_multiple_of=self.attention_window,
             truncation=True,
-            # max_length=self.max_length,
-            max_length=128,
+            max_length=self.max_length,
+            # max_length=128,
             return_tensors="pt",
             return_attention_mask=True,
         )
