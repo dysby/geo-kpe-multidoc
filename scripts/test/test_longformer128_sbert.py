@@ -70,10 +70,12 @@ def test(name):
         longformer_output = OrderedDict(
             {
                 # TODO: remove batch dimension?
-                "token_embeddings": longformer_output[0].squeeze(),
-                "input_ids": encoded_input_longformer["input_ids"].squeeze(),
-                "attention_mask": encoded_input_longformer["attention_mask"].squeeze(),
-                "sentence_embedding": sentence_embedding.squeeze(),
+                "token_embeddings": longformer_output[0].cpu().squeeze(),
+                "input_ids": encoded_input_longformer["input_ids"].cpu().squeeze(),
+                "attention_mask": encoded_input_longformer["attention_mask"]
+                .cpu()
+                .squeeze(),
+                "sentence_embedding": sentence_embedding.cpu().squeeze(),
             }
         )
 
