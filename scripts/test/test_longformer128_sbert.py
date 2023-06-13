@@ -7,9 +7,11 @@ import pandas as pd
 import torch
 from sentence_transformers import SentenceTransformer
 from sklearn.metrics.pairwise import cosine_similarity
+from tqdm import tqdm
 
 from geo_kpe_multidoc import GEO_KPE_MULTIDOC_OUTPUT_PATH
 from geo_kpe_multidoc.datasets import load_data
+from geo_kpe_multidoc.models.backend._longmodels import to_longformer_t_v4
 from geo_kpe_multidoc.models.backend.roberta2longformer.roberta2longformer import (
     convert_roberta_to_longformer,
 )
@@ -27,9 +29,16 @@ def test(name):
 
     attention_window = 128
     max_length = 4096
-    longformer, tokenizer = convert_roberta_to_longformer(
-        sbert._modules["0"].auto_model, sbert.tokenizer, max_length, attention_window
+    # longformer, tokenizer = convert_roberta_to_longformer(
+    #     sbert._modules["0"].auto_model, sbert.tokenizer, max_length, attention_window
+    # )
+
+    longformer, tokenizer = to_longformer_t_v4(
+        SentenceTransformer("paraphrase-multilingual-mpnet-base-v2"),
+        max_length,
+        attention_window,
     )
+
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     longformer = longformer.to(device)
     longformer.eval()
@@ -37,7 +46,7 @@ def test(name):
     results = pd.DataFrame()
 
     duc2001 = load_data("DUC2001")
-    for doc_id, txt, gold_kp in duc2001:
+    for doc_id, txt, gold_kp in tqdm(duc2001):
         txt = remove_whitespaces(remove_new_lines_and_tabs(txt))
 
         encoded_input_longformer = tokenizer(
@@ -76,9 +85,11 @@ def test(name):
                 "sentence_embedding": sentence_embedding.squeeze(),
             }
         )
-        longformer_output = batch_to_device(longformer_output, torch.device("cpu"))
 
         sbert_output = sbert.encode(txt, output_value=None, convert_to_tensor=True)
+
+        longformer_output = batch_to_device(longformer_output, torch.device("cpu"))
+        sbert_output = batch_to_device(sbert_output, torch.device("cpu"))
 
         row = {
             "doc": doc_id,
@@ -108,7 +119,7 @@ def test(name):
 
         results = pd.concat([results, pd.DataFrame([row])])
 
-    print(results["doc_similarity"].describe())
+    print(results["doc_similarity"].describe().T)
 
     results.to_csv(
         os.path.join(
