@@ -127,7 +127,7 @@ class KPEDataset(Dataset):
         return self.ids[idx], self.documents[idx], self.keys[idx]
 
 
-def load_data(name, root_dir) -> KPEDataset:
+def load_data(name, root_dir=GEO_KPE_MULTIDOC_DATA_PATH) -> KPEDataset:
     """
     name: Supported dataset name, must exist in DATASET dict
     root_dir: str = Data path.
@@ -193,7 +193,6 @@ def load_data(name, root_dir) -> KPEDataset:
         return ids, documents, keys
 
     zipfile = DATASETS[name].get("zip_file", None)
-    root_dir == root_dir if root_dir else GEO_KPE_MULTIDOC_DATA_PATH
     if zipfile:
         return KPEDataset(name, *_read_zip(path.join(root_dir, zipfile)))
     else:
