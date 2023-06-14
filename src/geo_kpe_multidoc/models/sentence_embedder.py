@@ -87,14 +87,14 @@ class LongformerSentenceEmbedder:
             padding=True,
             pad_to_multiple_of=self.attention_window,
             truncation=True,
-            # max_length=self.max_length,
-            max_length=256,
+            max_length=self.max_length,
+            # max_length=256,
             return_tensors="pt",
             return_attention_mask=True,
         )
 
         # limit only to 128 tokens
-        encoded_input["attention_mask"][128:] = 0
+        # encoded_input["attention_mask"][128:] = 0
 
         if global_attention_mask is not None:
             if global_attention_mask.size(1) != encoded_input["attention_mask"].size(1):

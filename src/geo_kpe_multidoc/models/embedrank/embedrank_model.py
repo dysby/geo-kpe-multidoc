@@ -75,6 +75,11 @@ class EmbedRank(BaseKPModel):
         doc.token_embeddings = doc_embeddings["token_embeddings"].detach().cpu()
         doc.attention_mask = doc_embeddings["attention_mask"].detach().cpu()
 
+        # TODO: longformer attention window 256 with inputs only 128
+        # limit_128 = True
+        # if limit_128:
+        #     doc.token_ids = doc.token_ids[:128]
+
         return doc_embeddings["sentence_embedding"].detach().cpu().numpy()
 
     def _search_mentions(self, candidate_mentions, token_ids):
@@ -102,6 +107,9 @@ class EmbedRank(BaseKPModel):
         return mentions  # , mentions_counts
 
     def _embedding_in_n_out_context(self, doc: Document):
+        # TODO: temp to comparison of out context embeddings vs in context embeddings
+        candidate_embeddings = dict()
+
         for candidate in doc.candidate_set:
             candidate_mentions_embeddings = []
             for mention in doc.candidate_mentions[candidate]:
@@ -124,6 +132,12 @@ class EmbedRank(BaseKPModel):
                     candidate_mentions_embeddings.append(
                         mention_out_of_context_embedding
                     )
+
+                    # TODO: temp to comparison of out context embeddings vs in context embeddings
+                    candidate_embeddings["candidate"] = {
+                        "out_context": mention_out_of_context_embedding
+                    }
+
                 else:
                     _, embed_dim = doc.token_embeddings.size()
                     embds = torch.empty(size=(len(mentions), embed_dim))
@@ -133,6 +147,12 @@ class EmbedRank(BaseKPModel):
                         )
                     mention_in_of_context_embedding = np.mean(embds, 0)
 
+                    # TODO: temp to comparison of out context embeddings vs in context embeddings
+                    candidate_embeddings["candidate"] = {
+                        "out_context": mention_out_of_context_embedding,
+                        "in_context": embds,
+                    }
+
                     candidate_mentions_embeddings.append(
                         np.mean(
                             [
@@ -141,6 +161,15 @@ class EmbedRank(BaseKPModel):
                             ]
                         )
                     )
+
+            # TODO: temp to comparison of out context embeddings vs in context embeddings
+            filename = os.path.join(
+                GEO_KPE_MULTIDOC_CACHE_PATH,
+                "temp_embeddings",
+                f"{doc.dataset}-{doc.id}.pkl",
+            )
+            Path(filename).parent.mkdir(exist_ok=True, parents=True)
+            joblib.dump(candidate_embeddings, filename)
 
             doc.candidate_set_embed.append(np.mean(candidate_mentions_embeddings, 0))
 
