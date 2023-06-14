@@ -40,6 +40,9 @@ from geo_kpe_multidoc.models.backend._longmodels import to_longformer_t_v4
 from geo_kpe_multidoc.models.backend.roberta2longformer.roberta2bigbird import (
     convert_roberta_to_bigbird,
 )
+from geo_kpe_multidoc.models.backend.roberta2longformer.roberta2longformer import (
+    convert_roberta_to_longformer,
+)
 from geo_kpe_multidoc.models.backend.roberta2longformer.roberta2nyströmformer import (
     convert_roberta_to_nystromformer,
 )
@@ -297,24 +300,39 @@ def generateLongformerRanker(backend_model_name, tagger_name, args):
         else None
     )
 
-    model_name = f"longformer_paraphrase_mnet_max{new_max_pos}_attw{attention_window}"
+    base_name = backend_model_name.split("/")[-1]
+
+    model_name = f"longformer_{base_name[:15]}_{new_max_pos}_attw{attention_window}"
     if copy_from_position:
         model_name += f"_cpmaxpos{copy_from_position}"
 
-    model, tokenizer = to_longformer_t_v4(
-        SentenceTransformer(backend_model_name),
-        max_pos=new_max_pos,
-        attention_window=attention_window,
-        copy_from_position=copy_from_position,
-    )
-    # in RAM convertion to longformer needs this.
-    if hasattr(model.embeddings, "token_type_ids"):
-        del model.embeddings.token_type_ids
+    # model, tokenizer = to_longformer_t_v4(
+    #     SentenceTransformer(backend_model_name),
+    #     max_pos=new_max_pos,
+    #     attention_window=attention_window,
+    #     copy_from_position=copy_from_position,
+    # )
+    # # in RAM convertion to longformer needs this.
+    # if hasattr(model.embeddings, "token_type_ids"):
+    #     del model.embeddings.token_type_ids
 
+    sbert = SentenceTransformer(backend_model_name)
+
+    longformer_model, longformer_tokenizer = convert_roberta_to_longformer(
+        sbert._modules["0"].auto_model,
+        sbert.tokenizer,
+        new_max_pos,
+        attention_window,
+        copy_from_position,
+    )
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
     kpe_model = EmbedRankManual(
-        model, tokenizer, tagger_name, device=device, name=model_name
+        longformer_model,
+        longformer_tokenizer,
+        tagger=tagger_name,
+        device=device,
+        name=model_name,
     )
     return kpe_model
 
