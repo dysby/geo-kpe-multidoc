@@ -209,7 +209,7 @@ class EmbedRank(BaseKPModel):
                     embds.append(embd)
 
                 # TODO: temp to comparison of out context embeddings vs in context embeddings
-                candidate_embeddings["candidate"] = {"out_context": embds}
+                candidate_embeddings[candidate] = {"out_context": embds}
 
                 doc.candidate_set_embed.append(np.mean(embds, 0))
                 # TODO: problem with original 'andrew - would' vs PoS extracted 'andrew-would'
@@ -224,7 +224,7 @@ class EmbedRank(BaseKPModel):
 
                 embds = embds.numpy()
                 # TODO: temp to comparison of out context embeddings vs in context embeddings
-                candidate_embeddings["candidate"] = {
+                candidate_embeddings[candidate] = {
                     "in_context": [embds[i] for i in range(embds.shape[0])]
                 }
 
