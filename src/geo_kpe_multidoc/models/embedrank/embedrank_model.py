@@ -162,22 +162,24 @@ class EmbedRank(BaseKPModel):
                         )
                     )
 
-            # TODO: temp to comparison of out context embeddings vs in context embeddings
-            filename = os.path.join(
-                GEO_KPE_MULTIDOC_CACHE_PATH,
-                "temp_embeddings",
-                f"{doc.dataset}-{doc.id}.pkl",
-            )
-            Path(filename).parent.mkdir(exist_ok=True, parents=True)
-            joblib.dump(candidate_embeddings, filename)
-
             doc.candidate_set_embed.append(np.mean(candidate_mentions_embeddings, 0))
+
+        # TODO: temp to comparison of out context embeddings vs in context embeddings
+        filename = os.path.join(
+            GEO_KPE_MULTIDOC_CACHE_PATH,
+            "temp_embeddings",
+            f"{doc.dataset}-{doc.id}.pkl",
+        )
+        Path(filename).parent.mkdir(exist_ok=True, parents=True)
+        joblib.dump(candidate_embeddings, filename)
 
     def _embedding_in_context(self, doc: Document, cand_mode: str = ""):
         # if "mean_in_n_out_context" in cand_mode:
         #     self._embedding_in_n_out_context(doc)
         #     return
 
+        # TODO: temp to comparison of out context embeddings vs in context embeddings
+        candidate_embeddings = dict()
         for candidate in doc.candidate_set:
             mentions = self._search_mentions(
                 doc.candidate_mentions[candidate], doc.token_ids
@@ -206,6 +208,9 @@ class EmbedRank(BaseKPModel):
                         )
                     embds.append(embd)
 
+                # TODO: temp to comparison of out context embeddings vs in context embeddings
+                candidate_embeddings["candidate"] = {"out_context": embds}
+
                 doc.candidate_set_embed.append(np.mean(embds, 0))
                 # TODO: problem with original 'andrew - would' vs PoS extracted 'andrew-would'
                 logger.debug(
@@ -218,6 +223,11 @@ class EmbedRank(BaseKPModel):
                     embds[i] = torch.mean(doc.token_embeddings[occurrence, :], dim=0)
 
                 embds = embds.numpy()
+                # TODO: temp to comparison of out context embeddings vs in context embeddings
+                candidate_embeddings["candidate"] = {
+                    "in_context": [embds[i] for i in range(embds.size(0))]
+                }
+
                 if "mean_in_n_out_context" in cand_mode:
                     for mention in doc.candidate_mentions[candidate]:
                         if isinstance(self.model, BaseEmbedder):
@@ -231,11 +241,26 @@ class EmbedRank(BaseKPModel):
                                 .cpu()
                                 .numpy()
                             )
+
                         embds = np.concatenate(
                             [embds, [mention_out_of_context_embedding]]
                         )
 
+                        # TODO: temp to comparison of out context embeddings vs in context embeddings
+                        candidate_embeddings["candidate"].setdefault(
+                            "out_context", []
+                        ).append(mention_out_of_context_embedding)
+
                 doc.candidate_set_embed.append(np.mean(embds, 0))
+
+        # TODO: temp to comparison of out context embeddings vs in context embeddings
+        filename = os.path.join(
+            GEO_KPE_MULTIDOC_CACHE_PATH,
+            "temp_embeddings",
+            f"{doc.dataset}-{doc.id}.pkl",
+        )
+        Path(filename).parent.mkdir(exist_ok=True, parents=True)
+        joblib.dump(candidate_embeddings, filename)
 
     def _embedding_out_context(self, doc: Document, cand_mode: str = ""):
         logger.debug(f"Getting candidate embeddings without context.")
