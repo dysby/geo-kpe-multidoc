@@ -460,7 +460,7 @@ def extract_keyphrases_docs(
     else:
         loader = islice(dataset, n_docs_limit)
 
-    for doc_id, txt, gold_kp in loader:
+    for doc_id, txt, gold_kp in tqdm(loader, total=n_docs_limit):
         logger.info(f"KPE for document {doc_id}")
         top_n_and_scores, candidates = model.extract_kp_from_doc(
             Document(

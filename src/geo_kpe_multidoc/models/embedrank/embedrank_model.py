@@ -134,7 +134,7 @@ class EmbedRank(BaseKPModel):
                     )
 
                     # TODO: temp to comparison of out context embeddings vs in context embeddings
-                    candidate_embeddings["candidate"] = {
+                    candidate_embeddings[candidate] = {
                         "out_context": mention_out_of_context_embedding
                     }
 
@@ -148,7 +148,7 @@ class EmbedRank(BaseKPModel):
                     mention_in_of_context_embedding = np.mean(embds, 0)
 
                     # TODO: temp to comparison of out context embeddings vs in context embeddings
-                    candidate_embeddings["candidate"] = {
+                    candidate_embeddings[candidate] = {
                         "out_context": mention_out_of_context_embedding,
                         "in_context": embds,
                     }
@@ -225,7 +225,7 @@ class EmbedRank(BaseKPModel):
                 embds = embds.numpy()
                 # TODO: temp to comparison of out context embeddings vs in context embeddings
                 candidate_embeddings["candidate"] = {
-                    "in_context": [embds[i] for i in range(embds.size(0))]
+                    "in_context": [embds[i] for i in range(embds.shape[0])]
                 }
 
                 if "mean_in_n_out_context" in cand_mode:
@@ -247,7 +247,7 @@ class EmbedRank(BaseKPModel):
                         )
 
                         # TODO: temp to comparison of out context embeddings vs in context embeddings
-                        candidate_embeddings["candidate"].setdefault(
+                        candidate_embeddings[candidate].setdefault(
                             "out_context", []
                         ).append(mention_out_of_context_embedding)
 
