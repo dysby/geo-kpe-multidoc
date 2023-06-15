@@ -14,11 +14,14 @@ from geo_kpe_multidoc import GEO_KPE_MULTIDOC_CACHE_PATH
 from geo_kpe_multidoc.datasets.datasets import KPEDataset
 from geo_kpe_multidoc.document import Document
 from geo_kpe_multidoc.models.backend.select_backend import select_backend
-from geo_kpe_multidoc.models.candidate_extract.candidate_extract_model import \
-    KPECandidateExtractionModel
+from geo_kpe_multidoc.models.candidate_extract.candidate_extract_model import (
+    KPECandidateExtractionModel,
+)
 from geo_kpe_multidoc.models.pre_processing.pos_tagging import POS_tagger
 from geo_kpe_multidoc.models.pre_processing.pre_processing_utils import (
-    remove_punctuation, remove_whitespaces)
+    remove_punctuation,
+    remove_whitespaces,
+)
 
 KPEScore = Tuple[str, float]
 
@@ -120,7 +123,7 @@ class BaseKPModel:
             doc, top_n, min_len, stemmer, **kwargs
         )
 
-        logger.info(f"Document #{self.counter} processed")
+        logger.debug(f"Document #{self.counter} processed")
         self.counter += 1
         torch.cuda.empty_cache()
 
@@ -171,7 +174,7 @@ class ExtractionEvaluator(BaseKPModel):
 
         top_n_scores = [(candidate, 0.5) for candidate in doc.candidate_set[:top_n]]
 
-        logger.info(f"Document #{self.counter} processed")
+        logger.debug(f"Document #{self.counter} processed")
         self.counter += 1
 
         return (top_n_scores, doc.candidate_set)

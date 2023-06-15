@@ -113,8 +113,6 @@ class EmbedRank(BaseKPModel):
         for candidate in doc.candidate_set:
             candidate_mentions_embeddings = []
             for mention in doc.candidate_mentions[candidate]:
-                mentions = self._search_mentions([mention], doc.token_ids)
-
                 if isinstance(self.model, BaseEmbedder):
                     mention_out_of_context_embedding = self.model.embed(mention)
                 else:
@@ -127,6 +125,7 @@ class EmbedRank(BaseKPModel):
                         .numpy()
                     )
 
+                mentions = self._search_mentions([mention], doc.token_ids)
                 if len(mentions) == 0:
                     # backoff procedure, if mention is not found.
                     candidate_mentions_embeddings.append(
@@ -134,8 +133,9 @@ class EmbedRank(BaseKPModel):
                     )
 
                     # TODO: temp to comparison of out context embeddings vs in context embeddings
-                    candidate_embeddings[candidate] = {
-                        "out_context": mention_out_of_context_embedding
+                    candidate_embeddings[mention] = {
+                        "out_context": mention_out_of_context_embedding,
+                        "in_context": [],
                     }
 
                 else:
@@ -145,19 +145,20 @@ class EmbedRank(BaseKPModel):
                         embds[i] = torch.mean(
                             doc.token_embeddings[occurrence, :], dim=0
                         )
-                    mention_in_of_context_embedding = np.mean(embds, 0)
+                    mention_in_context_embedding = np.mean(embds, 0)
 
                     # TODO: temp to comparison of out context embeddings vs in context embeddings
-                    candidate_embeddings[candidate] = {
+                    embds = embds.numpy()
+                    candidate_embeddings[mention] = {
                         "out_context": mention_out_of_context_embedding,
-                        "in_context": embds,
+                        "in_context": [embds[i] for i in range(embds.shape[0])],
                     }
 
                     candidate_mentions_embeddings.append(
                         np.mean(
                             [
                                 mention_out_of_context_embedding,
-                                mention_in_of_context_embedding,
+                                mention_in_context_embedding,
                             ]
                         )
                     )
@@ -174,12 +175,13 @@ class EmbedRank(BaseKPModel):
         joblib.dump(candidate_embeddings, filename)
 
     def _embedding_in_context(self, doc: Document, cand_mode: str = ""):
-        # if "mean_in_n_out_context" in cand_mode:
-        #     self._embedding_in_n_out_context(doc)
-        #     return
+        if "mean_in_n_out_context" in cand_mode:
+            self._embedding_in_n_out_context(doc)
+            return
 
         # TODO: temp to comparison of out context embeddings vs in context embeddings
         candidate_embeddings = dict()
+
         for candidate in doc.candidate_set:
             mentions = self._search_mentions(
                 doc.candidate_mentions[candidate], doc.token_ids
@@ -400,13 +402,13 @@ class EmbedRank(BaseKPModel):
         doc.doc_embed = self._embed_doc(
             doc, stemmer, doc_mode, post_processing, output_attentions=output_attentions
         )
-        logger.info(f"Embed Doc in {time() -  t:.2f}s")
+        logger.debug(f"Embed Doc in {time() -  t:.2f}s")
 
         t = time()
         self._aggregate_candidate_mention_embeddings(
             doc, stemmer, cand_mode, post_processing
         )
-        logger.info(f"Embed Candidates in {time() -  t:.2f}s")
+        logger.debug(f"Embed Candidates in {time() -  t:.2f}s")
 
         if use_cache:
             self._save_embeddings_in_cache(doc)

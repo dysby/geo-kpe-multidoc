@@ -457,6 +457,7 @@ def extract_keyphrases_docs(
         n_docs_limit = 1
     elif n_docs_limit == -1:
         loader = dataset
+        n_docs_limit = len(dataset)
     else:
         loader = islice(dataset, n_docs_limit)
 
