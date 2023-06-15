@@ -145,10 +145,10 @@ class EmbedRank(BaseKPModel):
                         embds[i] = torch.mean(
                             doc.token_embeddings[occurrence, :], dim=0
                         )
+                    embds = embds.numpy()
                     mention_in_context_embedding = np.mean(embds, 0)
 
                     # TODO: temp to comparison of out context embeddings vs in context embeddings
-                    embds = embds.numpy()
                     candidate_embeddings[mention] = {
                         "out_context": mention_out_of_context_embedding,
                         "in_context": [embds[i] for i in range(embds.shape[0])],
