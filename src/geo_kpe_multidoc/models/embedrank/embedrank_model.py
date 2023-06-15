@@ -159,7 +159,8 @@ class EmbedRank(BaseKPModel):
                             [
                                 mention_out_of_context_embedding,
                                 mention_in_context_embedding,
-                            ]
+                            ],
+                            0,
                         )
                     )
 
