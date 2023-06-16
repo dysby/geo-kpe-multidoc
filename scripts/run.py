@@ -7,7 +7,6 @@ from os import path
 from pathlib import Path
 from time import time
 
-import joblib
 import mlflow
 import pandas as pd
 import torch
@@ -18,6 +17,7 @@ from pandas import DataFrame
 from sentence_transformers import SentenceTransformer
 from tabulate import tabulate
 
+import wandb
 from geo_kpe_multidoc import (
     GEO_KPE_MULTIDOC_CACHE_PATH,
     GEO_KPE_MULTIDOC_DATA_PATH,
@@ -480,9 +480,9 @@ def main():
     # --------------- Run Experiment ------------------
     # -------------------------------------------------
 
-    mlflow.set_tracking_uri(
-        Path(GEO_KPE_MULTIDOC_OUTPUT_PATH).joinpath("mlruns").as_uri()
-    )
+    # mlflow.set_tracking_uri(
+    #     Path(GEO_KPE_MULTIDOC_OUTPUT_PATH).joinpath("mlruns").as_uri()
+    # )
 
     tags = {
         "dataset": args.dataset_name,
@@ -490,9 +490,12 @@ def main():
         "rank_model": args.rank_model,
     }
 
-    with mlflow.start_run(run_name=args.experiment_name, tags=tags):
-        for parameter, value in vars(args).items():
-            mlflow.log_param(parameter, value)
+    # with mlflow.start_run(run_name=args.experiment_name, tags=tags):
+    with wandb.init(
+        project="geo-kpe-multidoc", name=f"{args.experiment_name}", config=vars(args)
+    ):
+        # for parameter, value in vars(args).items():
+        #     mlflow.log_param(parameter, value)
 
         model_results, true_labels = extract_eval(
             data,
@@ -517,22 +520,29 @@ def main():
             xlim=(0, 1),
         )
 
-        mlflow.log_figure(fig, artifact_file="score_distribution.png")
+        # mlflow.log_figure(fig, artifact_file="score_distribution.png")
+        wandb.log({"score_distribution": wandb.Image(fig)})
 
         performance_metrics = evaluate_kp_extraction_base(model_results, true_labels)
         performance_metrics = pd.concat(
             [performance_metrics, evaluate_kp_extraction(model_results, true_labels)]
         )
-        mlflow.log_text(kpe_for_doc, artifact_file="first-doc-extraction-sample.txt")
+        # mlflow.log_text(kpe_for_doc, artifact_file="first-doc-extraction-sample.txt")
+        wandb.log({"first-doc-extraction-sample": kpe_for_doc})
 
         metric_names = [
             "_base_" + value for value in performance_metrics.iloc[0].index.values
         ]
         metrics = performance_metrics.iloc[0]
         metrics.index = metric_names
-        mlflow.log_metrics(metrics.to_dict())
+        all_metrics = metrics.to_dict()
+
+        # mlflow.log_metrics(metrics.to_dict())
         metrics = performance_metrics.iloc[1]
-        mlflow.log_metrics(metrics.to_dict())
+        # mlflow.log_metrics(metrics.to_dict())
+
+        all_metrics.update(metrics.to_dict())
+        wandb.log(all_metrics)
 
     print(
         tabulate(
