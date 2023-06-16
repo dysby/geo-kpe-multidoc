@@ -104,13 +104,40 @@ def postprocess_dataset_labels(
             for kp in corpus_true_labels[dataset][i]:
                 # if lemmer:
                 #     kp = lemmatize(kp, lemmer)
+
+                # TODO: Multi Language SnowballStemmer
+                # copy from https://github.com/LIAAD/kep/blob/master/kep/utility.py
+                # ISO_to_language_stemming_SnowballStemmer = {'en': 'english',
+                #    'pt': 'portuguese',
+                #    'fr': 'french',
+                #    'es': 'spanish',
+                #    'it': 'italian',
+                #    'nl': 'dutch',
+                #    'de': 'german',
+                #    'da': 'danish',
+                #    'fi': 'finnish',
+                #    'da': 'danish',
+                #    'hu': 'hungarian',
+                #    'nb': 'norwegian',
+                #    'ro': 'romanian',
+                #    'ru': 'russian',
+                #    'sv': 'swedish'}
+                # if normalization == "stemming":
+                #     if lang == 'en':
+                #         # create a new instance of a porter stemmer
+                #         stemmer = SnowballStemmer("porter")
+                #     else:
+                #         # create a new instance of a porter stemmer
+                #         stemmer = SnowballStemmer(ISO_to_language_stemming_SnowballStemmer[lang],
+                #                                 ignore_stopwords=True)
+
                 if stemmer:
                     kp = " ".join(
                         # [stemmer.stem(w) for w in simplemma.simple_tokenizer(kp)]
                         stemmer.stem(w)
-                        for w in kp.split()
+                        for w in kp.lower().split()
                     )
-                doc_results.append(kp.lower())
+                doc_results.append(kp)
             res[dataset].append(doc_results)
     return res
 
