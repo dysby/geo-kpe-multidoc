@@ -1,6 +1,8 @@
 from typing import Dict
 
 import numpy as np
+import pandas as pd
+import torch
 from loguru import logger
 from vincenty import vincenty
 
@@ -65,7 +67,11 @@ def cached_vincenty(c1, c2):
     return vincenty(c1, c2)
 
 
-def MoranI(scores, weight_matrix):
+def MoranI(
+    scores: pd.Series,
+    weight_matrix: np.array,
+    device: torch.device = torch.device("cpu"),
+):
     r"""
     .. math::
         I = \frac{z\top W z}{z \top z}
@@ -77,19 +83,23 @@ def MoranI(scores, weight_matrix):
 
 
     """
-    n = len(scores)
+    N = len(scores)
 
-    if n < 2:
-        # logger.warning("MoranI over a single observation. Returning np.NAN.")
+    if N < 2:
         return np.nan
 
     std = scores.std()
     if std == 0:
-        # logger.debug("MoranI over a constant surface. Returning 1.")
         return 1
+
     z = (scores - scores.mean()) / (scores.std())
 
-    moranI = z.T @ weight_matrix @ z / (z.T @ z)
+    z = torch.from_numpy(z.to_numpy()).to(device)
+    w = torch.from_numpy(weight_matrix).to(device).float()
+
+    moranI = z.T @ w @ z / (z.T @ z)
+
+    moranI = moranI.cpu().numpy().item()
     # mean = np.mean(scores)
     # adjusted_scores = scores - mean
 
@@ -107,7 +117,7 @@ def MoranI(scores, weight_matrix):
     return moranI
 
 
-def GearyC(scores, weight_matrix):
+def GearyC(scores: pd.Series, weight_matrix: np.array) -> float:
     """The value of Geary's C lies between 0 and some unspecified value greater than 1.
     Values significantly lower than 1 demonstrate increasing positive spatial autocorrelation,
     whilst values significantly higher than 1 illustrate increasing negative spatial autocorrelation.
@@ -120,12 +130,13 @@ def GearyC(scores, weight_matrix):
         the same value regardless of spacial position.
     """
 
-    n = len(scores)
+    N = len(scores)
 
-    if n < 2:
+    if N < 2:
         # logger.warning("GearyC over a single observation. Returning np.NAN.")
         return np.nan
 
+    scores = scores.to_numpy()
     mean = np.mean(scores)
     # sum_adjusted_scores = np.sum([(score - mean) ** 2 for score in scores])
     sum_adjusted_scores = np.sum((scores - mean) ** 2)
@@ -142,18 +153,19 @@ def GearyC(scores, weight_matrix):
     ).sum()  # elementwize product and sum all
     sum2 = weight_matrix.sum()
 
-    gearyC = ((n - 1.0) * sum1) / (2.0 * sum2 * sum_adjusted_scores)
+    gearyC = ((N - 1.0) * sum1) / (2.0 * sum2 * sum_adjusted_scores)
     return gearyC
 
 
-def GetisOrdG(scores, weight_matrix):
+def GetisOrdG(scores: pd.Series, weight_matrix: np.array) -> float:
     n = len(scores)
 
     if n < 2:
         # logger.warning("GetisOrdG over a single value. Returning np.NAN.")
         return np.nan
+    scores = scores.to_numpy()
 
-    outer_mul_scores = np.outer(np.asarray(scores), np.asarray(scores))
+    outer_mul_scores = np.outer(scores, scores)
 
     sum1 = (weight_matrix * outer_mul_scores).sum()  # elementwize product and sum all
     sum2 = outer_mul_scores.sum()
