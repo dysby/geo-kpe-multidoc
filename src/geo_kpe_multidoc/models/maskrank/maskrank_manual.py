@@ -49,6 +49,8 @@ class MaskFirst:
         for _, mentions in doc.candidate_mentions.items():
             text = doc.raw_text
             for mention in mentions:
+                if mention not in text:
+                    logger.debug(f"Mention '{mention}' - not in text")
                 text = text.replace(mention, "<mask>", self.occurrences)
                 if self.occurrences == 1:
                     break
@@ -268,7 +270,6 @@ class LongformerMaskRank(BaseKPModel):
 
             The default value is MaskAll.
         """
-
         t = time()
         doc.doc_embed = self._embed_doc(doc)
         logger.debug(f"Embed Doc in {time() -  t:.2f}s")
