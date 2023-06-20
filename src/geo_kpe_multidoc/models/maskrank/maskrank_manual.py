@@ -209,21 +209,14 @@ class LongformerMaskRank(BaseKPModel):
 
         doc_embed = doc_embed.reshape(1, -1)
         # TODO: simplify cand_mode if to test only MaskHighest
-        if "cand_mode" not in kwargs or kwargs["cand_mode"] != "MaskHighest":
+        if cand_mode != "MaskHighest":
             doc_sim = cosine_similarity(candidate_set_embed, doc_embed)
-
-        elif kwargs["cand_mode"] == "MaskHighest":
+        else:
+            # cand_mode == "MaskHighest":
             for mask_cand_occur in candidate_set_embed:
                 if mask_cand_occur != []:
                     doc_sim.append(
-                        [
-                            # np.ndarray.min(
-                            #     np.absolute(
-                            #         cosine_similarity(mask_cand_occur, doc_embed)
-                            #     )
-                            # )
-                            cosine_similarity(mask_cand_occur, doc_embed).min()
-                        ]
+                        [cosine_similarity(mask_cand_occur, doc_embed).min()]
                     )
                 else:
                     doc_sim.append(np.array([1.0]))
@@ -275,6 +268,11 @@ class LongformerMaskRank(BaseKPModel):
 
             The default value is MaskAll.
         """
+
+        t = time()
+        doc.doc_embed = self._embed_doc(doc)
+        logger.debug(f"Embed Doc in {time() -  t:.2f}s")
+
         doc.candidate_set_embed = []
 
         strategies: dict[str, CandidateMaskEmbeddingStrategy] = {
@@ -286,4 +284,6 @@ class LongformerMaskRank(BaseKPModel):
 
         strategy = strategies[cand_mode]
 
+        t = time()
         strategy().candidate_embeddings(self.model, doc)
+        logger.debug(f"Embed Candidates in {time() -  t:.2f}s")
