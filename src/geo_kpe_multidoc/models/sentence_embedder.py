@@ -42,11 +42,27 @@ def _text_length(text: Union[List[int], List[List[int]]]):
 class SentenceEmbedder(Protocol):
     def tokenize(self, sentence: Union[str, List[str]], **kwargs) -> Dict:
         """Tokenize the sentence"""
+        ...
 
     def encode(
         self, sentence, global_attention_mask=None, output_attentions=False, device=None
     ):
         """Encode the sentence"""
+        ...
+
+    def encode_batch(
+        self,
+        sentences: Union[str, List[str]],
+        batch_size: int = 32,
+        show_progress_bar: bool = None,
+        output_value: str = "sentence_embedding",
+        convert_to_numpy: bool = True,
+        convert_to_tensor: bool = False,
+        device: str = None,
+        normalize_embeddings: bool = False,
+        global_attention_mask=None,
+    ) -> Union[List[torch.Tensor], ndarray, torch.Tensor]:
+        ...
 
 
 class LongformerSentenceEmbedder:
@@ -140,7 +156,7 @@ class LongformerSentenceEmbedder:
 
         return output
 
-    def encode_stsbenchmark(
+    def encode_batch(
         self,
         sentences: Union[str, List[str]],
         batch_size: int = 32,
