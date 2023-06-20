@@ -412,15 +412,16 @@ def output_one_top_cands(
 
     for dataset in model_results.keys():
         doc_idx = doc_ids.index(doc_id) if doc_id else 0
-        doc_keys = [kp for kp, _ in model_results[dataset][doc_idx][0]]
+        # doc_keys = [kp for kp, _ in model_results[dataset][doc_idx][0]]
+        doc_keys = model_results[dataset][doc_idx][0]
         gold_keys = true_labels[dataset][doc_idx]
         print(f"Keyphrase extraction for {doc_id}")
         table = tabulate(
             [
-                [dk, gk]
+                [dk[0], dk[1], gk]
                 for dk, gk in zip_longest(doc_keys[:top_n], gold_keys, fillvalue="-")
             ],
-            headers=["Extracted", "Gold"],
+            headers=["Extracted", "Score", "Gold"],
         )
         print(table)
     return table
