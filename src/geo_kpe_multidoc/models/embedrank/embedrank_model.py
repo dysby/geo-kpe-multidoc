@@ -48,160 +48,6 @@ def _search_mentions(model, candidate_mentions, token_ids):
     return mentions  # , mentions_counts
 
 
-class CandidateEmbeddingStrategy(Protocol):
-    def candidate_embeddings(self, model, doc: Document):
-        ...
-
-
-class OutContextMentionsEmbedding(CandidateEmbeddingStrategy):
-    def candidate_embeddings(self, model, doc: Document):
-        for candidate in doc.candidate_set:
-            for mention in doc.candidate_mentions[candidate]:
-                embds = []
-                if isinstance(model, BaseEmbedder):
-                    embd = model.embed(mention)
-                else:
-                    embd = (
-                        model.encode(mention, device=model.device)["sentence_embedding"]
-                        .detach()
-                        .cpu()
-                        .numpy()
-                    )
-                embds.append(embd)
-
-            doc.candidate_set_embed.append(np.mean(embds, 0))
-
-
-class OutContextEmbedding(CandidateEmbeddingStrategy):
-    def candidate_embeddings(self, model, doc: Document):
-        for candidate in doc.candidate_set:
-            if isinstance(model, BaseEmbedder):
-                embd = model.embed(candidate)
-            else:
-                embd = (
-                    self.model.encode(candidate, device=device)["sentence_embedding"]
-                    .detach()
-                    .cpu()
-                    .numpy()
-                )
-
-            doc.candidate_set_embed.append(embd)
-
-
-class InContextEmbeddings(CandidateEmbeddingStrategy):
-    def candidate_embeddings(self, model, doc: Document):
-        for candidate in doc.candidate_set:
-            mentions = _search_mentions(
-                model, doc.candidate_mentions[candidate], doc.token_ids
-            )
-
-            # backoff procedure, if mentions not found.
-            # If this form is not present in token ids (remember max 4096), fallback to embedding without context.
-            # Can happen that tokenization gives different input_ids and the candidate form is not found in document
-            # input_ids.
-            # candidate is beyond max position for emdedding
-            # return a non-contextualized embedding.
-            if len(mentions) == 0:
-                # TODO: candidate -> mentions
-                for mention in doc.candidate_mentions[candidate]:
-                    embds = []
-                    if isinstance(model, BaseEmbedder):
-                        embd = model.embed(mention)
-                    else:
-                        embd = (
-                            model.encode(mention, device=model.device)[
-                                "sentence_embedding"
-                            ]
-                            .detach()
-                            .cpu()
-                            .numpy()
-                        )
-                    embds.append(embd)
-
-                doc.candidate_set_embed.append(np.mean(embds, 0))
-                # TODO: problem with original 'andrew - would' vs PoS extracted 'andrew-would'
-                logger.debug(
-                    f"Candidate {candidate} - mentions not found: {doc.candidate_mentions[candidate]}"
-                )
-            else:
-                _, embed_dim = doc.token_embeddings.size()
-                embds = torch.empty(size=(len(mentions), embed_dim))
-                for i, occurrence in enumerate(mentions):
-                    embds[i] = torch.mean(doc.token_embeddings[occurrence, :], dim=0)
-
-                embds = embds.numpy()
-                doc.candidate_set_embed.append(np.mean(embds, 0))
-
-
-class InAndOutContextEmbeddings(CandidateEmbeddingStrategy):
-    def candidate_embeddings(self, model, doc: Document):
-        # TODO: temp to comparison of out context embeddings vs in context embeddings
-        candidate_embeddings = dict()
-
-        for candidate in doc.candidate_set:
-            candidate_mentions_embeddings = []
-            for mention in doc.candidate_mentions[candidate]:
-                if isinstance(model, BaseEmbedder):
-                    mention_out_of_context_embedding = model.embed(mention)
-                else:
-                    mention_out_of_context_embedding = (
-                        model.encode(mention, device=model.device)["sentence_embedding"]
-                        .detach()
-                        .cpu()
-                        .numpy()
-                    )
-
-                mentions = _search_mentions([mention], doc.token_ids)
-                if len(mentions) == 0:
-                    # backoff procedure, if mention is not found.
-                    candidate_mentions_embeddings.append(
-                        mention_out_of_context_embedding
-                    )
-
-                    # TODO: temp to comparison of out context embeddings vs in context embeddings
-                    candidate_embeddings[mention] = {
-                        "out_context": mention_out_of_context_embedding,
-                        "in_context": [],
-                    }
-
-                else:
-                    _, embed_dim = doc.token_embeddings.size()
-                    embds = torch.empty(size=(len(mentions), embed_dim))
-                    for i, occurrence in enumerate(mentions):
-                        embds[i] = torch.mean(
-                            doc.token_embeddings[occurrence, :], dim=0
-                        )
-                    embds = embds.numpy()
-                    mention_in_context_embedding = np.mean(embds, 0)
-
-                    # TODO: temp to comparison of out context embeddings vs in context embeddings
-                    candidate_embeddings[mention] = {
-                        "out_context": mention_out_of_context_embedding,
-                        "in_context": [embds[i] for i in range(embds.shape[0])],
-                    }
-
-                    candidate_mentions_embeddings.append(
-                        np.mean(
-                            [
-                                mention_out_of_context_embedding,
-                                mention_in_context_embedding,
-                            ],
-                            0,
-                        )
-                    )
-
-            doc.candidate_set_embed.append(np.mean(candidate_mentions_embeddings, 0))
-
-        # TODO: temp to comparison of out context embeddings vs in context embeddings
-        filename = os.path.join(
-            GEO_KPE_MULTIDOC_CACHE_PATH,
-            "temp_embeddings",
-            f"{doc.dataset}-{doc.id}.pkl",
-        )
-        Path(filename).parent.mkdir(exist_ok=True, parents=True)
-        joblib.dump(candidate_embeddings, filename)
-
-
 class EmbedRank(BaseKPModel):
     """
     Simple class to encapsulate EmbedRank functionality. Uses
@@ -256,30 +102,6 @@ class EmbedRank(BaseKPModel):
 
         return doc_embeddings["sentence_embedding"].detach().cpu().numpy()
 
-    def _search_mentions(self, candidate_mentions, token_ids):
-        mentions = []
-        # TODO: mention counts for mean_in_n_out_context
-        # mentions_counts = []
-        for mention in candidate_mentions:
-            if isinstance(self.model, BaseEmbedder):
-                # original tokenization by KeyBert/SentenceTransformer
-                tokenized_candidate = tokenize_hf(mention, self.model)
-            else:
-                # tokenize via local SentenceEmbedder Class
-                tokenized_candidate = self.model.tokenize(mention)
-
-            filt_ids = filter_special_tokens(tokenized_candidate["input_ids"])
-
-            # Should not be Empty after filter
-            if filt_ids:
-                mentions += find_occurrences(filt_ids, token_ids)
-            # mentions_counts.append(len(mentions))
-
-        # mentions_counts = mentions_counts[:1] + [
-        #     y - x for x, y in pairwise(mentions_counts)
-        # ]
-        return mentions  # , mentions_counts
-
     def _embedding_in_n_out_context(self, doc: Document):
         # TODO: temp to comparison of out context embeddings vs in context embeddings
         candidate_embeddings = dict()
@@ -299,7 +121,7 @@ class EmbedRank(BaseKPModel):
                         .numpy()
                     )
 
-                mentions = self._search_mentions([mention], doc.token_ids)
+                mentions = _search_mentions(self.model, [mention], doc.token_ids)
                 if len(mentions) == 0:
                     # backoff procedure, if mention is not found.
                     candidate_mentions_embeddings.append(
@@ -358,8 +180,8 @@ class EmbedRank(BaseKPModel):
         # candidate_embeddings = dict()
 
         for candidate in doc.candidate_set:
-            mentions = self._search_mentions(
-                doc.candidate_mentions[candidate], doc.token_ids
+            mentions = _search_mentions(
+                self.model, doc.candidate_mentions[candidate], doc.token_ids
             )
 
             # backoff procedure, if mentions not found.
@@ -508,8 +330,8 @@ class EmbedRank(BaseKPModel):
         mentions = []
         for candidate in doc.candidate_set:
             # mentions_positions, _ = self._search_mentions(doc, candidate)
-            mentions_positions = self._search_mentions(
-                doc.candidate_mentions[candidate], doc.token_ids
+            mentions_positions = _search_mentions(
+                self.model, doc.candidate_mentions[candidate], doc.token_ids
             )
             if len(mentions_positions) > 0:
                 # candidate mentions where found in document token_ids

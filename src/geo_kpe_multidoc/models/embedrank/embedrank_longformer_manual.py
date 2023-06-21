@@ -27,8 +27,7 @@ from geo_kpe_multidoc.models.sentence_embedder import (
 
 class EmbedRankManual(EmbedRank):
     """
-    Simple class to encapsulate EmbedRank functionality. Uses
-    the KeyBert backend to retrieve models
+    EmbedRank variant for Longformer model
     """
 
     def __init__(
