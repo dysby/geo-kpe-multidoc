@@ -18,6 +18,13 @@ from sklearn.metrics.pairwise import cosine_similarity
 from geo_kpe_multidoc import GEO_KPE_MULTIDOC_CACHE_PATH
 from geo_kpe_multidoc.document import Document
 from geo_kpe_multidoc.models.base_KP_model import BaseKPModel, find_occurrences
+from geo_kpe_multidoc.models.embedrank.embedding_strategy import (
+    CandidateEmbeddingStrategy,
+    InAndOutContextEmbeddings,
+    InContextEmbeddings,
+    OutContextEmbedding,
+    OutContextMentionsEmbedding,
+)
 from geo_kpe_multidoc.models.pre_processing.post_processing_utils import (
     z_score_normalization,
 )
@@ -102,202 +109,6 @@ class EmbedRank(BaseKPModel):
 
         return doc_embeddings["sentence_embedding"].detach().cpu().numpy()
 
-    def _embedding_in_n_out_context(self, doc: Document):
-        # TODO: temp to comparison of out context embeddings vs in context embeddings
-        candidate_embeddings = dict()
-
-        for candidate in doc.candidate_set:
-            candidate_mentions_embeddings = []
-            for mention in doc.candidate_mentions[candidate]:
-                if isinstance(self.model, BaseEmbedder):
-                    mention_out_of_context_embedding = self.model.embed(mention)
-                else:
-                    mention_out_of_context_embedding = (
-                        self.model.encode(mention, device=self.device)[
-                            "sentence_embedding"
-                        ]
-                        .detach()
-                        .cpu()
-                        .numpy()
-                    )
-
-                mentions = _search_mentions(self.model, [mention], doc.token_ids)
-                if len(mentions) == 0:
-                    # backoff procedure, if mention is not found.
-                    candidate_mentions_embeddings.append(
-                        mention_out_of_context_embedding
-                    )
-
-                    # TODO: temp to comparison of out context embeddings vs in context embeddings
-                    candidate_embeddings[mention] = {
-                        "out_context": mention_out_of_context_embedding,
-                        "in_context": [],
-                    }
-
-                else:
-                    _, embed_dim = doc.token_embeddings.size()
-                    embds = torch.empty(size=(len(mentions), embed_dim))
-                    for i, occurrence in enumerate(mentions):
-                        embds[i] = torch.mean(
-                            doc.token_embeddings[occurrence, :], dim=0
-                        )
-                    embds = embds.numpy()
-                    mention_in_context_embedding = np.mean(embds, 0)
-
-                    # TODO: temp to comparison of out context embeddings vs in context embeddings
-                    candidate_embeddings[mention] = {
-                        "out_context": mention_out_of_context_embedding,
-                        "in_context": [embds[i] for i in range(embds.shape[0])],
-                    }
-
-                    candidate_mentions_embeddings.append(
-                        np.mean(
-                            [
-                                mention_out_of_context_embedding,
-                                mention_in_context_embedding,
-                            ],
-                            0,
-                        )
-                    )
-
-            doc.candidate_set_embed.append(np.mean(candidate_mentions_embeddings, 0))
-
-        # TODO: temp to comparison of out context embeddings vs in context embeddings
-        filename = os.path.join(
-            GEO_KPE_MULTIDOC_CACHE_PATH,
-            "temp_embeddings",
-            f"{doc.dataset}-{doc.id}.pkl",
-        )
-        Path(filename).parent.mkdir(exist_ok=True, parents=True)
-        joblib.dump(candidate_embeddings, filename)
-
-    def _embedding_in_context(self, doc: Document, cand_mode: str = ""):
-        if "mean_in_n_out_context" in cand_mode:
-            self._embedding_in_n_out_context(doc)
-            return
-
-        # TODO: temp to comparison of out context embeddings vs in context embeddings
-        # candidate_embeddings = dict()
-
-        for candidate in doc.candidate_set:
-            mentions = _search_mentions(
-                self.model, doc.candidate_mentions[candidate], doc.token_ids
-            )
-
-            # backoff procedure, if mentions not found.
-            if len(mentions) == 0:
-                # If this form is not present in token ids (remember max 4096), fallback to embedding without context.
-                # Can happen that tokenization gives different input_ids and the candidate form is not found in document
-                # input_ids.
-                # candidate is beyond max position for emdedding
-                # return a non-contextualized embedding.
-                # TODO: candidate -> mentions
-                for mention in doc.candidate_mentions[candidate]:
-                    embds = []
-                    if isinstance(self.model, BaseEmbedder):
-                        embd = self.model.embed(mention)
-                    else:
-                        embd = (
-                            self.model.encode(mention, device=self.device)[
-                                "sentence_embedding"
-                            ]
-                            .detach()
-                            .cpu()
-                            .numpy()
-                        )
-                    embds.append(embd)
-
-                # TODO: temp to comparison of out context embeddings vs in context embeddings
-                # candidate_embeddings[candidate] = {"out_context": embds}
-
-                doc.candidate_set_embed.append(np.mean(embds, 0))
-                # TODO: problem with original 'andrew - would' vs PoS extracted 'andrew-would'
-                logger.debug(
-                    f"Candidate {candidate} - mentions not found: {doc.candidate_mentions[candidate]}"
-                )
-            else:
-                _, embed_dim = doc.token_embeddings.size()
-                embds = torch.empty(size=(len(mentions), embed_dim))
-                for i, occurrence in enumerate(mentions):
-                    embds[i] = torch.mean(doc.token_embeddings[occurrence, :], dim=0)
-
-                embds = embds.numpy()
-                # TODO: temp to comparison of out context embeddings vs in context embeddings
-                # candidate_embeddings[candidate] = {
-                #     "in_context": [embds[i] for i in range(embds.shape[0])]
-                # }
-
-                if "mean_in_n_out_context" in cand_mode:
-                    for mention in doc.candidate_mentions[candidate]:
-                        if isinstance(self.model, BaseEmbedder):
-                            mention_out_of_context_embedding = self.model.embed(mention)
-                        else:
-                            mention_out_of_context_embedding = (
-                                self.model.encode(mention, device=self.device)[
-                                    "sentence_embedding"
-                                ]
-                                .detach()
-                                .cpu()
-                                .numpy()
-                            )
-
-                        embds = np.concatenate(
-                            [embds, [mention_out_of_context_embedding]]
-                        )
-
-                        # TODO: temp to comparison of out context embeddings vs in context embeddings
-                        # candidate_embeddings[candidate].setdefault(
-                        #     "out_context", []
-                        # ).append(mention_out_of_context_embedding)
-
-                doc.candidate_set_embed.append(np.mean(embds, 0))
-
-        # TODO: temp to comparison of out context embeddings vs in context embeddings
-        # filename = os.path.join(
-        #     GEO_KPE_MULTIDOC_CACHE_PATH,
-        #     "temp_embeddings",
-        #     f"{doc.dataset}-{doc.id}.pkl",
-        # )
-        # Path(filename).parent.mkdir(exist_ok=True, parents=True)
-        # joblib.dump(candidate_embeddings, filename)
-
-    def _embedding_out_context(self, doc: Document, cand_mode: str = ""):
-        logger.debug(f"Getting candidate embeddings without context.")
-
-        if "mentions" in cand_mode:
-            for candidate in doc.candidate_set:
-                for mention in doc.candidate_mentions[candidate]:
-                    embds = []
-                    if isinstance(self.model, BaseEmbedder):
-                        embd = self.model.embed(mention)
-                    else:
-                        embd = (
-                            self.model.encode(mention, device=self.device)[
-                                "sentence_embedding"
-                            ]
-                            .detach()
-                            .cpu()
-                            .numpy()
-                        )
-                    embds.append(embd)
-
-                doc.candidate_set_embed.append(np.mean(embds, 0))
-        else:
-            for candidate in doc.candidate_set:
-                if isinstance(self.model, BaseEmbedder):
-                    embd = self.model.embed(candidate)
-                else:
-                    embd = (
-                        self.model.encode(candidate, device=self.device)[
-                            "sentence_embedding"
-                        ]
-                        .detach()
-                        .cpu()
-                        .numpy()
-                    )
-
-                doc.candidate_set_embed.append(embd)
-
     def _aggregate_candidate_mention_embeddings(
         self,
         doc: Document,
@@ -308,17 +119,18 @@ class EmbedRank(BaseKPModel):
         """
         Method that embeds the current candidate set, having several modes according to usage.
         The default value just embeds candidates directly.
-
-        TODO: deal with subclassing EmbedRankManual
         """
         # TODO: keep this init?
         doc.candidate_set_embed = []
 
-        # special simple case
-        if "no_context" in cand_mode:
-            self._embedding_out_context(doc, cand_mode)
-        else:
-            self._embedding_in_context(doc, cand_mode)
+        strategies = {
+            "no_context": OutContextEmbedding,
+            "mentions_no_context": OutContextMentionsEmbedding,
+            "in_context": InContextEmbeddings,
+            "in_n_out_context": InAndOutContextEmbeddings,
+        }
+        strategy: CandidateEmbeddingStrategy = strategies[cand_mode]
+        strategy().candidate_embeddings(self.model, doc)
 
         if "z_score" in post_processing:
             # TODO: Why z_score_normalization by space split?

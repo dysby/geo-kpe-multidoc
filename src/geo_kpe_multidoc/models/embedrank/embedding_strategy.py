@@ -18,11 +18,12 @@ class CandidateEmbeddingStrategy(Protocol):
         ...
 
 
-class OutContextMentionsEmbedding(CandidateEmbeddingStrategy):
+class OutContextMentionsEmbedding:
     def candidate_embeddings(self, model, doc: Document):
         for candidate in doc.candidate_set:
             for mention in doc.candidate_mentions[candidate]:
                 embds = []
+                # TODO: deal with subclassing EmbedRankManual
                 if isinstance(model, BaseEmbedder):
                     embd = model.embed(mention)
                 else:
@@ -37,7 +38,7 @@ class OutContextMentionsEmbedding(CandidateEmbeddingStrategy):
             doc.candidate_set_embed.append(np.mean(embds, 0))
 
 
-class OutContextEmbedding(CandidateEmbeddingStrategy):
+class OutContextEmbedding:
     def candidate_embeddings(self, model, doc: Document):
         for candidate in doc.candidate_set:
             if isinstance(model, BaseEmbedder):
@@ -55,7 +56,7 @@ class OutContextEmbedding(CandidateEmbeddingStrategy):
             doc.candidate_set_embed.append(embd)
 
 
-class InContextEmbeddings(CandidateEmbeddingStrategy):
+class InContextEmbeddings:
     def candidate_embeddings(self, model, doc: Document):
         for candidate in doc.candidate_set:
             mentions = _search_mentions(
@@ -100,7 +101,7 @@ class InContextEmbeddings(CandidateEmbeddingStrategy):
                 doc.candidate_set_embed.append(np.mean(embds, 0))
 
 
-class InAndOutContextEmbeddings(CandidateEmbeddingStrategy):
+class InAndOutContextEmbeddings:
     def candidate_embeddings(self, model, doc: Document):
         # TODO: temp to comparison of out context embeddings vs in context embeddings
         save_embeddings = False
