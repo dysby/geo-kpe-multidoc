@@ -10,7 +10,7 @@ from loguru import logger
 
 from geo_kpe_multidoc import GEO_KPE_MULTIDOC_CACHE_PATH
 from geo_kpe_multidoc.document import Document
-from geo_kpe_multidoc.models.embedrank.embedrank_model import _search_mentions
+from geo_kpe_multidoc.models.base_KP_model import _search_mentions
 
 
 class CandidateEmbeddingStrategy(Protocol):

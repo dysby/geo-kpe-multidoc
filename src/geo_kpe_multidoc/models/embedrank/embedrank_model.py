@@ -17,7 +17,7 @@ from sklearn.metrics.pairwise import cosine_similarity
 
 from geo_kpe_multidoc import GEO_KPE_MULTIDOC_CACHE_PATH
 from geo_kpe_multidoc.document import Document
-from geo_kpe_multidoc.models.base_KP_model import BaseKPModel, find_occurrences
+from geo_kpe_multidoc.models.base_KP_model import BaseKPModel, _search_mentions
 from geo_kpe_multidoc.models.embedrank.embedding_strategy import (
     CandidateEmbeddingStrategy,
     InAndOutContextEmbeddings,
@@ -33,26 +33,6 @@ from geo_kpe_multidoc.models.pre_processing.pre_processing_utils import (
     tokenize_hf,
 )
 from geo_kpe_multidoc.models.sentence_embedder import LongformerSentenceEmbedder
-
-
-def _search_mentions(model, candidate_mentions, token_ids):
-    mentions = []
-    # TODO: mention counts for mean_in_n_out_context
-    # mentions_counts = []
-    for mention in candidate_mentions:
-        if isinstance(model, BaseEmbedder):
-            # original tokenization by KeyBert/SentenceTransformer
-            tokenized_candidate = tokenize_hf(mention, model)
-        else:
-            # tokenize via local SentenceEmbedder Class
-            tokenized_candidate = model.tokenize(mention)
-
-        filt_ids = filter_special_tokens(tokenized_candidate["input_ids"])
-
-        # Should not be Empty after filter
-        if filt_ids:
-            mentions += find_occurrences(filt_ids, token_ids)
-    return mentions  # , mentions_counts
 
 
 class EmbedRank(BaseKPModel):

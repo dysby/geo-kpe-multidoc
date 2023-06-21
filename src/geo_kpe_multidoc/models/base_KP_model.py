@@ -34,6 +34,26 @@ class CandidateMode(Enum):
     GLOBAL_ATTENTION = auto()
 
 
+def _search_mentions(model, candidate_mentions, token_ids):
+    mentions = []
+    # TODO: mention counts for mean_in_n_out_context
+    # mentions_counts = []
+    for mention in candidate_mentions:
+        if isinstance(model, BaseEmbedder):
+            # original tokenization by KeyBert/SentenceTransformer
+            tokenized_candidate = tokenize_hf(mention, model)
+        else:
+            # tokenize via local SentenceEmbedder Class
+            tokenized_candidate = model.tokenize(mention)
+
+        filt_ids = filter_special_tokens(tokenized_candidate["input_ids"])
+
+        # Should not be Empty after filter
+        if filt_ids:
+            mentions += find_occurrences(filt_ids, token_ids)
+    return mentions  # , mentions_counts
+
+
 def find_occurrences(a: List[int], b: List[int]) -> List[List[int]]:
     occurrences = []
     # TODO: escape search in right padding indexes
