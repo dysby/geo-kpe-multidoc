@@ -418,10 +418,11 @@ def output_one_top_cands(
         print(f"Keyphrase extraction for {doc_id}")
         table = tabulate(
             [
-                [dk[0], dk[1], gk]
+                [dk[0] if len(dk) > 1 else dk, dk[1] if len(dk) > 1 else dk, gk]
                 for dk, gk in zip_longest(doc_keys[:top_n], gold_keys, fillvalue="-")
             ],
             headers=["Extracted", "Score", "Gold"],
+            floatfmt=".5f",
         )
         print(table)
     return table

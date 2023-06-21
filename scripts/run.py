@@ -4,12 +4,9 @@ import sys
 import textwrap
 from datetime import datetime
 from os import path
-from pathlib import Path
 from time import time
 
-import mlflow
 import pandas as pd
-import torch
 from loguru import logger
 from matplotlib import pyplot as plt
 from nltk.stem import PorterStemmer
@@ -17,11 +14,7 @@ from pandas import DataFrame
 from tabulate import tabulate
 
 import wandb
-from geo_kpe_multidoc import (
-    GEO_KPE_MULTIDOC_CACHE_PATH,
-    GEO_KPE_MULTIDOC_DATA_PATH,
-    GEO_KPE_MULTIDOC_OUTPUT_PATH,
-)
+from geo_kpe_multidoc import GEO_KPE_MULTIDOC_DATA_PATH, GEO_KPE_MULTIDOC_OUTPUT_PATH
 from geo_kpe_multidoc.datasets.datasets import DATASETS, load_data
 from geo_kpe_multidoc.evaluation.evaluation_tools import (
     evaluate_kp_extraction,
@@ -34,26 +27,10 @@ from geo_kpe_multidoc.evaluation.evaluation_tools import (
     postprocess_res_labels,
 )
 from geo_kpe_multidoc.evaluation.report import plot_score_distribuitions_with_gold
-from geo_kpe_multidoc.models import EmbedRank, FusionModel, MaskRank, MDKPERank
-from geo_kpe_multidoc.models.backend._longmodels import to_longformer_t_v4
-from geo_kpe_multidoc.models.backend.roberta2longformer.roberta2bigbird import (
-    convert_roberta_to_bigbird,
-)
-from geo_kpe_multidoc.models.backend.roberta2longformer.roberta2longformer import (
-    convert_roberta_to_longformer,
-)
-from geo_kpe_multidoc.models.backend.roberta2longformer.roberta2nyströmformer import (
-    convert_roberta_to_nystromformer,
-)
-from geo_kpe_multidoc.models.base_KP_model import BaseKPModel, ExtractionEvaluator
-from geo_kpe_multidoc.models.embedrank.embedrank_longformer_manual import (
-    EmbedRankManual,
-)
+from geo_kpe_multidoc.models import MDKPERank
 from geo_kpe_multidoc.models.factory import kpe_model_factory
-from geo_kpe_multidoc.models.maskrank.maskrank_manual import LongformerMaskRank
 from geo_kpe_multidoc.models.pre_processing.pre_processing_utils import (
     remove_new_lines_and_tabs,
-    remove_special_chars,
     remove_whitespaces,
 )
 

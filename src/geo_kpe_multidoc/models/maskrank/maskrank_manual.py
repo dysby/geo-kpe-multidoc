@@ -48,7 +48,7 @@ class MaskFirst:
 
         for _, mentions in doc.candidate_mentions.items():
             text = doc.raw_text
-            for mention in mentions:
+            for mention in sorted(mentions, key=len, reverse=True):
                 if mention not in text:
                     logger.debug(f"Mention '{mention}' - not in text")
                 text = text.replace(mention, "<mask>", self.occurrences)
