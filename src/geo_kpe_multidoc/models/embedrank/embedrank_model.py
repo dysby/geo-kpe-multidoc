@@ -109,7 +109,10 @@ class EmbedRank(BaseKPModel):
             "in_context": InContextEmbeddings,
             "in_n_out_context": InAndOutContextEmbeddings,
         }
-        strategy: CandidateEmbeddingStrategy = strategies[cand_mode]
+        # TODO: deal with global_attention and global_attention_dilated
+        strategy: CandidateEmbeddingStrategy = strategies.get(
+            cand_mode, InContextEmbeddings
+        )
         strategy().candidate_embeddings(self.model, doc)
 
         if "z_score" in post_processing:

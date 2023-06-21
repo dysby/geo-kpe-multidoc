@@ -1,26 +1,23 @@
 import re
 from enum import Enum, auto
-from itertools import chain
-from os import path
-from pathlib import Path
 from typing import Callable, List, Optional, Set, Tuple
 
-import joblib
 import torch
+from keybert.backend._base import BaseEmbedder
 from loguru import logger
 from nltk.stem.api import StemmerI
 
-from geo_kpe_multidoc import GEO_KPE_MULTIDOC_CACHE_PATH
 from geo_kpe_multidoc.datasets.datasets import KPEDataset
 from geo_kpe_multidoc.document import Document
 from geo_kpe_multidoc.models.backend.select_backend import select_backend
 from geo_kpe_multidoc.models.candidate_extract.candidate_extract_model import (
     KPECandidateExtractionModel,
 )
-from geo_kpe_multidoc.models.pre_processing.pos_tagging import POS_tagger
 from geo_kpe_multidoc.models.pre_processing.pre_processing_utils import (
+    filter_special_tokens,
     remove_punctuation,
     remove_whitespaces,
+    tokenize_hf,
 )
 
 KPEScore = Tuple[str, float]

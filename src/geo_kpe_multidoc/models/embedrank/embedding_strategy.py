@@ -121,7 +121,7 @@ class InAndOutContextEmbeddings:
                         .numpy()
                     )
 
-                mentions = _search_mentions([mention], doc.token_ids)
+                mentions = _search_mentions(model, [mention], doc.token_ids)
                 if len(mentions) == 0:
                     # backoff procedure, if mention is not found.
                     candidate_mentions_embeddings.append(

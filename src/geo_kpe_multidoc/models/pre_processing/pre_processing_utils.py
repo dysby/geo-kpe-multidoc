@@ -5,6 +5,8 @@ from typing import Callable, List, Tuple, Union
 import torch
 from keybert.backend._base import BaseEmbedder
 from nltk.corpus import stopwords
+from nltk.stem.api import StemmerI
+from nltk.stem.snowball import SnowballStemmer
 from simplemma import simplemma, text_lemmatizer
 
 from .stopwords import ENGLISH_STOP_WORDS
@@ -134,6 +136,37 @@ def lemmatize(text: Union[str, List], lang: str) -> Union[str, List]:
     return " ".join(
         [simplemma.lemmatize(w, lang, greedy=True) for w in text.split()]
     ).lower()
+
+
+def select_stemmer(lang: str = "en") -> StemmerI:
+    # TODO: Multi Language SnowballStemmer
+    # copy from https://github.com/LIAAD/kep/blob/master/kep/utility.py
+    ISO_to_language_stemming_SnowballStemmer = {
+        "en": "english",
+        "pt": "portuguese",
+        "fr": "french",
+        "es": "spanish",
+        "it": "italian",
+        "nl": "dutch",
+        "de": "german",
+        "da": "danish",
+        "fi": "finnish",
+        "da": "danish",
+        "hu": "hungarian",
+        "nb": "norwegian",
+        "ro": "romanian",
+        "ru": "russian",
+        "sv": "swedish",
+    }
+    if lang == "en":
+        # create a new instance of a porter stemmer
+        stemmer = SnowballStemmer("porter")
+    else:
+        # create a new instance of a porter stemmer
+        stemmer = SnowballStemmer(
+            ISO_to_language_stemming_SnowballStemmer[lang], ignore_stopwords=True
+        )
+    return stemmer
 
 
 def filter_special_tokens(input_ids: torch.Tensor) -> List[int]:

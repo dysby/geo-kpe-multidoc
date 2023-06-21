@@ -9,7 +9,6 @@ from time import time
 import pandas as pd
 from loguru import logger
 from matplotlib import pyplot as plt
-from nltk.stem import PorterStemmer
 from pandas import DataFrame
 from tabulate import tabulate
 
@@ -32,6 +31,7 @@ from geo_kpe_multidoc.models.factory import kpe_model_factory
 from geo_kpe_multidoc.models.pre_processing.pre_processing_utils import (
     remove_new_lines_and_tabs,
     remove_whitespaces,
+    select_stemmer,
 )
 
 
@@ -281,7 +281,9 @@ def main():
     else:
         extract_eval = extract_keyphrases_docs
 
-    stemmer = None if args.no_stemming else PorterStemmer()
+    stemmer = (
+        None if args.no_stemming else select_stemmer(DATASETS[ds_name].get("language"))
+    )
     assert stemmer != None
     if not stemmer:
         logger.critical("KPE Evaluation usually need stemmer!")
