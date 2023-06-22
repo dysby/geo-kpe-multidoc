@@ -25,11 +25,13 @@ class FusionModel:
 
     def __init__(
         self,
-        models: List[BaseKPModel] = [],
+        models: List[BaseKPModel],
         averaging_strategy: EnsembleMode = "weighted",
         models_weights: List[float] = [0.5, 0.5],
     ):
-        self.models = models if models != [] else print("Invalid models argument given")
+        self.models = models
+        if len(models) < 2:
+            raise ValueError("Invalid model list")
 
         temp_name = f"{str(self.__str__).split()[3]}_["
         for model in models:
