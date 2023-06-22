@@ -55,6 +55,11 @@ def remove_punctuation(text: str = "") -> str:
     return re.sub("[.,;:\"'!?`´()$£€\-^|=/<>]", " ", text)
 
 
+def remove_hyphens_and_dots(text: str):
+    # TODO: other hyphen forms - – — ?
+    return text.replace("-", " ").replace(".", "")
+
+
 def remove_special_chars(text: str) -> str:
     """
     Quick snippet to remove punctuation marks

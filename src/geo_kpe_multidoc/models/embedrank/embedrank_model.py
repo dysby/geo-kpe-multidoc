@@ -56,7 +56,7 @@ class EmbedRank(BaseKPModel):
         doc: Document,
         stemmer: Callable = None,
         doc_mode: str = "",
-        post_processing: List[str] = [],
+        post_processing: List[str] = None,
         output_attentions=None,
     ) -> np.ndarray:
         """
@@ -94,7 +94,7 @@ class EmbedRank(BaseKPModel):
         doc: Document,
         stemmer: Optional[StemmerI] = None,
         cand_mode: str = "",
-        post_processing: List[str] = [],
+        post_processing: List[str] = None,
     ):
         """
         Method that embeds the current candidate set, having several modes according to usage.
@@ -289,7 +289,7 @@ class EmbedRank(BaseKPModel):
 
             candidate_score = sorted(
                 [
-                    (candidate, candidate_doc_sim)
+                    (candidate, candidate_doc_sim.item())
                     for (candidate, candidate_doc_sim) in zip(candidate_set, doc_sim)
                 ],
                 # [(candidate_set[i], doc_sim[i][0]) for i in range(len(doc_sim))],

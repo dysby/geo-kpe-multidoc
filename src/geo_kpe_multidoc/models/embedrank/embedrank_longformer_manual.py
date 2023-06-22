@@ -72,7 +72,7 @@ class EmbedRankManual(EmbedRank):
         doc: Document,
         stemmer: Callable = None,
         doc_mode: str = "",
-        post_processing: List[str] = [],
+        post_processing: List[str] = None,
         output_attentions=False,
     ) -> np.ndarray:
         """

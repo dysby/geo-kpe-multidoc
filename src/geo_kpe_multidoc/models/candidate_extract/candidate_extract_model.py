@@ -11,7 +11,11 @@ from nltk import RegexpParser
 from geo_kpe_multidoc import GEO_KPE_MULTIDOC_CACHE_PATH
 from geo_kpe_multidoc.document import Document
 from geo_kpe_multidoc.models.pre_processing.pos_tagging import POS_tagger_spacy
-from geo_kpe_multidoc.models.pre_processing.pre_processing_utils import lemmatize
+from geo_kpe_multidoc.models.pre_processing.pre_processing_utils import (
+    lemmatize,
+    remove_hyphens_and_dots,
+    remove_whitespaces,
+)
 
 
 def extract_kp_from_doc(
@@ -187,6 +191,10 @@ class KPECandidateExtractionModel:
                         if lemmer_lang
                         else candidate.lower()
                     )
+                    # TODO: normalize hyphens and dots in candidate
+                    l_candidate = remove_whitespaces(
+                        remove_hyphens_and_dots(l_candidate.lower())
+                    )
                     doc.candidate_set.add(l_candidate)
 
                     doc.candidate_mentions.setdefault(l_candidate, set()).add(candidate)
@@ -285,7 +293,7 @@ class KPECandidateExtractionModel:
         return doc.candidate_set, doc.candidate_mentions
 
     def __extract_candidates(
-        self, tagged_doc: List[List[Tuple]] = [], **kwargs
+        self, tagged_doc: List[List[Tuple]], **kwargs
     ) -> List[str]:
         """
         Method that uses Regex patterns on POS tags to extract unique candidates from a tagged document
