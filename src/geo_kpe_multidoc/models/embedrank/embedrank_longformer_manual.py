@@ -15,6 +15,13 @@ from geo_kpe_multidoc.document import Document
 from geo_kpe_multidoc.models.candidate_extract.candidate_extract_model import (
     KPECandidateExtractionModel,
 )
+from geo_kpe_multidoc.models.embedrank.embedding_strategy import (
+    CandidateEmbeddingStrategy,
+    InAndOutContextEmbeddings,
+    InContextEmbeddings,
+    OutContextEmbedding,
+    OutContextMentionsEmbedding,
+)
 from geo_kpe_multidoc.models.embedrank.embedrank_model import EmbedRank
 from geo_kpe_multidoc.models.pre_processing.pos_tagging import POS_tagger_spacy
 from geo_kpe_multidoc.models.sentence_embedder import (
@@ -37,6 +44,7 @@ class EmbedRankManual(EmbedRank):
         tagger: POS_tagger_spacy,
         device=None,
         name="",
+        candidate_embedding_strategy: str = "",
     ):
         # TODO: init super class
         self.candidate_selection_model = KPECandidateExtractionModel(tagger=tagger)
@@ -66,6 +74,18 @@ class EmbedRankManual(EmbedRank):
 
         self.model: SentenceEmbedder = embedder_cls(model, tokenizer)
         self.name = f"EmbedRankManual_{name}"
+
+        strategies = {
+            "no_context": OutContextEmbedding,
+            "mentions_no_context": OutContextMentionsEmbedding,
+            "in_context": InContextEmbeddings,
+            "in_n_out_context": InAndOutContextEmbeddings,
+        }
+        # TODO: deal with global_attention and global_attention_dilated
+        strategy: CandidateEmbeddingStrategy = strategies.get(
+            candidate_embedding_strategy, InContextEmbeddings
+        )
+        self.candidate_embedding_strategy = strategy()
 
     def _embed_doc(
         self,

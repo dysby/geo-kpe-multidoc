@@ -258,7 +258,7 @@ def scores_weight_matrix(
             # of the coordenates (lat+long vs lat+long).
             cached_vincenty(coordinates[i], coordinates[j])
             if sum(coordinates[i]) <= sum(coordinates[j])
-            else cached_vincenty(coordinates[i], coordinates[j])
+            else cached_vincenty(coordinates[j], coordinates[i])
         )
     # # vincenty(coordinates[i], coordinates[j])
 
@@ -273,7 +273,7 @@ def scores_weight_matrix(
     #             # of the coordenates (lat+long vs lat+long).
     #             cached_vincenty(coordinates[i], coordinates[j])
     #             if sum(coordinates[i]) <= sum(coordinates[j])
-    #             else cached_vincenty(coordinates[i], coordinates[j])
+    #             else cached_vincenty(coordinates[j], coordinates[i])
     #             for i in range(n)
     #         ]
     #         for j in range(n)

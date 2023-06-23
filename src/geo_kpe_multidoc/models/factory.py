@@ -84,6 +84,7 @@ def generateLongformerRanker(
         tagger=tagger_name,
         device=device,
         name=model_name,
+        candidate_embedding_strategy=args.candidate_mode,
     )
     return kpe_model
 
@@ -105,7 +106,12 @@ def generateBigBirdRanker(backend_model_name, tagger_name, args):
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
     kpe_model = EmbedRankManual(
-        bigbird_model, bigbird_tokenizer, tagger_name, device=device, name=model_name
+        bigbird_model,
+        bigbird_tokenizer,
+        tagger_name,
+        device=device,
+        name=model_name,
+        candidate_embedding_strategy=args.candidate_mode,
     )
     return kpe_model
 
@@ -127,7 +133,12 @@ def generateNystromformerRanker(backend_model_name, tagger_name, args):
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
     kpe_model = EmbedRankManual(
-        bigbird_model, bigbird_tokenizer, tagger_name, device=device, name=model_name
+        bigbird_model,
+        bigbird_tokenizer,
+        tagger_name,
+        device=device,
+        name=model_name,
+        candidate_embedding_strategy=args.candidate_mode,
     )
     return kpe_model
 
@@ -150,7 +161,11 @@ def kpe_model_factory(args, BACKEND_MODEL_NAME, TAGGER_NAME) -> BaseKPModel:
                 BACKEND_MODEL_NAME.replace("[nystromformer]", ""), TAGGER_NAME, args
             )
         else:
-            kpe_model = EmbedRank(BACKEND_MODEL_NAME, TAGGER_NAME)
+            kpe_model = EmbedRank(
+                BACKEND_MODEL_NAME,
+                TAGGER_NAME,
+                candidate_embedding_strategy=args.candidate_mode,
+            )
     elif args.rank_model == "MaskRank":
         if "[longformer]" in BACKEND_MODEL_NAME:
             kpe_model = generateLongformerRanker(
@@ -168,14 +183,22 @@ def kpe_model_factory(args, BACKEND_MODEL_NAME, TAGGER_NAME) -> BaseKPModel:
                 generateLongformerRanker(EmbedRankManual, base_name, TAGGER_NAME, args)
             )
         else:
-            ranker = EmbedRank(BACKEND_MODEL_NAME, TAGGER_NAME)
+            ranker = EmbedRank(
+                BACKEND_MODEL_NAME,
+                TAGGER_NAME,
+                candidate_embedding_strategy=args.candidate_mode,
+            )
             kpe_model = MDKPERank(ranker)
     elif args.rank_model == "ExtractionEvaluator":
         kpe_model = ExtractionEvaluator(BACKEND_MODEL_NAME, TAGGER_NAME)
     elif args.rank_model == "FusionRank":
         kpe_model = FusionModel(
             [
-                EmbedRank(BACKEND_MODEL_NAME, TAGGER_NAME),
+                EmbedRank(
+                    BACKEND_MODEL_NAME,
+                    TAGGER_NAME,
+                    candidate_embedding_strategy=args.candidate_mode,
+                ),
                 MaskRank(BACKEND_MODEL_NAME, TAGGER_NAME),
             ],
             averaging_strategy=args.ensemble_mode,

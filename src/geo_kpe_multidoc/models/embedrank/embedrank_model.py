@@ -47,9 +47,21 @@ class EmbedRank(BaseKPModel):
         mean_in_n_out_context               - add non contextualized form embedding to mentions embeddings and do the average as candidade embedding.
     """
 
-    def __init__(self, model, tagger):
+    def __init__(self, model, tagger, candidate_embedding_strategy: str = ""):
         super().__init__(model, tagger)
         self.counter = 0
+
+        strategies = {
+            "no_context": OutContextEmbedding,
+            "mentions_no_context": OutContextMentionsEmbedding,
+            "in_context": InContextEmbeddings,
+            "in_n_out_context": InAndOutContextEmbeddings,
+        }
+        # TODO: deal with global_attention and global_attention_dilated
+        strategy: CandidateEmbeddingStrategy = strategies.get(
+            candidate_embedding_strategy, InContextEmbeddings
+        )
+        self.candidate_embedding_strategy = strategy()
 
     def _embed_doc(
         self,
