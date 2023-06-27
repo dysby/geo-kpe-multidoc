@@ -16,11 +16,9 @@ from geo_kpe_multidoc.models.candidate_extract.candidate_extract_model import (
     KPECandidateExtractionModel,
 )
 from geo_kpe_multidoc.models.embedrank.embedding_strategy import (
+    STRATEGIES,
     CandidateEmbeddingStrategy,
-    InAndOutContextEmbeddings,
     InContextEmbeddings,
-    OutContextEmbedding,
-    OutContextMentionsEmbedding,
 )
 from geo_kpe_multidoc.models.embedrank.embedrank_model import EmbedRank
 from geo_kpe_multidoc.models.pre_processing.pos_tagging import POS_tagger_spacy
@@ -69,23 +67,24 @@ class EmbedRankManual(EmbedRank):
             embedder_cls = NystromformerSentenceEmbedder
         else:
             raise ValueError(
-                f'Model of type "{model.__class__.__name__}" not supported for SentenceEmbedder.'
+                f"Model of type '{model.__class__.__name__}' not supported for SentenceEmbedder."
             )
 
         self.model: SentenceEmbedder = embedder_cls(model, tokenizer)
         self.name = f"EmbedRankManual_{name}"
 
-        strategies = {
-            "no_context": OutContextEmbedding,
-            "mentions_no_context": OutContextMentionsEmbedding,
-            "in_context": InContextEmbeddings,
-            "in_n_out_context": InAndOutContextEmbeddings,
-        }
+        # strategies = {
+        #     "no_context": OutContextEmbedding,
+        #     "mentions_no_context": OutContextMentionsEmbedding,
+        #     "in_context": InContextEmbeddings,
+        #     "in_n_out_context": InAndOutContextEmbeddings,
+        # }
         # TODO: deal with global_attention and global_attention_dilated
-        strategy: CandidateEmbeddingStrategy = strategies.get(
-            candidate_embedding_strategy, InContextEmbeddings
+        strategy = STRATEGIES.get(candidate_embedding_strategy, InContextEmbeddings)
+        self.candidate_embedding_strategy: CandidateEmbeddingStrategy = strategy()
+        logger.info(
+            f"Initialize EmbedRank w/ {self.candidate_embedding_strategy.__class__.__name__}"
         )
-        self.candidate_embedding_strategy = strategy()
 
     def _embed_doc(
         self,

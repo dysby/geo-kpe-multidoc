@@ -1,13 +1,12 @@
 import os
-from itertools import chain, pairwise
+from itertools import chain
 from operator import itemgetter
 from pathlib import Path
 from time import time
-from typing import Callable, List, Optional, Protocol, Set, Tuple, Union
+from typing import Callable, List, Optional, Tuple
 
 import joblib
 import numpy as np
-import simplemma
 import torch
 from keybert._mmr import mmr
 from keybert.backend._base import BaseEmbedder
@@ -19,19 +18,14 @@ from geo_kpe_multidoc import GEO_KPE_MULTIDOC_CACHE_PATH
 from geo_kpe_multidoc.document import Document
 from geo_kpe_multidoc.models.base_KP_model import BaseKPModel, _search_mentions
 from geo_kpe_multidoc.models.embedrank.embedding_strategy import (
+    STRATEGIES,
     CandidateEmbeddingStrategy,
-    InAndOutContextEmbeddings,
     InContextEmbeddings,
-    OutContextEmbedding,
-    OutContextMentionsEmbedding,
 )
 from geo_kpe_multidoc.models.pre_processing.post_processing_utils import (
     z_score_normalization,
 )
-from geo_kpe_multidoc.models.pre_processing.pre_processing_utils import (
-    filter_special_tokens,
-    tokenize_hf,
-)
+from geo_kpe_multidoc.models.pre_processing.pre_processing_utils import tokenize_hf
 from geo_kpe_multidoc.models.sentence_embedder import LongformerSentenceEmbedder
 
 
@@ -44,24 +38,25 @@ class EmbedRank(BaseKPModel):
         {mentions}?{no_context}+            - candidate embeddings from non contextualized form
         {global_attention}+{dilated_(n)}?   - get embeddings using longformer global attention in all doc tokens where a candidate is present.
                                             If dilated mode is selected a sparse pattern is used, considering global attention on every n position.
-        mean_in_n_out_context               - add non contextualized form embedding to mentions embeddings and do the average as candidade embedding.
+        in_n_out_context                    - add non contextualized form embedding to mentions embeddings and do the average as candidade embedding.
     """
 
     def __init__(self, model, tagger, candidate_embedding_strategy: str = ""):
         super().__init__(model, tagger)
         self.counter = 0
 
-        strategies = {
-            "no_context": OutContextEmbedding,
-            "mentions_no_context": OutContextMentionsEmbedding,
-            "in_context": InContextEmbeddings,
-            "in_n_out_context": InAndOutContextEmbeddings,
-        }
+        # strategies = {
+        #     "no_context": OutContextEmbedding,
+        #     "mentions_no_context": OutContextMentionsEmbedding,
+        #     "in_context": InContextEmbeddings,
+        #     "in_n_out_context": InAndOutContextEmbeddings,
+        # }
         # TODO: deal with global_attention and global_attention_dilated
-        strategy: CandidateEmbeddingStrategy = strategies.get(
-            candidate_embedding_strategy, InContextEmbeddings
+        strategy = STRATEGIES.get(candidate_embedding_strategy, InContextEmbeddings)
+        self.candidate_embedding_strategy: CandidateEmbeddingStrategy = strategy()
+        logger.info(
+            f"Initialize EmbedRank w/ {self.candidate_embedding_strategy.__class__.__name__}"
         )
-        self.candidate_embedding_strategy = strategy()
 
     def _embed_doc(
         self,
@@ -115,17 +110,8 @@ class EmbedRank(BaseKPModel):
         # TODO: keep this init?
         doc.candidate_set_embed = []
 
-        strategies = {
-            "no_context": OutContextEmbedding,
-            "mentions_no_context": OutContextMentionsEmbedding,
-            "in_context": InContextEmbeddings,
-            "in_n_out_context": InAndOutContextEmbeddings,
-        }
         # TODO: deal with global_attention and global_attention_dilated
-        strategy: CandidateEmbeddingStrategy = strategies.get(
-            cand_mode, InContextEmbeddings
-        )
-        strategy().candidate_embeddings(self.model, doc)
+        self.candidate_embedding_strategy.candidate_embeddings(self.model, doc)
 
         if "z_score" in post_processing:
             # TODO: Why z_score_normalization by space split?
@@ -197,6 +183,7 @@ class EmbedRank(BaseKPModel):
                 input_size = doc.global_attention_mask.size(1)
                 indices = torch.arange(0, input_size, dilation)
                 doc.global_attention_mask.index_fill_(1, indices, 1)
+                # cand_mode = cand_mode[: cand_mode.index("dilated") + 7]  # remove digits
             else:
                 self._set_global_attention_on_candidates(doc)
 

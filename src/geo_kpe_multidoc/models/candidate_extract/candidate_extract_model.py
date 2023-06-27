@@ -73,6 +73,12 @@ class KPECandidateExtractionModel:
                 GRAMMAR3 = NP:
                     {<NN.*|JJ|VBG|VBN>*<NN.*>}  # Adjective(s)(optional) + Noun(s)
 
+            HAKE: an Unsupervised Approach to Automatic Keyphrase Extraction for Multiple Domains
+                    {(NN | NNS | NNP | NNPS | VBN | JJ | JJS | RB) * (NN | NNS | NNP | NNPS | VBG) + }
+                    adverbial noun (tag RB) such as “double experience” (RB NN), and a verb in present participle (tag VBG) such as follows:
+                    “virtual desktop conferencing” (JJ NN VBG), where the VBG tag can be at the beginning, the middle,
+                    or at the end of the noun phrase.
+
     """
 
     def __init__(self, tagger, grammar=None):

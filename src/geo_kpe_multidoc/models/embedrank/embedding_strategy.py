@@ -1,4 +1,5 @@
 import os
+from itertools import chain
 from pathlib import Path
 from typing import Protocol
 
@@ -21,6 +22,7 @@ class CandidateEmbeddingStrategy(Protocol):
 class OutContextMentionsEmbedding:
     def candidate_embeddings(self, model, doc: Document):
         for candidate in doc.candidate_set:
+            # TODO: refactor to batch encode
             for mention in doc.candidate_mentions[candidate]:
                 embds = []
                 # TODO: deal with subclassing EmbedRankManual
@@ -40,6 +42,7 @@ class OutContextMentionsEmbedding:
 
 class OutContextEmbedding:
     def candidate_embeddings(self, model, doc: Document):
+        # TODO: refactor to batch encode
         for candidate in doc.candidate_set:
             if isinstance(model, BaseEmbedder):
                 embd = model.embed(candidate)
@@ -173,3 +176,48 @@ class InAndOutContextEmbeddings:
             )
             Path(filename).parent.mkdir(exist_ok=True, parents=True)
             joblib.dump(candidate_embeddings, filename)
+
+
+class GlobalAttentionCandidateStrategy(InContextEmbeddings):
+    def _set_global_attention_on_candidates(self, model, doc: Document):
+        mentions = []
+        for candidate in doc.candidate_set:
+            # mentions_positions, _ = self._search_mentions(doc, candidate)
+            mentions_positions = _search_mentions(
+                model, doc.candidate_mentions[candidate], doc.token_ids
+            )
+            if len(mentions_positions) > 0:
+                # candidate mentions where found in document token_ids
+                mentions.extend(mentions_positions)
+        mentions = tuple(set(chain(*mentions)))
+        logger.debug(f"Global Attention in {len(mentions)} tokens")
+        doc.global_attention_mask[:, mentions] = 1
+
+    def candidate_embeddings(self, model, doc: Document):
+        self._set_global_attention_on_candidates(doc)
+
+        super().candidate_embeddings(model, doc)
+
+
+class GlobalAttentionDilatedStrategy(InContextEmbeddings):
+    def __init__(self, dilated: int = 128) -> None:
+        self.dilated = dilated
+
+    def candidate_embeddings(self, model, doc: Document):
+        input_size = doc.global_attention_mask.size(1)
+        indices = torch.arange(0, input_size, self.dilation)
+        doc.global_attention_mask.index_fill_(1, indices, 1)
+
+        super().candidate_embeddings(model, doc)
+
+
+STRATEGIES = {
+    "no_context": OutContextEmbedding,
+    "mentions_no_context": OutContextMentionsEmbedding,
+    "in_context": InContextEmbeddings,
+    "in_n_out_context": InAndOutContextEmbeddings,
+    "global_attention": InContextEmbeddings,
+    "global_attention_dilated": InContextEmbeddings,
+    # "global_attention": GlobalAttentionCandidateStrategy,
+    # "dilated": GlobalAttentionDilatedStrategy,
+}

@@ -27,7 +27,6 @@ from geo_kpe_multidoc.models.pre_processing.pre_processing_utils import (
     lemmatize,
     remove_hyphens_and_dots,
 )
-from geo_kpe_multidoc.utils.IO import write_to_file
 
 
 def postprocess_res_labels(
@@ -286,6 +285,84 @@ def evaluate_kp_extraction_base(
     return results
 
 
+from sklearn.metrics import precision_recall_fscore_support
+
+
+def evaluate_kp_extraction_sklearn(
+    model_results: Dict[str, List] = {},
+    true_labels: Dict[str, List[List]] = {},
+    model_name: str = "",
+    kp_eval: bool = True,
+    k_set=[5, 10, 15],
+    **kwargs,
+) -> pd.DataFrame:
+    results = pd.DataFrame()
+    results.index.name = "Dataset"
+
+    for dataset in model_results:
+        results_c = {"Precision": [], "Recall": [], "F1": []}
+
+        results_kp = {"MAP": [], "nDCG": []}
+
+        for k in k_set:
+            results_kp[f"Precision_{k}"] = []
+            results_kp[f"Recall_{k}"] = []
+            results_kp[f"F1_{k}"] = []
+
+        for i in range(len(model_results[dataset])):
+            top_kp = [kp for kp, _score in model_results[dataset][i][0]]
+
+            candidates = model_results[dataset][i][1]
+
+            true_label = true_labels[dataset][i]
+
+            # Precision, Recall and F1-Score for candidates
+            p, r, f1, _ = precision_recall_fscore_support(
+                true_label, candidates, average="macro"
+            )
+
+            results_c["Precision"].append(p)
+            results_c["Recall"].append(r)
+            results_c["F1"].append(f1)
+
+            if kp_eval:
+                # Precision_k, Recall_k, F1-Score_k, MAP and nDCG for KP
+                for k in k_set:
+                    p_k, r_k, f1_k, _ = precision_recall_fscore_support(
+                        true_label, candidates, average="macro"
+                    )
+                    # p_k = precision(top_kp[:k], true_label)
+                    # r_k = recall(top_kp[:k], true_label)
+                    # f1_k = f1_score(p_k, r_k)
+
+                    results_kp[f"Precision_{k}"].append(p_k)
+                    results_kp[f"Recall_{k}"].append(r_k)
+                    results_kp[f"F1_{k}"].append(f1_k)
+
+                map = MAP(top_kp, true_label)
+                ndcg = nDCG(top_kp, true_label)
+
+                results_kp["MAP"].append(map)
+                results_kp["nDCG"].append(ndcg)
+
+        row = {**results_c, **results_kp}
+
+        # row = (
+        #     pd.concat(
+        #         [
+        #             pd.DataFrame(results_c).mean(axis=0),
+        #             pd.DataFrame(results_kp).mean(axis=0),
+        #         ]
+        #     )
+        #     .to_frame()
+        #     .T
+        # )
+        # row.index = pd.Index([dataset])
+        results = pd.concat([results, pd.DataFrame(row, index=[dataset])])
+
+    return results
+
+
 def evaluate_kp_extraction(
     model_results: Dict[str, List] = {},
     true_labels: Dict[str, List[List]] = {},
@@ -293,7 +370,7 @@ def evaluate_kp_extraction(
     kp_eval: bool = True,
     k_set=[5, 10, 15],
     **kwargs,
-) -> None:
+) -> pd.DataFrame:
     """
     Evaluate model results for each dataset, considering the true labels.
 
