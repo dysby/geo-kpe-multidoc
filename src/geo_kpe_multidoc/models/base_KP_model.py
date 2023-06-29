@@ -1,6 +1,6 @@
 import re
 from enum import Enum, auto
-from typing import Callable, List, Optional, Set, Tuple
+from typing import Callable, List, Optional, Tuple
 
 import torch
 from keybert.backend._base import BaseEmbedder
@@ -119,7 +119,7 @@ class BaseKPModel:
         """
         Abstract method to retrieve top_n candidates
         """
-        raise NotImplemented
+        raise NotImplementedError
 
     def extract_kp_from_doc(
         self,
@@ -142,7 +142,6 @@ class BaseKPModel:
 
         logger.debug(f"Document #{self.counter} processed")
         self.counter += 1
-        torch.cuda.empty_cache()
 
         return (top_n, candidate_set)
 
@@ -165,7 +164,7 @@ class BaseKPModel:
             corpus: Dataset with topic id, list of documents (txt form) for topic, and list of keyphrases for topic.
 
         """
-        raise NotImplemented
+        raise NotImplementedError
 
 
 class ExtractionEvaluator(BaseKPModel):

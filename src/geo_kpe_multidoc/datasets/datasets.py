@@ -59,7 +59,7 @@ DATASETS = {
     "pak2018": {
         "zip_file": "pak2018.zip",
         "language": "pl",
-        "tagger": "en_core_web_trf",
+        "tagger": "en_core_web_trf",  # TODO: select pl spacy model
     },
     "PubMed": {"zip_file": "PubMed.zip", "language": "en", "tagger": "en_core_web_trf"},
     "Schutz2008": {

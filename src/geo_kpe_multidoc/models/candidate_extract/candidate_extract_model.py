@@ -1,9 +1,8 @@
 from os import path
 from pathlib import Path
-from typing import Callable, List, Set, Tuple
+from typing import Callable, List, Tuple
 
 import joblib
-import numpy as np
 import tqdm
 from loguru import logger
 from nltk import RegexpParser
@@ -192,14 +191,16 @@ class KPECandidateExtractionModel:
                 # TODO: Remove min_len and max words
                 if len(candidate) > min_len:  # and len(candidate.split(" ")) <= 5:
                     # TODO: 'we insurer':{'US INSURERS'} but 'eastern us': {'eastern US'} ...
+                    # TODO: normalize hyphens and dots in candidate
                     l_candidate = (
-                        lemmatize(candidate, lemmer_lang)
+                        lemmatize(
+                            remove_whitespaces(
+                                remove_hyphens_and_dots(candidate.lower())
+                            ),
+                            lemmer_lang,
+                        )
                         if lemmer_lang
                         else candidate.lower()
-                    )
-                    # TODO: normalize hyphens and dots in candidate
-                    l_candidate = remove_whitespaces(
-                        remove_hyphens_and_dots(l_candidate.lower())
                     )
                     doc.candidate_set.add(l_candidate)
 
@@ -298,9 +299,7 @@ class KPECandidateExtractionModel:
 
         return doc.candidate_set, doc.candidate_mentions
 
-    def __extract_candidates(
-        self, tagged_doc: List[List[Tuple]], **kwargs
-    ) -> List[str]:
+    def __extract_candidates(self, doc: Document, **kwargs) -> List[str]:
         """
         Method that uses Regex patterns on POS tags to extract unique candidates from a tagged document
         """
@@ -313,7 +312,7 @@ class KPECandidateExtractionModel:
 
         candidate_set = set()
         parser = RegexpParser(self.grammar)
-        np_trees = parser.parse_sents(tagged_doc)
+        np_trees = parser.parse_sents(doc.tagged_doc)
 
         for tree in np_trees:
             for subtree in tree.subtrees(filter=lambda t: t.label() == "NP"):

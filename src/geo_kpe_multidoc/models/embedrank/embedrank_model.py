@@ -41,7 +41,13 @@ class EmbedRank(BaseKPModel):
         in_n_out_context                    - add non contextualized form embedding to mentions embeddings and do the average as candidade embedding.
     """
 
-    def __init__(self, model, tagger, candidate_embedding_strategy: str = ""):
+    def __init__(
+        self,
+        model,
+        tagger,
+        pooling_strategy: str = "mean",
+        candidate_embedding_strategy: str = "",
+    ):
         super().__init__(model, tagger)
         self.counter = 0
 
@@ -53,6 +59,7 @@ class EmbedRank(BaseKPModel):
         # }
         # TODO: deal with global_attention and global_attention_dilated
         strategy = STRATEGIES.get(candidate_embedding_strategy, InContextEmbeddings)
+        self.pooling_strategy = pooling_strategy
         self.candidate_embedding_strategy: CandidateEmbeddingStrategy = strategy()
         logger.info(
             f"Initialize EmbedRank w/ {self.candidate_embedding_strategy.__class__.__name__}"
@@ -78,7 +85,7 @@ class EmbedRank(BaseKPModel):
         # doc.raw_text = doc.raw_text.lower()
         if doc_mode == "global_attention":
             logger.warning(
-                "Global Attention not used in SentenceTransformer API, use EmbedRankManual"
+                "Global Attention not used in SentenceTransformer API, use LongEmbedRank"
             )
 
         doc_embeddings = self.model.embedding_model.encode(
@@ -93,7 +100,6 @@ class EmbedRank(BaseKPModel):
         # limit_128 = True
         # if limit_128:
         #     doc.token_ids = doc.token_ids[:128]
-
         return doc_embeddings["sentence_embedding"].detach().cpu().numpy()
 
     def _aggregate_candidate_mention_embeddings(

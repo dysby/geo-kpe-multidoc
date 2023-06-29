@@ -30,7 +30,7 @@ from geo_kpe_multidoc.models.sentence_embedder import (
 )
 
 
-class EmbedRankManual(EmbedRank):
+class LongEmbedRank(EmbedRank):
     """
     EmbedRank variant for Longformer model
     """
@@ -50,10 +50,10 @@ class EmbedRankManual(EmbedRank):
 
         if device is None:
             device = "cuda" if torch.cuda.is_available() else "cpu"
-            logger.info("EmbedRankManual use pytorch device: {}".format(device))
+            logger.info("LongEmbedRank use pytorch device: {}".format(device))
             # if torch.cuda.device_count() > 1:
             #     device = "cuda" if torch.cuda.is_available() else "cpu"
-            #     logger.info("EmbedRankManual use pytorch device: {}".format(device))
+            #     logger.info("LongEmbedRank use pytorch device: {}".format(device))
             #     model = nn.DataParallel(model)
 
         model.to(device)
@@ -71,7 +71,7 @@ class EmbedRankManual(EmbedRank):
             )
 
         self.model: SentenceEmbedder = embedder_cls(model, tokenizer)
-        self.name = f"EmbedRankManual_{name}"
+        self.name = f"LongEmbedRank_{name}"
 
         # strategies = {
         #     "no_context": OutContextEmbedding,

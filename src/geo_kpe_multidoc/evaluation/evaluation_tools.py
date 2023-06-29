@@ -12,19 +12,15 @@ import pandas as pd
 import simplemma
 from loguru import logger
 from nltk.stem.api import StemmerI
-from tabulate import tabulate
 from tqdm import tqdm
 
-from geo_kpe_multidoc import GEO_KPE_MULTIDOC_CACHE_PATH, GEO_KPE_MULTIDOC_OUTPUT_PATH
-from geo_kpe_multidoc.datasets import DATASETS, KPEDataset
+from geo_kpe_multidoc import GEO_KPE_MULTIDOC_CACHE_PATH
+from geo_kpe_multidoc.datasets import KPEDataset
 from geo_kpe_multidoc.document import Document
 from geo_kpe_multidoc.evaluation.metrics import MAP, f1_score, nDCG, precision, recall
 from geo_kpe_multidoc.models import EmbedRank, MaskRank, MDKPERank
-from geo_kpe_multidoc.models.embedrank.embedrank_longformer_manual import (
-    EmbedRankManual,
-)
+from geo_kpe_multidoc.models.embedrank.longembedrank import LongEmbedRank
 from geo_kpe_multidoc.models.pre_processing.pre_processing_utils import (
-    lemmatize,
     remove_hyphens_and_dots,
 )
 
@@ -285,84 +281,6 @@ def evaluate_kp_extraction_base(
     return results
 
 
-from sklearn.metrics import precision_recall_fscore_support
-
-
-def evaluate_kp_extraction_sklearn(
-    model_results: Dict[str, List] = {},
-    true_labels: Dict[str, List[List]] = {},
-    model_name: str = "",
-    kp_eval: bool = True,
-    k_set=[5, 10, 15],
-    **kwargs,
-) -> pd.DataFrame:
-    results = pd.DataFrame()
-    results.index.name = "Dataset"
-
-    for dataset in model_results:
-        results_c = {"Precision": [], "Recall": [], "F1": []}
-
-        results_kp = {"MAP": [], "nDCG": []}
-
-        for k in k_set:
-            results_kp[f"Precision_{k}"] = []
-            results_kp[f"Recall_{k}"] = []
-            results_kp[f"F1_{k}"] = []
-
-        for i in range(len(model_results[dataset])):
-            top_kp = [kp for kp, _score in model_results[dataset][i][0]]
-
-            candidates = model_results[dataset][i][1]
-
-            true_label = true_labels[dataset][i]
-
-            # Precision, Recall and F1-Score for candidates
-            p, r, f1, _ = precision_recall_fscore_support(
-                true_label, candidates, average="macro"
-            )
-
-            results_c["Precision"].append(p)
-            results_c["Recall"].append(r)
-            results_c["F1"].append(f1)
-
-            if kp_eval:
-                # Precision_k, Recall_k, F1-Score_k, MAP and nDCG for KP
-                for k in k_set:
-                    p_k, r_k, f1_k, _ = precision_recall_fscore_support(
-                        true_label, candidates, average="macro"
-                    )
-                    # p_k = precision(top_kp[:k], true_label)
-                    # r_k = recall(top_kp[:k], true_label)
-                    # f1_k = f1_score(p_k, r_k)
-
-                    results_kp[f"Precision_{k}"].append(p_k)
-                    results_kp[f"Recall_{k}"].append(r_k)
-                    results_kp[f"F1_{k}"].append(f1_k)
-
-                map = MAP(top_kp, true_label)
-                ndcg = nDCG(top_kp, true_label)
-
-                results_kp["MAP"].append(map)
-                results_kp["nDCG"].append(ndcg)
-
-        row = {**results_c, **results_kp}
-
-        # row = (
-        #     pd.concat(
-        #         [
-        #             pd.DataFrame(results_c).mean(axis=0),
-        #             pd.DataFrame(results_kp).mean(axis=0),
-        #         ]
-        #     )
-        #     .to_frame()
-        #     .T
-        # )
-        # row.index = pd.Index([dataset])
-        results = pd.concat([results, pd.DataFrame(row, index=[dataset])])
-
-    return results
-
-
 def evaluate_kp_extraction(
     model_results: Dict[str, List] = {},
     true_labels: Dict[str, List[List]] = {},
@@ -446,106 +364,9 @@ def evaluate_kp_extraction(
     return results
 
 
-def output_top_cands(
-    model_results: Dict[str, List] = {}, true_labels: Dict[str, Tuple[List]] = {}
-):
-    """
-    Print Top N candidates that are in Gold Candidate list
-
-    Parameters:
-    -----------
-        model_results: values are a list with results for each document [((doc1_top_n_candidates, doc1_top_n_scores], doc1_candidates), ...]
-    """
-    top_cand_l = []
-    for dataset in model_results:
-        for i in range(len(model_results[dataset])):
-            top_kp_and_score = model_results[dataset][i][0]
-            true_label = true_labels[dataset][i]
-            top_cand_l += [
-                round(float(score), 2)
-                for kp, score in top_kp_and_score
-                if kp in true_label
-            ]
-    print(top_cand_l)
-
-    top_cand_sims = {
-        round(float(x), 2): (0 + top_cand_l.count(round(float(x), 2)))
-        for x in np.arange(0, 1.01, 0.01)
-    }
-    print(top_cand_sims)
-
-
-def output_one_top_cands(
-    doc_ids: List[str],
-    model_results: Dict[str, List] = {},
-    true_labels: Dict[str, Tuple[List]] = {},
-    top_n: int = 20,
-    doc_id: str = None,
-) -> str:
-    """
-    Print one example Top N candidate and Gold Candidate list
-
-    Parameters:
-    -----------
-        model_results: values are a list with results for each document [((doc1_top_n_candidates, doc1_top_n_scores], doc1_candidates), ...]
-    """
-
-    for dataset in model_results.keys():
-        doc_idx = doc_ids.index(doc_id) if doc_id else 0
-        # doc_keys = [kp for kp, _ in model_results[dataset][doc_idx][0]]
-        doc_keys = model_results[dataset][doc_idx][0]
-        gold_keys = true_labels[dataset][doc_idx]
-        print(f"Keyphrase extraction for {doc_id}")
-        table = tabulate(
-            [
-                [dk[0] if len(dk) > 1 else dk, dk[1] if len(dk) > 1 else dk, gk]
-                for dk, gk in zip_longest(doc_keys[:top_n], gold_keys, fillvalue="-")
-            ],
-            headers=["Extracted", "Score", "Gold"],
-            floatfmt=".5f",
-        )
-        print(table)
-    return table
-
-
-def output_one_top_cands_geo(
-    doc_ids: List[str],
-    model_results: Dict[str, List] = {},
-    true_labels: Dict[str, Tuple[List]] = {},
-    top_n: int = 20,
-):
-    """
-    Print one example Top N candidate and Gold Candidate list
-
-    Parameters:
-    -----------
-        model_results: values are a list with results for each document
-            [((doc1_top_n_candidates, doc1_top_n_scores], doc1_candidates), ...]
-    """
-    for dataset in model_results.keys():
-        # print only 1 document example
-        top_n_and_scores, candidates = dataset[0]
-        gold_keys = true_labels[dataset][0]
-        print(doc_ids[0])
-        for ranking_type, (candidates_scores, candidades) in top_n_and_scores.items():
-            doc_keys = [kp for kp, _ in candidates_scores]
-            print(f"Table for {ranking_type}")
-            print(
-                tabulate(
-                    [
-                        [dk, gk]
-                        for dk, gk in zip_longest(
-                            doc_keys[:top_n], gold_keys, fillvalue="-"
-                        )
-                    ],
-                    headers=["Extracted", "Gold"],
-                )
-            )
-
-
 def extract_keyphrases_docs(
     dataset: KPEDataset,
-    model: Union[EmbedRank, MaskRank, EmbedRankManual],
+    model: Union[EmbedRank, MaskRank, LongEmbedRank],
     top_n=20,
     min_len=0,
     lemmer=None,
@@ -663,7 +484,7 @@ def extract_keyphrases_topics(
         logger.info(f"KPE for topic {topic_id}")
         (
             top_n_scores,
-            score_per_document,
+            # score_per_document,
             candidate_document_matrix,
             documents_embeddings,
             candidate_embeddings,
@@ -711,7 +532,7 @@ def extract_keyphrases_topics(
                     "dataset": dataset.name,
                     "topic": topic_id,
                     "top_n_scores": top_n_scores,
-                    "score_per_document": score_per_document,
+                    "score_per_document": None,
                     "candidate_document_matrix": candidate_document_matrix,
                     "gold_kp": gold_kp,
                     "documents_embeddings": documents_embeddings,
@@ -720,6 +541,18 @@ def extract_keyphrases_topics(
                 filename,
             )
             logger.info(f"Saving {topic_id} results in cache dir {filename}")
+
+        if len(preprocessing) > 0:
+            processed_gold_kp = []
+            for kp in gold_kp:
+                kp = remove_hyphens_and_dots(kp.lower())
+                for transformation in preprocessing:
+                    kp = transformation(kp)
+                processed_gold_kp.append(kp)
+            # TODO: remove duplicates and discard empty
+            processed_gold_kp = set(processed_gold_kp)
+            processed_gold_kp.discard("")
+            gold_kp = processed_gold_kp
 
         true_labels[dataset.name].append(gold_kp)
         gc.collect()

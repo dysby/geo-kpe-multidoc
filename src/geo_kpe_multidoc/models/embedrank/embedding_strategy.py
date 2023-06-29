@@ -25,7 +25,7 @@ class OutContextMentionsEmbedding:
             # TODO: refactor to batch encode
             for mention in doc.candidate_mentions[candidate]:
                 embds = []
-                # TODO: deal with subclassing EmbedRankManual
+                # TODO: deal with subclassing LongEmbedRank
                 if isinstance(model, BaseEmbedder):
                     embd = model.embed(mention)
                 else:

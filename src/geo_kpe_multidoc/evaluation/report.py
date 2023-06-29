@@ -3,11 +3,109 @@ from datetime import datetime
 from itertools import chain, zip_longest
 
 import matplotlib.pyplot as plt
+import numpy as np
 import pandas as pd
 import seaborn as sb
 from tabulate import tabulate
 
 from geo_kpe_multidoc import GEO_KPE_MULTIDOC_OUTPUT_PATH
+
+
+def output_top_cands(
+    model_results: dict[str, list] = {}, true_labels: dict[str, tuple[list, ...]] = {}
+):
+    """
+    Print Top N candidates that are in Gold Candidate list
+
+    Parameters:
+    -----------
+        model_results: values are a list with results for each document [((doc1_top_n_candidates, doc1_top_n_scores], doc1_candidates), ...]
+    """
+    top_cand_l = []
+    for dataset in model_results:
+        for i in range(len(model_results[dataset])):
+            top_kp_and_score = model_results[dataset][i][0]
+            true_label = true_labels[dataset][i]
+            top_cand_l += [
+                round(float(score), 2)
+                for kp, score in top_kp_and_score
+                if kp in true_label
+            ]
+    print(top_cand_l)
+
+    top_cand_sims = {
+        round(float(x), 2): (0 + top_cand_l.count(round(float(x), 2)))
+        for x in np.arange(0, 1.01, 0.01)
+    }
+    print(top_cand_sims)
+
+
+def output_one_top_cands(
+    doc_ids: list[str],
+    model_results: dict[str, list] = {},
+    true_labels: dict[str, tuple[list]] = {},
+    top_n: int = 20,
+    doc_id: str = None,
+) -> str:
+    """
+    Print one example Top N candidate and Gold Candidate list
+
+    Parameters:
+    -----------
+        model_results: values are a list with results for each document [((doc1_top_n_candidates, doc1_top_n_scores], doc1_candidates), ...]
+    """
+
+    for dataset in model_results.keys():
+        doc_idx = doc_ids.index(doc_id) if doc_id else 0
+        # doc_keys = [kp for kp, _ in model_results[dataset][doc_idx][0]]
+        doc_keys = model_results[dataset][doc_idx][0]
+        gold_keys = true_labels[dataset][doc_idx]
+        print(f"Keyphrase extraction for {doc_id}")
+        table = tabulate(
+            [
+                [dk[0] if len(dk) > 1 else dk, dk[1] if len(dk) > 1 else dk, gk]
+                for dk, gk in zip_longest(doc_keys[:top_n], gold_keys, fillvalue="-")
+            ],
+            headers=["Extracted", "Score", "Gold"],
+            floatfmt=".5f",
+        )
+        print(table)
+    return table
+
+
+def output_one_top_cands_geo(
+    doc_ids: list[str],
+    model_results: dict[str, list] = {},
+    true_labels: dict[str, tuple[list]] = {},
+    top_n: int = 20,
+):
+    """
+    Print one example Top N candidate and Gold Candidate list
+
+    Parameters:
+    -----------
+        model_results: values are a list with results for each document
+            [((doc1_top_n_candidates, doc1_top_n_scores], doc1_candidates), ...]
+    """
+    for dataset in model_results.keys():
+        # print only 1 document example
+        top_n_and_scores, candidates = dataset[0]
+        gold_keys = true_labels[dataset][0]
+        print(doc_ids[0])
+        for ranking_type, (candidates_scores, candidades) in top_n_and_scores.items():
+            doc_keys = [kp for kp, _ in candidates_scores]
+            print(f"Table for {ranking_type}")
+            print(
+                tabulate(
+                    [
+                        [dk, gk]
+                        for dk, gk in zip_longest(
+                            doc_keys[:top_n], gold_keys, fillvalue="-"
+                        )
+                    ],
+                    headers=["Extracted", "Gold"],
+                )
+            )
 
 
 def diff_greedy(doc_idx):
@@ -19,13 +117,13 @@ def diff_greedy(doc_idx):
             [
                 (c1, c2, c3)
                 for c1, c2, c3 in zip_longest(
-                    kpe[(kpe.doc == doc_idx) & (kpe.in_gold == True)]["candidate"],
-                    kpe_lemma[(kpe_lemma.doc == doc_idx) & (kpe_lemma.in_gold == True)][
+                    kpe[(kpe.doc == doc_idx) & (kpe.in_gold)]["candidate"],
+                    kpe_lemma[(kpe_lemma.doc == doc_idx) & (kpe_lemma.in_gold)][
                         "candidate"
                     ],
-                    kpe_greedy[
-                        (kpe_greedy.doc == doc_idx) & (kpe_greedy.in_gold == True)
-                    ]["candidate"],
+                    kpe_greedy[(kpe_greedy.doc == doc_idx) & (kpe_greedy.in_gold)][
+                        "candidate"
+                    ],
                     fillvalue="-",
                 )
             ],
@@ -40,8 +138,8 @@ def plot_score_distribuitions_with_gold(
     plt.rcParams["figure.figsize"] = (6.4, 4.8)
 
     fig, ax = plt.subplots()
-    ax = results[results["in_gold"] == False]["score"].plot.hist(density=True)
-    ax = results[results["in_gold"] == True]["score"].plot.hist(density=True, alpha=0.5)
+    ax = results[~results["in_gold"]]["score"].plot.hist(density=True)
+    ax = results[results["in_gold"]]["score"].plot.hist(density=True, alpha=0.5)
     if xlim is not None:
         ax.set_xlim(xlim)
     ax.set_title(title, fontsize=12)
@@ -116,7 +214,7 @@ def plot_dist(
     # p.set_title(title)
 
     sb.histplot(
-        df[df.gold == False].loc[idx_filter],
+        df[~df.in_gold].loc[idx_filter],
         stat="probability",
         x=column,
         color="steelblue",
@@ -125,7 +223,7 @@ def plot_dist(
     )
 
     sb.histplot(
-        df[df.gold == True].loc[idx_filter],
+        df[df.in_gold].loc[idx_filter],
         stat="probability",
         x=column,
         color="goldenrod",

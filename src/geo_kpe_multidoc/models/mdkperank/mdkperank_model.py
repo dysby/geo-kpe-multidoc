@@ -1,24 +1,19 @@
-from collections import OrderedDict, namedtuple
+from collections import namedtuple
 from dataclasses import dataclass
 from itertools import chain
-from operator import itemgetter
 from statistics import mean
-from typing import Callable, Dict, Iterable, List, Set, Tuple
+from typing import Callable, Dict, Iterable, List, Tuple
 
 import numpy as np
 import pandas as pd
 from loguru import logger
-from sklearn.metrics.pairwise import cosine_similarity
 
 from geo_kpe_multidoc.datasets.datasets import KPEDataset
-from geo_kpe_multidoc.datasets.process_mordecai import load_topic_geo_locations
 from geo_kpe_multidoc.document import Document
-from geo_kpe_multidoc.geo.measures import GearyC, GetisOrdG, MoranI
+from geo_kpe_multidoc.models.mdkperank.mdkperank_strategy import STRATEGIES
 
 from ..base_KP_model import BaseKPModel, KPEScore
 from ..embedrank import EmbedRank
-from ..fusion_model import FusionModel
-from ..maskrank import MaskRank
 
 
 @dataclass
@@ -35,12 +30,12 @@ class KpeModelScores:
 
 MDKPERankOutput = namedtuple(
     "MDKPERankOutput",
-    "top_n_scores score_per_document candidate_document_matrix documents_embeddings candidate_embeddings",
+    "top_n_scores candidate_document_matrix documents_embeddings candidate_embeddings",
 )
 
 
 class MDKPERank(BaseKPModel):
-    def __init__(self, model: EmbedRank):
+    def __init__(self, model: EmbedRank, rank_strategy: str = "MEAN"):
         self.base_model_embed: EmbedRank = model
         # TODO: what how to join MaskRank
         # self.base_model_mask = MaskRank(model, tagger)
@@ -48,6 +43,8 @@ class MDKPERank(BaseKPModel):
             ".".join([self.__class__.__name__, model.name.split("_")[0]])
             + model.name[model.name.index("_") :]
         )
+
+        self.ranking_strategy = STRATEGIES[rank_strategy]()
 
     def extract_kp_from_doc(
         self, doc, top_n, min_len, stemmer=None, lemmer=None, **kwargs
@@ -57,12 +54,12 @@ class MDKPERank(BaseKPModel):
         relevant to its specific functionality
         """
 
-        self.base_model_embed.extract_candidates(
-            doc, min_len, lemmer_lang=lemmer, **kwargs
-        )
+        self.base_model_embed.extract_candidates(doc, min_len, lemmer, **kwargs)
 
         _, cand_embeds, candidate_set = self.base_model_embed.embed_candidates(
-            doc, stemmer, **kwargs
+            doc,
+            stemmer=stemmer,
+            **kwargs,
         )
 
         return (doc, cand_embeds, candidate_set)
@@ -325,26 +322,21 @@ class MDKPERank(BaseKPModel):
             candidate_embeddings, orient="index"
         )
 
-        # >>> doc_embed = np.random.rand(6, 768)
-        # >>> candidates_embed = np.random.rand(100, 768)
-        # >>> cosine_similarity(candidates_embed, doc_embed).shape
-        # (100, 6)
-        score_per_document = pd.DataFrame(
-            cosine_similarity(candidate_embeddings, documents_embeddings)
-        )
-        score_per_document.index = candidate_embeddings.index
-        score_per_document.columns = documents_embeddings.index
-
-        top_n_scores = score_per_document.mean(axis=1).sort_values(ascending=False)
+        top_n_scores = self.ranking_strategy(candidate_embeddings, documents_embeddings)
 
         # new dataframe with 0
-        candidate_document_matrix = (score_per_document * 0).astype(int)
+        candidate_document_matrix = pd.DataFrame(
+            np.zeros((len(candidate_embeddings), len(documents_embeddings)), dtype=int),
+            index=candidate_embeddings.index,
+            columns=documents_embeddings.index,
+        )
         for doc, _, cand_set in topic_res:
+            # Each mention is an observation in the document
             candidate_document_matrix.loc[cand_set, doc.id] += 1
 
         return MDKPERankOutput(
             top_n_scores,
-            score_per_document,
+            # score_per_document,
             candidate_document_matrix,
             documents_embeddings,
             candidate_embeddings,

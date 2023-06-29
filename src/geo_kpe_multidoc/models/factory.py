@@ -12,10 +12,8 @@ from geo_kpe_multidoc.models.backend.roberta2longformer.roberta2nyströmformer i
     convert_roberta_to_nystromformer,
 )
 from geo_kpe_multidoc.models.base_KP_model import BaseKPModel, ExtractionEvaluator
-from geo_kpe_multidoc.models.embedrank.embedrank_longformer_manual import (
-    EmbedRankManual,
-)
 from geo_kpe_multidoc.models.embedrank.embedrank_model import EmbedRank
+from geo_kpe_multidoc.models.embedrank.longembedrank import LongEmbedRank
 from geo_kpe_multidoc.models.fusion_model import FusionModel
 from geo_kpe_multidoc.models.maskrank.maskrank_manual import LongformerMaskRank
 from geo_kpe_multidoc.models.maskrank.maskrank_model import MaskRank
@@ -105,7 +103,7 @@ def generateBigBirdRanker(backend_model_name, tagger_name, args):
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-    kpe_model = EmbedRankManual(
+    kpe_model = LongEmbedRank(
         bigbird_model,
         bigbird_tokenizer,
         tagger_name,
@@ -132,7 +130,7 @@ def generateNystromformerRanker(backend_model_name, tagger_name, args):
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-    kpe_model = EmbedRankManual(
+    kpe_model = LongEmbedRank(
         bigbird_model,
         bigbird_tokenizer,
         tagger_name,
@@ -147,7 +145,7 @@ def kpe_model_factory(args, BACKEND_MODEL_NAME, TAGGER_NAME) -> BaseKPModel:
     if args.rank_model == "EmbedRank":
         if "[longformer]" in BACKEND_MODEL_NAME:
             kpe_model = generateLongformerRanker(
-                EmbedRankManual,
+                LongEmbedRank,
                 BACKEND_MODEL_NAME.replace("[longformer]", ""),
                 TAGGER_NAME,
                 args,
@@ -180,7 +178,8 @@ def kpe_model_factory(args, BACKEND_MODEL_NAME, TAGGER_NAME) -> BaseKPModel:
         if "[longformer]" in BACKEND_MODEL_NAME:
             base_name = BACKEND_MODEL_NAME.replace("[longformer]", "")
             kpe_model = MDKPERank(
-                generateLongformerRanker(EmbedRankManual, base_name, TAGGER_NAME, args)
+                generateLongformerRanker(LongEmbedRank, base_name, TAGGER_NAME, args),
+                rank_strategy=args.md_strategy,
             )
         else:
             ranker = EmbedRank(
@@ -188,7 +187,7 @@ def kpe_model_factory(args, BACKEND_MODEL_NAME, TAGGER_NAME) -> BaseKPModel:
                 TAGGER_NAME,
                 candidate_embedding_strategy=args.candidate_mode,
             )
-            kpe_model = MDKPERank(ranker)
+            kpe_model = MDKPERank(ranker, rank_strategy=args.md_strategy)
     elif args.rank_model == "ExtractionEvaluator":
         kpe_model = ExtractionEvaluator(BACKEND_MODEL_NAME, TAGGER_NAME)
     elif args.rank_model == "FusionRank":
