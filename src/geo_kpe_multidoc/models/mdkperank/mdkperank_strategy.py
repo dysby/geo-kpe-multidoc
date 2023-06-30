@@ -77,7 +77,7 @@ class MrrRank(Ranker):
         score_per_document.columns = documents_embeddings.index
 
         top_n_scores = (
-            (1 / score_per_document.rank()).mean(axis=1).sort_values(ascending=False)
+            (1 / score_per_document.rank()).mean(axis=1).sort_values(ascending=True)
         )
         return top_n_scores
 
