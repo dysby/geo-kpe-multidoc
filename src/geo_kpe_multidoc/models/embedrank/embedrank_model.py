@@ -273,8 +273,8 @@ class EmbedRank(BaseKPModel):
 
         doc_sim = []
         if mmr_mode:
-            assert mmr_diversity > 0
-            assert mmr_diversity < 1
+            assert mmr_diversity >= 0
+            assert mmr_diversity <= 1
 
             valid_top_n = len(candidate_set)
             if top_n > 0:
