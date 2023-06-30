@@ -81,11 +81,6 @@ class MrrRank:
         )
         return top_n_scores
 
-    def __call__(
-        self, candidates_embeddings: np.ndarray, documents_embeddings: np.ndarray
-    ) -> pd.DataFrame:
-        self._rank(candidates_embeddings, documents_embeddings)
-
 
 class MmrRank:
     # TODO: Maximal Relevance in Multidoc???
@@ -101,11 +96,6 @@ class MmrRank:
 
         top_n_scores = score_per_document.mean(axis=1).sort_values(ascending=False)
         return top_n_scores
-
-    def __call__(
-        self, candidates_embeddings: np.ndarray, documents_embeddings: np.ndarray
-    ) -> pd.DataFrame:
-        self._rank(candidates_embeddings, documents_embeddings)
 
 
 class Top20MaxSum:
@@ -131,11 +121,6 @@ class Top20MaxSum:
         top_n_scores = score_per_document.mean(axis=1).sort_values(ascending=False)
         return top_n_scores
 
-    def __call__(
-        self, candidates_embeddings: np.ndarray, documents_embeddings: np.ndarray
-    ) -> pd.DataFrame:
-        self._rank(candidates_embeddings, documents_embeddings)
-
 
 class Top20ClusterCentroids:
     def _rank(
@@ -146,11 +131,6 @@ class Top20ClusterCentroids:
         top_n_scores = None
         return top_n_scores
 
-    def __call__(
-        self, candidates_embeddings: np.ndarray, documents_embeddings: np.ndarray
-    ) -> pd.DataFrame:
-        self._rank(candidates_embeddings, documents_embeddings)
-
 
 class ComunityRank:
     def _rank(
@@ -160,11 +140,6 @@ class ComunityRank:
         # 2: Comunities and assign a keyphrase from largest comunities
         top_n_scores = None
         return top_n_scores
-
-    def __call__(
-        self, candidates_embeddings: np.ndarray, documents_embeddings: np.ndarray
-    ) -> pd.DataFrame:
-        self._rank(candidates_embeddings, documents_embeddings)
 
 
 # TODO: Graph (Graph-Based Text Summarization Using Modified TextRank)
@@ -180,11 +155,6 @@ class EigenRank:
         # 2: EigenVector Centrality for the network and get
         top_n_scores = None
         return top_n_scores
-
-    def __call__(
-        self, candidates_embeddings: np.ndarray, documents_embeddings: np.ndarray
-    ) -> pd.DataFrame:
-        self._rank(candidates_embeddings, documents_embeddings)
 
 
 STRATEGIES = {
