@@ -64,7 +64,7 @@ class ITCSRank(Ranker):
         return top_n_scores
 
 
-class MrrRank:
+class MrrRank(Ranker):
     def _rank(
         self, candidates_embeddings: np.ndarray, documents_embeddings: np.ndarray
     ) -> pd.DataFrame:
@@ -82,7 +82,7 @@ class MrrRank:
         return top_n_scores
 
 
-class MmrRank:
+class MmrRank(Ranker):
     # TODO: Maximal Relevance in Multidoc???
     # Based on KeyBERT implementation
     def _rank(
@@ -98,7 +98,7 @@ class MmrRank:
         return top_n_scores
 
 
-class Top20MaxSum:
+class Top20MaxSum(Ranker):
     """From KeyBERT
     Calculate Max Sum Distance for extraction of keywords
 
@@ -122,7 +122,7 @@ class Top20MaxSum:
         return top_n_scores
 
 
-class Top20ClusterCentroids:
+class Top20ClusterCentroids(Ranker):
     def _rank(
         self, candidates_embeddings: np.ndarray, documents_embeddings: np.ndarray
     ) -> pd.DataFrame:
@@ -132,7 +132,7 @@ class Top20ClusterCentroids:
         return top_n_scores
 
 
-class ComunityRank:
+class ComunityRank(Ranker):
     def _rank(
         self, candidates_embeddings: np.ndarray, documents_embeddings: np.ndarray
     ) -> pd.DataFrame:
@@ -147,7 +147,7 @@ class ComunityRank:
 #           sentences within a cluster are similar to each other and sentences of different cluster represent their dissimilarity.
 
 
-class EigenRank:
+class EigenRank(Ranker):
     def _rank(
         self, candidates_embeddings: np.ndarray, documents_embeddings: np.ndarray
     ) -> pd.DataFrame:
