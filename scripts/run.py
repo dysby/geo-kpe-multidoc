@@ -21,11 +21,13 @@ from geo_kpe_multidoc.evaluation.evaluation_tools import (
     extract_keyphrases_docs,
     extract_keyphrases_topics,
     model_scores_to_dataframe,
-    output_one_top_cands,
     postprocess_dataset_labels,
     postprocess_res_labels,
 )
-from geo_kpe_multidoc.evaluation.report import plot_score_distribuitions_with_gold
+from geo_kpe_multidoc.evaluation.report import (
+    output_one_top_cands,
+    plot_score_distribuitions_with_gold,
+)
 from geo_kpe_multidoc.models import MDKPERank
 from geo_kpe_multidoc.models.factory import kpe_model_factory
 from geo_kpe_multidoc.models.pre_processing.pre_processing_utils import (
@@ -68,6 +70,7 @@ def parse_args():
     )
     parser.add_argument(
         "--doc_name",
+        default=None,
         type=str,
         help="Doc ID to test from Dataset.",
     )
@@ -76,10 +79,9 @@ def parse_args():
         "--rank_model",
         default="EmbedRank",
         type=str,
-        help="The Ranking Model [EmbedRank, EmbedRankManual, MaskRank, and FusionRank], MDKPERank",
+        help="The Ranking Model [EmbedRank, MaskRank, and FusionRank], MDKPERank",
         choices=[
             "EmbedRank",
-            "EmbedRankManual",
             "MaskRank",
             "FusionRank",
             "MDKPERank",
@@ -107,23 +109,36 @@ def parse_args():
     parser.add_argument(
         "--longformer_only_copy_to_max_position",
         type=int,
+        default=None,
         help="Longformer: only copy first positions of Pretrained Model position embedding weights",
+    )
+    parser.add_argument(
+        "--pooling",
+        type=str,
+        default="mean",
+        help="Embedding Pooling strategy [mean, max]",
     )
     parser.add_argument(
         "--candidate_mode",
         default="",
         type=str,
-        # required=True,
         help="The method for candidate mode (no_context, mentions_no_context, global_attention, global_attention_dilated_nnn, attention_rank).",
+    )
+    parser.add_argument(
+        "--md_strategy",
+        default="MEAN",
+        type=str,
+        help="Candidate ranking method for Multi-document extraction",
     )
     parser.add_argument(
         "--min_len",
         type=int,
+        default=0,
         help="Candidate keyphrase minimum length",
     )
     parser.add_argument(
         "--top_n",
-        default="-1",
+        default=-1,
         type=int,
         help="Keep only Top N candidates",
     )
@@ -140,6 +155,7 @@ def parse_args():
     parser.add_argument(
         "--embedrank_diversity",
         type=float,
+        default=None,
         help="EmbedRank MMR diversity parameter value.",
     )
     parser.add_argument(
@@ -150,6 +166,7 @@ def parse_args():
     parser.add_argument(
         "--tagger_name",
         type=str,
+        default=None,
         help="Explicit use this Spacy tagger",
     )
     parser.add_argument(
@@ -284,7 +301,7 @@ def main():
     stemmer = (
         None if args.no_stemming else select_stemmer(DATASETS[ds_name].get("language"))
     )
-    assert stemmer != None
+    assert stemmer is not None
     if not stemmer:
         logger.critical("KPE Evaluation usually need stemmer!")
     lemmer = DATASETS[ds_name].get("language") if args.lemmatization else None
@@ -348,12 +365,14 @@ def main():
         performance_metrics = pd.concat(
             [performance_metrics, evaluate_kp_extraction(model_results, true_labels)]
         )
+
         # mlflow.log_text(kpe_for_doc, artifact_file="first-doc-extraction-sample.txt")
         wandb.log({"first-doc-extraction-sample": kpe_for_doc})
 
         metric_names = [
             "_base_" + value for value in performance_metrics.iloc[0].index.values
         ]
+
         metrics = performance_metrics.iloc[0]
         metrics.index = metric_names
         all_metrics = metrics.to_dict()
@@ -365,6 +384,7 @@ def main():
         all_metrics.update(metrics.to_dict())
         wandb.log(all_metrics)
 
+    logger.info(f"Args: {args}")
     print(
         tabulate(
             performance_metrics[
