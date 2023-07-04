@@ -50,13 +50,9 @@ class EmbedRank(BaseKPModel):
     ):
         super().__init__(model, tagger)
         self.counter = 0
+        # manualy set SentenceTransformer max seq lenght1
+        # self.model.embedding_model.max_seq_length = 384
 
-        # strategies = {
-        #     "no_context": OutContextEmbedding,
-        #     "mentions_no_context": OutContextMentionsEmbedding,
-        #     "in_context": InContextEmbeddings,
-        #     "in_n_out_context": InAndOutContextEmbeddings,
-        # }
         # TODO: deal with global_attention and global_attention_dilated
         strategy = STRATEGIES.get(candidate_embedding_strategy, InContextEmbeddings)
         self.pooling_strategy = pooling_strategy
@@ -182,6 +178,12 @@ class EmbedRank(BaseKPModel):
         doc.token_ids = tokenized_doc["input_ids"].squeeze().tolist()
         doc.global_attention_mask = torch.zeros(tokenized_doc["input_ids"].shape)
         doc.global_attention_mask[:, 0] = 1  # CLS token
+
+        # TODO: Global Attention alternatives
+        # Global attention on the first 100 tokens
+        # global_attention_mask[:, :100] = 1
+        # # Global attention on periods
+        # global_attention_mask[(input_ids == self.tokenizer.convert_tokens_to_ids('.'))] = 1
 
         if "global_attention" in cand_mode:
             if "dilated" in cand_mode:

@@ -299,40 +299,12 @@ class MDKPERank(BaseKPModel):
             for doc in topic_docs
         ]
 
-        documents_embeddings = {}
-        candidate_embeddings = {}
-        for doc, cand_embeds, cand_set in topic_res:
-            documents_embeddings[doc.id] = doc.doc_embed  # .reshape(1, -1)
-            # Size([1, 768])
-
-            for candidate, embedding in zip(cand_set, cand_embeds):
-                candidate_embeddings.setdefault(candidate, []).append(embedding)
-
-        # The candidate embedding is the average of each embedding
-        # of the candidate in the document.
-        candidate_embeddings = {
-            candidate: np.mean(embeddings, axis=0)
-            for candidate, embeddings in candidate_embeddings.items()
-        }
-
-        documents_embeddings = pd.DataFrame.from_dict(
-            documents_embeddings, orient="index"
-        )
-        candidate_embeddings = pd.DataFrame.from_dict(
-            candidate_embeddings, orient="index"
-        )
-
-        top_n_scores = self.ranking_strategy(candidate_embeddings, documents_embeddings)
-
-        # new dataframe with 0
-        candidate_document_matrix = pd.DataFrame(
-            np.zeros((len(candidate_embeddings), len(documents_embeddings)), dtype=int),
-            index=candidate_embeddings.index,
-            columns=documents_embeddings.index,
-        )
-        for doc, _, cand_set in topic_res:
-            # Each mention is an observation in the document
-            candidate_document_matrix.loc[cand_set, doc.id] += 1
+        (
+            documents_embeddings,
+            candidate_embeddings,
+            candidate_document_matrix,
+            top_n_scores,
+        ) = self.ranking_strategy(topic_res)
 
         return MDKPERankOutput(
             top_n_scores,
