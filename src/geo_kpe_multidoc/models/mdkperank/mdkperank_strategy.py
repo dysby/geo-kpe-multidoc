@@ -291,7 +291,7 @@ class DCSPRank(Ranker):
     $ \delta $ - predefined similarity thereshold
     """
 
-    def _represent_score(sim_matrix, delta):
+    def _represent_score(self, sim_matrix, delta):
         # sentences_count = len(sim_matrix)
         # result = np.zeros(shape=(sentences_count,))
         # for i in range(sentences_count):
@@ -311,7 +311,7 @@ class DCSPRank(Ranker):
         score = np.sum(is_represent, axis=1) / sentences_count
         return score
 
-    def _diversity_score(sim_matrix, s_rep_vector):
+    def _diversity_score(self, sim_matrix, s_rep_vector):
         """
         Diversity score of a sentence is measured by computing the minimum distance
         between the sentence $s_i$ and any other sentences with higher density score
