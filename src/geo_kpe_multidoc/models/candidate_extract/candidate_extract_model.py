@@ -215,7 +215,7 @@ class KPECandidateExtractionModel:
 
         if cache_candidate_selection:
             self._save_cache(
-                doc.dataset, doc.doc_id, doc.candidate_set, doc.candidate_mentions
+                doc.dataset, doc.id, doc.candidate_set, doc.candidate_mentions
             )
 
         return doc.candidate_set, doc.candidate_mentions

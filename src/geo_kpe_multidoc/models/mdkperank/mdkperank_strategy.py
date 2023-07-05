@@ -359,6 +359,10 @@ class DCSPRank(Ranker):
 
 
 class ClusterCentroidsRank(Ranker):
+    """Based on:
+    https://github.com/caomanhhaipt/Extractive-Multi-document-Summarization/blob/master/methods/main_method/Kmeans_CentroidBase_MMR_SentencePosition.py
+    """
+
     def __init__(self, **kwargs) -> None:
         self.n_clusters = kwargs.get("n_clusters", 20)
 
