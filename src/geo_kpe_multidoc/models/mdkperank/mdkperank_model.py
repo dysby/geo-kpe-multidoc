@@ -6,7 +6,6 @@ from typing import Callable, Dict, Iterable, List, Tuple
 
 import numpy as np
 import pandas as pd
-from loguru import logger
 
 from geo_kpe_multidoc.datasets.datasets import KPEDataset
 from geo_kpe_multidoc.document import Document
@@ -35,7 +34,7 @@ MDKPERankOutput = namedtuple(
 
 
 class MDKPERank(BaseKPModel):
-    def __init__(self, model: EmbedRank, rank_strategy: str = "MEAN"):
+    def __init__(self, model: EmbedRank, rank_strategy: str = "MEAN", **kwargs):
         self.base_model_embed: EmbedRank = model
         # TODO: what how to join MaskRank
         # self.base_model_mask = MaskRank(model, tagger)
@@ -44,7 +43,7 @@ class MDKPERank(BaseKPModel):
             + model.name[model.name.index("_") :]
         )
 
-        self.ranking_strategy = STRATEGIES[rank_strategy]()
+        self.ranking_strategy = STRATEGIES[rank_strategy](**kwargs)
 
     def extract_kp_from_doc(
         self, doc, top_n, min_len, stemmer=None, lemmer=None, **kwargs
