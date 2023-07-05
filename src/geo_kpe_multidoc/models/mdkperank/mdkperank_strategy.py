@@ -439,6 +439,9 @@ class EigenRank(Ranker):
 
 
 class PageRank(Ranker):
+    def __init__(self, **kwargs) -> None:
+        self.delta = 0.3
+
     def _rank(
         self,
         candidates_embeddings: pd.DataFrame,
@@ -458,6 +461,9 @@ class PageRank(Ranker):
         adjacency_matrix = cosine_similarity(
             candidates_embeddings, candidates_embeddings
         )
+
+        adjacency_matrix[np.diag_indices_from(adjacency_matrix)] = 0
+        adjacency_matrix[adjacency_matrix < self.delta] = 0
 
         # Matrix_B= row normalisation of bag of words model
         # matrix_B = np.array([[0 for x in range(len(bag_of_words[0]))] for y in range(len(bag_of_words))])
