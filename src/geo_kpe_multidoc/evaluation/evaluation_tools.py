@@ -510,13 +510,24 @@ def extract_keyphrases_topics(
 
         model_results[dataset.name].append(
             (
-                list(zip(top_n_scores.index.tolist(), top_n_scores.tolist())),
-                top_n_scores.index.tolist(),
+                top_n_scores,
+                candidate_embeddings.index.tolist(),
             )
         )
 
-        # if lemmer:
-        #     gold_kp = lemmatize(gold_kp, lemmer)
+        if len(preprocessing) > 0:
+            processed_gold_kp = []
+            for kp in gold_kp:
+                kp = remove_hyphens_and_dots(kp.lower())
+                for transformation in preprocessing:
+                    kp = transformation(kp)
+                processed_gold_kp.append(kp)
+            # TODO: remove duplicates and discard empty
+            processed_gold_kp = set(processed_gold_kp)
+            processed_gold_kp.discard("")
+            gold_kp = processed_gold_kp
+
+        true_labels[dataset.name].append(gold_kp)
 
         if cache_results:
             filename = path.join(
@@ -532,7 +543,6 @@ def extract_keyphrases_topics(
                     "dataset": dataset.name,
                     "topic": topic_id,
                     "top_n_scores": top_n_scores,
-                    "score_per_document": None,
                     "candidate_document_matrix": candidate_document_matrix,
                     "gold_kp": gold_kp,
                     "documents_embeddings": documents_embeddings,
@@ -542,20 +552,6 @@ def extract_keyphrases_topics(
             )
             logger.info(f"Saving {topic_id} results in cache dir {filename}")
 
-        if len(preprocessing) > 0:
-            processed_gold_kp = []
-            for kp in gold_kp:
-                kp = remove_hyphens_and_dots(kp.lower())
-                for transformation in preprocessing:
-                    kp = transformation(kp)
-                processed_gold_kp.append(kp)
-            # TODO: remove duplicates and discard empty
-            processed_gold_kp = set(processed_gold_kp)
-            processed_gold_kp.discard("")
-            gold_kp = processed_gold_kp
-
-        true_labels[dataset.name].append(gold_kp)
-        gc.collect()
     return model_results, true_labels
 
 
