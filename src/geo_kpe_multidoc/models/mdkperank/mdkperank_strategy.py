@@ -358,7 +358,6 @@ class DCSPRank(Ranker):
             reverse=True,
         )
 
-        top_n_scores = sorted
         return (
             documents_embeddings,
             candidates_embeddings,
