@@ -3,7 +3,7 @@ from operator import itemgetter
 
 import numpy as np
 import pandas as pd
-from sklearn.cluster import KMeans
+from sklearn.cluster import DBSCAN, KMeans
 from sklearn.metrics import pairwise_distances_argmin_min
 from sklearn.metrics.pairwise import cosine_similarity
 
@@ -286,7 +286,7 @@ class DDPRank(Ranker):
         )
 
 
-class DCSPRank(Ranker):
+class DPSCRank(Ranker):
     """Yunqing Xia, Yi Liu, Yang Zhang, Wenmin Wang "Clustering Sentences with Density Peaks for Multi-document Summarization" (2015)
 
     adapted from https://github.com/pvgladkov/density-peaks-sentence-clustering
@@ -307,10 +307,6 @@ class DCSPRank(Ranker):
         #     if not result[i]:
         #         result[i] = 10 ** (-10)
         # return result
-
-        sim_matrix = sim_matrix.copy()
-        sim_matrix[np.diag_indices_from(sim_matrix)] = 0
-
         sentences_count = len(sim_matrix)
         is_represent = (sim_matrix - delta) > 0
         score = np.sum(is_represent, axis=1) / sentences_count
@@ -321,6 +317,12 @@ class DCSPRank(Ranker):
         Diversity score of a sentence is measured by computing the minimum distance
         between the sentence $s_i$ and any other sentences with higher density score
         """
+
+        # sentences_count = len(sim_matrix)
+        # result = np.zeros(shape=(sentences_count,))
+        # for i in range(sentences_count):
+        #     result[i] = np.min(sim_matrix[i][s_rep_vector > s_rep_vector[i]])
+
         sentences_count = len(sim_matrix)
         result = np.zeros(shape=(sentences_count,))
         for i in range(sentences_count):
@@ -344,6 +346,7 @@ class DCSPRank(Ranker):
         **kwargs,
     ):
         sim_matrix = cosine_similarity(candidates_embeddings, candidates_embeddings)
+        sim_matrix[np.diag_indices_from(sim_matrix)] = 0
         # effective_lens = [effective_length(s) for s in split_into_sentences(text)]
         # real_lens = [real_length(s) for s in split_into_sentences(text)]
 
@@ -352,6 +355,8 @@ class DCSPRank(Ranker):
         score = rep_score + div_score
         # len_score = np.log(length_score_(effective_lens, real_lens))
         # score = rep_score + div_score + len_score
+
+        # TODO: check why sorting backwards (reverse=False) give better results
         top_n_scores = sorted(
             [(sent, s) for sent, s in zip(candidate_document_matrix.index, score)],
             key=itemgetter(1),
@@ -372,7 +377,8 @@ class ClusterCentroidsRank(Ranker):
     """
 
     def __init__(self, **kwargs) -> None:
-        self.n_clusters = kwargs.get("n_clusters", 20)
+        # self.clustering = KMeans(**kwargs)
+        self.clustering = DBSCAN(**kwargs)
 
     def _rank(
         self,
@@ -383,16 +389,21 @@ class ClusterCentroidsRank(Ranker):
         **kwargs,
     ):
         # 1: compute 20 clusters
-        kmeans = KMeans(n_clusters=self.n_clusters)
-        kmeans = kmeans.fit(candidates_embeddings)
+        sim_matrix = cosine_similarity(candidates_embeddings, candidates_embeddings)
+        sim_matrix[sim_matrix < 0] = 0
+        distance = sim_matrix - 1
+        if isinstance(self.clustering, KMeans):
+            fitted = self.clustering.fit(candidates_embeddings)
+        else:
+            fitted = self.clustering.fit(distance)
 
         avg = []
         for j in range(self.n_clusters):
-            idx = np.where(kmeans.labels_ == j)[0]
+            idx = np.where(fitted.labels_ == j)[0]
             avg.append(np.mean(idx))
         # 2: get keyphrase embedding closest to cluster centroid
         closest, _ = pairwise_distances_argmin_min(
-            kmeans.cluster_centers_, candidates_embeddings
+            fitted.cluster_centers_, candidates_embeddings
         )
         ordering = sorted(range(self.n_clusters), key=lambda k: avg[k])
 
@@ -494,7 +505,7 @@ class AffinityRank(Ranker):
             else:
                 sentence_score_t_1 = sentence_score_t
 
-        top_n_scores = list(
+        top_n_scores = sorted(
             [
                 (sent, s)
                 for sent, s in zip(candidate_document_matrix.index, sentence_score_t_1)
@@ -525,6 +536,13 @@ class PageRank(Ranker):
         *args,
         **kwargs,
     ):
+        # N = M.shape[1]
+        # v = np.ones(N) / N
+        # M_hat = (d * M + (1 - d) / N)
+        # for i in range(num_iterations):
+        #     v = M_hat @ v
+        # return v
+
         """based on https://github.com/bshivangi47/Text-Summarization-using-Corank/blob/main/for100files.py"""
         score_per_document = pd.DataFrame(
             cosine_similarity(candidates_embeddings, documents_embeddings)
@@ -591,5 +609,5 @@ STRATEGIES = {
     "EIGEN": EigenRank,
     "PAGERANK": PageRank,
     "AFFINITY": AffinityRank,
-    "DCSP": DCSPRank,
+    "DPSC": DPSCRank,
 }
