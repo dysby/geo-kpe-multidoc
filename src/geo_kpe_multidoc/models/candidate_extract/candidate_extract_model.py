@@ -359,7 +359,8 @@ class KPECandidateExtractionModel:
     def _read_cache(self, dataset, doc_id) -> Tuple[set, dict]:
         cache_file_path = path.join(
             GEO_KPE_MULTIDOC_CACHE_PATH,
-            "candidates" f"{dataset}-{doc_id}-candidates.cache",
+            "candidates",
+            f"{dataset}-{doc_id}-candidates.cache",
         )
         if path.exists(cache_file_path):
             (candidate_set, candidate_mentions) = joblib.load(cache_file_path)
@@ -371,7 +372,8 @@ class KPECandidateExtractionModel:
     def _save_cache(self, dataset, doc_id, candidate_set, candidate_mentions):
         cache_file_path = path.join(
             GEO_KPE_MULTIDOC_CACHE_PATH,
-            "candidates" f"{dataset}-{doc_id}-candidates.cache",
+            "candidates",
+            f"{dataset}-{doc_id}-candidates.cache",
         )
         Path(cache_file_path).parent.mkdir(exist_ok=True, parents=True)
         joblib.dump((candidate_set, candidate_mentions), cache_file_path)

@@ -146,6 +146,7 @@ def evaluate_kp_extraction_base(
     model_name: str = "",
     save: bool = True,
     kp_eval: bool = True,
+    stemmer: StemmerI = None,
     **kwargs,
 ) -> None:
     """
@@ -183,6 +184,17 @@ def evaluate_kp_extraction_base(
 
             true_label = true_labels[dataset][i]
             len_true_label = float(len(true_label))
+
+            # Use stemming for evaluation
+            if stemmer:
+                candidates = [
+                    " ".join([stemmer.stem(w) for w in kp.split()]).lower()
+                    for kp in candidates
+                ]
+                true_label = [
+                    " ".join([stemmer.stem(w) for w in kp.split()]).lower()
+                    for kp in true_label
+                ]
 
             # Precision, Recall and F1-Score for candidates
             p = min(
