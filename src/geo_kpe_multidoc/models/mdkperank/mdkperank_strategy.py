@@ -1,5 +1,5 @@
 import itertools
-from operator import getitem
+from operator import itemgetter
 
 import numpy as np
 import pandas as pd
@@ -354,7 +354,7 @@ class DCSPRank(Ranker):
         # score = rep_score + div_score + len_score
         top_n_scores = sorted(
             [(sent, s) for sent, s in zip(candidate_document_matrix.index, score)],
-            key=getitem(1),
+            key=itemgetter(1),
             reverse=True,
         )
 
@@ -446,6 +446,65 @@ class EigenRank(Ranker):
             top_n_scores,
         )
 
+class AffinityRank(Ranker):
+    """Improved Affinity Graph Based Multi-Document Summarization"""
+    def __init__(self, **kwargs) -> None:
+        self.gamma = 0.9
+        self.damping = 0.85
+
+    def _rank(
+        self,
+        candidates_embeddings: pd.DataFrame,
+        documents_embeddings: pd.DataFrame,
+        candidate_document_matrix: pd.DataFrame,
+        *args,
+        **kwargs,
+    ):
+        score_per_document = pd.DataFrame(
+            cosine_similarity(candidates_embeddings, documents_embeddings)
+        )
+
+        score_per_document.index = candidates_embeddings.index
+        score_per_document.columns = documents_embeddings.index
+
+        M = cosine_similarity(
+            candidates_embeddings, candidates_embeddings
+        )
+        M[np.diag_indices_from(M)] = 0
+
+        M_tilda = np.zeros_like(M)
+        for t in range(1, 5+1):
+            M_tilda = M_tilda + self.gamma**(t-1) * np.linalg.matrix_power(M, t)
+        M_tilda = M_tilda / np.linalg.norm(M_tilda, axis=1, keepdims=True)
+
+        
+        alpha = 0.6
+        epsilon = 0.00001
+        first_term = np.multiply(alpha, adjacency_matrix)
+        B_transpose = np.transpose(matrix_B)
+        temp = np.matmul(matrix_B, B_transpose)
+        second_term = np.multiply(1 - alpha, temp)
+        constant_matrix = np.add(first_term, second_term)
+        while True:
+            sentence_score_t = constant_matrix.dot(sentence_score_t_1)
+            condition = np.linalg.norm(
+                np.subtract(sentence_score_t, sentence_score_t_1)
+            )
+            if condition * condition > epsilon:
+                break
+            else:
+                sentence_score_t_1 = sentence_score_t
+
+        top_n_scores = [
+            (sent, s)
+            for sent, s in zip(candidate_document_matrix.index, sentence_score_t_1)
+        ]
+        return (
+            documents_embeddings,
+            candidates_embeddings,
+            candidate_document_matrix,
+            top_n_scores,
+        )
 
 class PageRank(Ranker):
     def __init__(self, **kwargs) -> None:
