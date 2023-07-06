@@ -360,7 +360,8 @@ class KPECandidateExtractionModel:
         cache_file_path = path.join(
             GEO_KPE_MULTIDOC_CACHE_PATH,
             "candidates",
-            f"{dataset}-{doc_id}-candidates.cache",
+            dataset,
+            f"{doc_id}-candidates.cache",
         )
         if path.exists(cache_file_path):
             (candidate_set, candidate_mentions) = joblib.load(cache_file_path)
@@ -373,7 +374,8 @@ class KPECandidateExtractionModel:
         cache_file_path = path.join(
             GEO_KPE_MULTIDOC_CACHE_PATH,
             "candidates",
-            f"{dataset}-{doc_id}-candidates.cache",
+            dataset,
+            f"{doc_id}-candidates.cache",
         )
         Path(cache_file_path).parent.mkdir(exist_ok=True, parents=True)
         joblib.dump((candidate_set, candidate_mentions), cache_file_path)

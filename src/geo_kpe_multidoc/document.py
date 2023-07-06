@@ -62,10 +62,10 @@ class Document:
 
     def __init__(
         self,
-        raw_text,
-        id,
-        dataset: str = None,
-        topic: str = None,
+        raw_text: str,
+        id: str,
+        dataset: str,
+        topic: str,
         pre_processing_pipeline: List[Callable] = [],
     ):
         for f in pre_processing_pipeline:

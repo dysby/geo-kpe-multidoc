@@ -1,4 +1,5 @@
 import itertools
+from operator import getitem
 
 import numpy as np
 import pandas as pd
@@ -351,9 +352,13 @@ class DCSPRank(Ranker):
         score = rep_score + div_score
         # len_score = np.log(length_score_(effective_lens, real_lens))
         # score = rep_score + div_score + len_score
-        top_n_scores = [
-            (sent, s) for sent, s in zip(candidate_document_matrix.index, score)
-        ]
+        top_n_scores = sorted(
+            [(sent, s) for sent, s in zip(candidate_document_matrix.index, score)],
+            key=getitem(1),
+            reverse=True,
+        )
+
+        top_n_scores = sorted
         return (
             documents_embeddings,
             candidates_embeddings,
