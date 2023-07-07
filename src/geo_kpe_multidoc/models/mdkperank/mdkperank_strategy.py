@@ -398,14 +398,17 @@ class ClusterCentroidsRank(Ranker):
             fitted = self.clustering.fit(distance)
 
         avg = []
-        for j in range(self.n_clusters):
+
+        n_clusters = len(fitted.labels_)
+
+        for j in range(n_clusters):
             idx = np.where(fitted.labels_ == j)[0]
             avg.append(np.mean(idx))
         # 2: get keyphrase embedding closest to cluster centroid
         closest, _ = pairwise_distances_argmin_min(
             fitted.cluster_centers_, candidates_embeddings
         )
-        ordering = sorted(range(self.n_clusters), key=lambda k: avg[k])
+        ordering = sorted(range(n_clusters), key=lambda k: avg[k])
 
         top_n_scores = [(candidates_embeddings.index[closest[i]], i) for i in ordering]
 
