@@ -3,7 +3,7 @@ from operator import itemgetter
 
 import numpy as np
 import pandas as pd
-from sklearn.cluster import DBSCAN, KMeans
+from sklearn.cluster import HDBSCAN, KMeans
 from sklearn.metrics import pairwise_distances_argmin_min
 from sklearn.metrics.pairwise import cosine_similarity
 
@@ -378,7 +378,8 @@ class ClusterCentroidsRank(Ranker):
 
     def __init__(self, **kwargs) -> None:
         # self.clustering = KMeans(**kwargs)
-        self.clustering = DBSCAN(**kwargs)
+        # self.clustering = DBSCAN(**kwargs)
+        self.clustering = HDBSCAN(metric="cosine", store_centers="memoid")
 
     def _rank(
         self,
@@ -389,24 +390,28 @@ class ClusterCentroidsRank(Ranker):
         **kwargs,
     ):
         # 1: compute 20 clusters
-        sim_matrix = cosine_similarity(candidates_embeddings, candidates_embeddings)
-        sim_matrix[sim_matrix < 0] = 0
-        distance = sim_matrix - 1
+        # sim_matrix = cosine_similarity(candidates_embeddings, candidates_embeddings)
+        # sim_matrix[sim_matrix < 0] = 0
+        # distance = sim_matrix - 1
         if isinstance(self.clustering, KMeans):
             fitted = self.clustering.fit(candidates_embeddings)
         else:
-            fitted = self.clustering.fit(distance)
+            fitted = self.clustering.fit(candidates_embeddings)
 
         avg = []
 
-        n_clusters = len(fitted.labels_)
+        # n_clusters = len(fitted.labels_)
+        n_clusters = len(fitted.medoids_)
 
         for j in range(n_clusters):
             idx = np.where(fitted.labels_ == j)[0]
             avg.append(np.mean(idx))
         # 2: get keyphrase embedding closest to cluster centroid
         closest, _ = pairwise_distances_argmin_min(
-            fitted.cluster_centers_, candidates_embeddings
+            # fitted.cluster_centers_, candidates_embeddings, metric="cosine"
+            fitted.medoids_,
+            candidates_embeddings,
+            metric="cosine",
         )
         ordering = sorted(range(n_clusters), key=lambda k: avg[k])
 
