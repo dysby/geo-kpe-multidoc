@@ -3,9 +3,11 @@ from operator import itemgetter
 
 import numpy as np
 import pandas as pd
+import umap
 from sklearn.cluster import HDBSCAN, KMeans
 from sklearn.metrics import pairwise_distances_argmin_min
-from sklearn.metrics.pairwise import cosine_similarity
+from sklearn.metrics.pairwise import cosine_distances, cosine_similarity
+from sklearn.preprocessing import normalize
 
 # TODO: Condorcet Fuse combines rankings by sorting the documents according to the pairwise relation r(d1) < r(d2),
 #       which is determined for each (d1, d2) by majority vote among the input rankings.
@@ -371,15 +373,9 @@ class DPSCRank(Ranker):
         )
 
 
-class ClusterCentroidsRank(Ranker):
-    """Based on:
-    https://github.com/caomanhhaipt/Extractive-Multi-document-Summarization/blob/master/methods/main_method/Kmeans_CentroidBase_MMR_SentencePosition.py
-    """
-
+class UmapClustersRank(Ranker):
     def __init__(self, **kwargs) -> None:
-        # self.clustering = KMeans(**kwargs)
-        # self.clustering = DBSCAN(**kwargs)
-        self.clustering = HDBSCAN(metric="cosine", store_centers="memoid")
+        self.min = 5
 
     def _rank(
         self,
@@ -389,14 +385,20 @@ class ClusterCentroidsRank(Ranker):
         *args,
         **kwargs,
     ):
-        # 1: compute 20 clusters
-        # sim_matrix = cosine_similarity(candidates_embeddings, candidates_embeddings)
-        # sim_matrix[sim_matrix < 0] = 0
-        # distance = sim_matrix - 1
-        if isinstance(self.clustering, KMeans):
-            fitted = self.clustering.fit(candidates_embeddings)
-        else:
-            fitted = self.clustering.fit(candidates_embeddings)
+        clusterable_embedding = umap.UMAP(
+            # n_neighbors=10,
+            # min_dist=0.0,
+            # n_components=2,
+            # random_state=42,
+            metric="cosine",
+            n_components=2,
+        ).fit_transform(candidates_embeddings)
+
+        fitted = HDBSCAN(
+            min_samples=8,
+            min_cluster_size=2,
+            store_centers="medoid",
+        ).fit(clusterable_embedding)
 
         avg = []
 
@@ -410,8 +412,69 @@ class ClusterCentroidsRank(Ranker):
         closest, _ = pairwise_distances_argmin_min(
             # fitted.cluster_centers_, candidates_embeddings, metric="cosine"
             fitted.medoids_,
+            clusterable_embedding,
+        )
+
+        scores = cosine_similarity(
+            candidates_embeddings.iloc[closest],
+            documents_embeddings.mean().to_numpy().reshape(1, -1),
+        )
+        top_n_scores = sorted(
+            [
+                (candidate, score)
+                for candidate, score in zip(
+                    candidates_embeddings.iloc[closest].index, scores
+                )
+            ],
+            key=itemgetter(1),
+            reverse=True,
+        )
+
+        return (
+            documents_embeddings,
             candidates_embeddings,
-            metric="cosine",
+            candidate_document_matrix,
+            top_n_scores,
+        )
+
+
+class ClusterCentroidsRank(Ranker):
+    """Based on:
+    https://github.com/caomanhhaipt/Extractive-Multi-document-Summarization/blob/master/methods/main_method/Kmeans_CentroidBase_MMR_SentencePosition.py
+    """
+
+    def __init__(self, **kwargs) -> None:
+        # self.clustering = KMeans(**kwargs)
+        # self.clustering = DBSCAN(**kwargs)
+        self.clustering = HDBSCAN(store_centers="medoid")
+
+    def _rank(
+        self,
+        candidates_embeddings: pd.DataFrame,
+        documents_embeddings: pd.DataFrame,
+        candidate_document_matrix: pd.DataFrame,
+        *args,
+        **kwargs,
+    ):
+        # 1: compute 20 clusters
+        # sim_matrix = cosine_similarity(candidates_embeddings, candidates_embeddings)
+        # sim_matrix[sim_matrix < 0] = 0
+        # distance = sim_matrix - 1
+        norm_data = normalize(candidates_embeddings, norm="l2")
+        fitted = self.clustering.fit(norm_data)
+
+        avg = []
+
+        n_clusters = len(fitted.medoids_)
+
+        for j in range(n_clusters):
+            idx = np.where(fitted.labels_ == j)[0]
+            avg.append(np.mean(idx))
+        # 2: get keyphrase embedding closest to cluster centroid
+        closest, _ = pairwise_distances_argmin_min(
+            fitted.medoids_,
+            norm_data,
+            # fitted.cluster_centers_, candidates_embeddings, metric="cosine"
         )
         ordering = sorted(range(n_clusters), key=lambda k: avg[k])
 
@@ -613,6 +676,7 @@ STRATEGIES = {
     "ITCS": ITCSRank,
     "MAXSUM": MaxSumRank,
     "CLUSTERCENTROIDS": ClusterCentroidsRank,
+    "UMAPCLUSTERS": UmapClustersRank,
     "COMUNITY": ComunityRank,
     "EIGEN": EigenRank,
     "PAGERANK": PageRank,

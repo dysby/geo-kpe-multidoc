@@ -1,6 +1,5 @@
-import gc
 import os
-from itertools import islice, zip_longest
+from itertools import islice
 from os import path
 from pathlib import Path
 from time import gmtime, strftime
@@ -9,7 +8,6 @@ from typing import Callable, Dict, List, Tuple, Union
 import joblib
 import numpy as np
 import pandas as pd
-import simplemma
 from loguru import logger
 from nltk.stem.api import StemmerI
 from tqdm import tqdm
@@ -545,7 +543,7 @@ def extract_keyphrases_topics(
             filename = path.join(
                 GEO_KPE_MULTIDOC_CACHE_PATH,
                 experiment,
-                f"{topic_id}-mdkpe-geo.pkl",
+                f"{topic_id}-mdkpe-results.pkl",
             )
 
             Path(filename).parent.mkdir(exist_ok=True, parents=True)
