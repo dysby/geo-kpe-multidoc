@@ -1,4 +1,5 @@
 import re
+from itertools import islice
 from typing import Callable, List, Optional, Tuple
 
 import numpy as np
@@ -10,7 +11,7 @@ from torch.utils.data import DataLoader
 from tqdm import tqdm
 from transformers import T5ForConditionalGeneration, T5TokenizerFast
 
-from geo_kpe_multidoc.datasets.datasets import KPEDataset
+from geo_kpe_multidoc.datasets.datasets import KPEDataset, load_data
 from geo_kpe_multidoc.document import Document
 from geo_kpe_multidoc.models.base_KP_model import BaseKPModel
 from geo_kpe_multidoc.models.candidate_extract.candidate_extract_model import (
@@ -21,7 +22,7 @@ from geo_kpe_multidoc.models.pre_processing.pre_processing_utils import (
     remove_whitespaces,
     select_stemmer,
 )
-from geo_kpe_multidoc.models.PromptRank.data import data_process
+from geo_kpe_multidoc.models.PromptRank.data import PromptRankExtractor
 
 
 def get_PRF(num_c, num_e, num_s):
@@ -56,14 +57,16 @@ class PromptRank(BaseKPModel):
             self.__class__.__name__, re.sub("[-/]", "_", model_name)
         )
 
-        self.candidate_selection_model = KPECandidateExtractionModel(tagger=tagger)
+        self.candidate_selection_model = PromptRankExtractor(
+            model_name, tagger=tagger, **kwargs
+        )
 
-        MAX_LEN = 512
+        self.max_len = kwargs.get("max_len", 512)
 
         self.device = "cuda" if torch.cuda.is_available() else "cpu"
         self.model = T5ForConditionalGeneration.from_pretrained(model_name)
         self.tokenizer = T5TokenizerFast.from_pretrained(
-            model_name, model_max_length=MAX_LEN
+            model_name, model_max_length=self.max_len
         )
         self.model.to(self.device)
         self.model.eval()
@@ -75,6 +78,7 @@ class PromptRank(BaseKPModel):
         self.position_factor = kwargs.get("position_factor", 1.2e8)
         self.length_factor = kwargs.get("length_factor", 0.6)
 
+        self.stemmer = select_stemmer(kwargs.get("lang", "en"))
         self.counter = 1
 
     def extract_candidates(self, doc, min_len, lemmer, **kwargs) -> List[str]:
@@ -107,7 +111,13 @@ class PromptRank(BaseKPModel):
         )  # single space
         # print(template_len)
         # etting_dict["temp_en"] +
-        dataset, doc_list, labels, labels_stemed = data_process("DUC2001")
+        dataset = load_data("DUC2001")
+        (
+            dataset,
+            doc_list,
+            labels,
+            labels_stemed,
+        ) = self.candidate_selection_model.data_process(dataset)
         # dataloader = DataLoader(dataset, num_workers=4, batch_size=args.batch_size)
         dataloader = DataLoader(dataset)
 
@@ -165,17 +175,41 @@ class PromptRank(BaseKPModel):
         for i in range(len(doc_list)):
             doc_len = len(doc_list[i].split())
 
-            doc_results = cosine_similarity_rank.loc[
-                cosine_similarity_rank["doc_id"] == i
-            ]
+            # doc_results = cosine_similarity_rank.loc[
+            #     cosine_similarity_rank["doc_id"] == i
+            # ]
+            # if self.enable_pos:
+            #     # doc_results.loc[:,"pos"] = torch.Tensor(doc_results["pos"].values.astype(float)) / doc_len + position_factor / (doc_len ** 3)
+            #     doc_results["pos"] = doc_results[
+            #         "pos"
+            #     ] / doc_len + self.position_factor / (doc_len**3)
+            #     doc_results["score"] = doc_results["pos"] * doc_results["score"]
+            # # * doc_results["score"].values.astype(float)
+            # ranked_keyphrases = doc_results.sort_values(by="score", ascending=False)
+
             if self.enable_pos:
                 # doc_results.loc[:,"pos"] = torch.Tensor(doc_results["pos"].values.astype(float)) / doc_len + position_factor / (doc_len ** 3)
-                doc_results["pos"] = doc_results[
-                    "pos"
-                ] / doc_len + self.position_factor / (doc_len**3)
-                doc_results["score"] = doc_results["pos"] * doc_results["score"]
-            # * doc_results["score"].values.astype(float)
-            ranked_keyphrases = doc_results.sort_values(by="score", ascending=False)
+                cosine_similarity_rank.loc[
+                    cosine_similarity_rank["doc_id"] == i, "pos"
+                ] = cosine_similarity_rank.loc[
+                    cosine_similarity_rank["doc_id"] == i, "pos"
+                ] / doc_len + self.position_factor / (
+                    doc_len**3
+                )
+                cosine_similarity_rank.loc[
+                    cosine_similarity_rank["doc_id"] == i, "score"
+                ] = (
+                    cosine_similarity_rank.loc[
+                        cosine_similarity_rank["doc_id"] == i, "pos"
+                    ]
+                    * cosine_similarity_rank.loc[
+                        cosine_similarity_rank["doc_id"] == i, "score"
+                    ]
+                )
+
+            ranked_keyphrases = cosine_similarity_rank.loc[
+                cosine_similarity_rank["doc_id"] == i
+            ].sort_values(by="score", ascending=False)
             top_k = ranked_keyphrases.reset_index(drop=True)
             top_k_can = top_k.loc[:, ["candidate"]].values.tolist()
             # print(top_k)
@@ -195,10 +229,9 @@ class PromptRank(BaseKPModel):
 
             j = 0
             Matched = candidates_dedup[:15]
-            porter = select_stemmer()
             for id, temp in enumerate(candidates_dedup[0:15]):
                 tokens = temp.split()
-                tt = " ".join(porter.stem(t) for t in tokens)
+                tt = " ".join(self.stemmer.stem(t) for t in tokens)
                 if tt in labels_stemed[i] or temp in labels[i]:
                     Matched[id] = [temp]
                     if j < 5:

@@ -13,77 +13,219 @@ from torch.utils.data import Dataset
 from tqdm import tqdm
 from transformers import T5TokenizerFast
 
-from geo_kpe_multidoc.datasets.datasets import load_data
-
-stopword_dict = set(stopwords.words("english"))
-exclude = ["ner", "lemmatizer"]
-en_model = spacy.load("en_core_web_trf", exclude=exclude)
-
-MAX_LEN = 512
-tokenizer = T5TokenizerFast.from_pretrained(
-    "google/flan-t5-small", model_max_length=MAX_LEN
-)
-enable_filter = None
-temp_en = None
-temp_de = None
-temp_en = "Book:"
-temp_de = "This book mainly talks about "
-enable_filter = False
-enable_pos = True
-position_factor = 1.2e8
-length_factor = 0.6
-GRAMMAR = """  NP:
-        {<NN.*|JJ>*<NN.*>}  # Adjective(s)(optional) + Noun(s)"""
+from geo_kpe_multidoc.datasets.datasets import KPEDataset
+from geo_kpe_multidoc.models.pre_processing.pre_processing_utils import select_stemmer
 
 
-def extract_candidates(tokens_tagged, no_subset=False):
-    """
-    Based on part of speech return a list of candidate phrases
-    :param text_obj: Input text Representation see @InputTextObj
-    :param no_subset: if true won't put a candidate which is the subset of an other candidate
-    :return keyphrase_candidate: list of list of candidate phrases: [tuple(string,tuple(start_index,end_index))]
-    """
+class PromptRankExtractor:
+    def __init__(self, model_name, **kwargs) -> None:
+        self.max_len = kwargs.get("max_len", 512)
+        self.temp_en = kwargs.get("temp_en", "Book:")
+        self.temp_de = kwargs.get("temp_de", "This book mainly talks about ")
+        self.enable_filter = kwargs.get("enable_filter", False)
+        self.enable_pos = kwargs.get("enable_pos", True)
+        self.position_factor = kwargs.get("position_factor", 1.2e8)
+        self.length_factor = kwargs.get("length_factor", 0.6)
 
-    cans_count = dict()
+        self.tokenizer = T5TokenizerFast.from_pretrained(
+            model_name, model_max_length=self.max_len
+        )
 
-    np_parser = nltk.RegexpParser(GRAMMAR)  # Noun phrase parser
-    keyphrase_candidate = []
-    np_pos_tag_tokens = np_parser.parse(tokens_tagged)
-    count = 0
-    for token in np_pos_tag_tokens:
-        if isinstance(token, nltk.tree.Tree) and token._label == "NP":
-            np = " ".join(word for word, tag in token.leaves())
-            length = len(token.leaves())
-            start_end = (count, count + length)
-            count += length
+        exclude = ["ner", "lemmatizer"]
+        tagger = kwargs.get("tagger", "en_core_web_trf")
 
-            if len(np.split()) == 1:
-                if np not in cans_count.keys():
-                    cans_count[np] = 0
-                cans_count[np] += 1
+        self.en_model = spacy.load(tagger, exclude=exclude)
+        self.stemmer = select_stemmer(kwargs.get("lang", "en"))
 
-            keyphrase_candidate.append((np, start_end))
+        self.GRAMMAR = """  NP:
+                {<NN.*|JJ>*<NN.*>}  # Adjective(s)(optional) + Noun(s)"""
 
-        else:
-            count += 1
+    def extract_candidates(self, tokens_tagged, no_subset=False):
+        """
+        Based on part of speech return a list of candidate phrases
+        :param text_obj: Input text Representation see @InputTextObj
+        :param no_subset: if true won't put a candidate which is the subset of an other candidate
+        :return keyphrase_candidate: list of list of candidate phrases: [tuple(string,tuple(start_index,end_index))]
+        """
 
-    if enable_filter:
-        i = 0
-        while i < len(keyphrase_candidate):
-            can, pos = keyphrase_candidate[i]
-            # pos[0] > 50 and
-            if can in cans_count.keys() and cans_count[can] == 1:
-                keyphrase_candidate.pop(i)
+        cans_count = dict()
+
+        np_parser = nltk.RegexpParser(self.GRAMMAR)  # Noun phrase parser
+        keyphrase_candidate = []
+        np_pos_tag_tokens = np_parser.parse(tokens_tagged)
+        count = 0
+        for token in np_pos_tag_tokens:
+            if isinstance(token, nltk.tree.Tree) and token._label == "NP":
+                np = " ".join(word for word, tag in token.leaves())
+                length = len(token.leaves())
+                start_end = (count, count + length)
+                count += length
+
+                if len(np.split()) == 1:
+                    if np not in cans_count.keys():
+                        cans_count[np] = 0
+                    cans_count[np] += 1
+
+                keyphrase_candidate.append((np, start_end))
+
+            else:
+                count += 1
+
+        if self.enable_filter:
+            i = 0
+            while i < len(keyphrase_candidate):
+                can, pos = keyphrase_candidate[i]
+                # pos[0] > 50 and
+                if can in cans_count.keys() and cans_count[can] == 1:
+                    keyphrase_candidate.pop(i)
+                    continue
+                i += 1
+
+        return keyphrase_candidate
+
+    def generate_doc_pairs(self, doc, candidates, idx):
+        count = 0
+        doc_pairs = []
+
+        en_input = self.tokenizer(
+            doc,
+            max_length=self.max_len,
+            padding="max_length",
+            truncation=True,
+            return_tensors="pt",
+        )
+        en_input_ids = en_input["input_ids"]
+        en_input_mask = en_input["attention_mask"]
+
+        for id, can_and_pos in enumerate(candidates):
+            candidate = can_and_pos[0]
+            # Remove stopwords in a candidate
+            if remove(candidate):
+                count += 1
                 continue
-            i += 1
 
-    return keyphrase_candidate
+            de_input = self.temp_de + candidate + " ."
+            de_input_ids = self.tokenizer(
+                de_input,
+                max_length=30,
+                padding="max_length",
+                truncation=True,
+                return_tensors="pt",
+            )["input_ids"]
+            de_input_ids[0, 0] = 0
+            de_input_len = (de_input_ids[0] == self.tokenizer.eos_token_id).nonzero()[
+                0
+            ].item() - 2
+
+            #         for i in de_input_ids[0]:
+            #             print(tokenizer.decode(i))
+            #         print(de_input_len)
+
+            #         x = tokenizer(temp_de, return_tensors="pt")["input_ids"]
+            #         for i in x[0]:
+            #             print(tokenizer.decode(i))
+            #         exit(0)
+            dic = {
+                "de_input_len": de_input_len,
+                "candidate": candidate,
+                "idx": idx,
+                "pos": can_and_pos[1][0],
+            }
+
+            doc_pairs.append([en_input_ids, en_input_mask, de_input_ids, dic])
+            # print(tokenizer.decode(en_input_ids[0]))
+            # print(tokenizer.decode(de_input_ids[0]))
+            # print(candidate)
+            # print(de_input_len)
+            # print()
+            # exit(0)
+        return doc_pairs, count
+
+    def data_process(self, dataset: KPEDataset):
+        """
+        Core API in data.py which returns the dataset
+        """
+
+        # init(setting_dict)
+
+        # if dataset_name == "SemEval2017":
+        #     data, referneces = get_semeval2017_data(
+        #         dataset_dir + "/docsutf8", dataset_dir + "/keys"
+        #     )
+        # elif dataset_name == "DUC2001":
+        #     data, referneces = get_duc2001_data(dataset_dir)
+        # elif dataset_name == "nus":
+        #     data, referneces = get_long_data(dataset_dir + "/nus_test.json")
+        # elif dataset_name == "krapivin":
+        #     data, referneces = get_long_data(dataset_dir + "/krapivin_test.json")
+        # elif dataset_name == "kp20k":
+        #     data, referneces = get_short_data(dataset_dir + "/kp20k_valid200_test.json")
+        # elif dataset_name == "SemEval2010":
+        #     data, referneces = get_short_data(dataset_dir + "/semeval_test.json")
+        # else:
+        #     data, referneces = get_inspec_data(dataset_dir)
+
+        docs_pairs = []
+        doc_list = []
+        labels = []
+        labels_stemed = []
+        t_n = 0
+        candidate_num = 0
+
+        for idx, (doc_id, text, gold_kp) in enumerate(dataset):
+            text = text.lower()
+            text = clean_text(text, database="duc2001")
+            text = text.strip("\n")
+
+            # Get stemmed labels and document segments
+            labels.append([ref.replace(" \n", "") for ref in gold_kp])
+            labels_s = []
+            for l in gold_kp:
+                tokens = l.split()
+                if len(tokens) > 0:
+                    labels_s.append(" ".join(self.stemmer.stem(t) for t in tokens))
+
+            doc = " ".join(text.split()[: self.max_len])
+            labels_stemed.append(labels_s)
+            doc_list.append(doc)
+
+            # Statistic on empty docs
+            empty_doc = 0
+            # try:
+            #     text_obj = InputTextObj(en_model, doc)
+            # except Exception as e:
+            #     empty_doc += 1
+            #     logger.critical(e)
+            #     logger.critical(f"Empty doc: {doc_id}")
+            text_obj = InputTextObj(self.en_model, doc)
+            # Generate candidates (lower)
+            cans = self.extract_candidates(text_obj.tokens_tagged)
+            candidates = []
+            for can, pos in cans:
+                if self.enable_filter and (len(can.split()) > 4):
+                    continue
+                candidates.append([can.lower(), pos])
+            candidate_num += len(candidates)
+
+            # Generate docs_paris for constructing dataset
+            # doc = doc.lower()
+            doc = self.temp_en + '"' + doc + '"'
+            doc_pairs, count = self.generate_doc_pairs(doc, candidates, idx)
+            docs_pairs.extend(doc_pairs)
+            t_n += count
+
+        logger.debug(f"Extracted candidates: {candidate_num}")
+        logger.debug(f"Unmatched: {t_n}")
+        dataset = PromptRankDataset(docs_pairs)
+        logger.debug(f"Doc-candidate pairs: {dataset.total_examples}")
+
+        return dataset, doc_list, labels, labels_stemed
 
 
 class InputTextObj:
     """Represent the input text in which we want to extract keyphrases"""
 
-    def __init__(self, en_model, text=""):
+    def __init__(self, en_model, text="", language="english"):
         """
         :param is_sectioned: If we want to section the text.
         :param en_model: the pipeline of tokenization and POS-tagger
@@ -94,6 +236,7 @@ class InputTextObj:
         self.tokens = []
         self.tokens_tagged = []
 
+        stopword_dict = set(stopwords.words(language))
         doc = en_model(text)
 
         self.tokens_tagged = [
@@ -109,10 +252,10 @@ class InputTextObj:
         for i, token in enumerate(self.tokens):
             if token.lower() in stopword_dict:
                 self.tokens_tagged[i] = (token, "IN")
-        self.keyphrase_candidate = extract_candidates(self.tokens_tagged)
+        # self.keyphrase_candidate = extract_candidates(self.tokens_tagged)
 
 
-class KPE_Dataset(Dataset):
+class PromptRankDataset(Dataset):
     def __init__(self, docs_pairs):
         self.docs_pairs = docs_pairs
         self.total_examples = len(self.docs_pairs)
@@ -130,9 +273,9 @@ class KPE_Dataset(Dataset):
         return [en_input_ids, en_input_mask, de_input_ids, dic]
 
 
-def clean_text(text="", database="Inspec"):
+def clean_text(text="", database="inspec"):
     # Specially for Duc2001 Database
-    if database == "Duc2001" or database == "Semeval2017":
+    if database == "duc2001" or database == "semeval2017":
         pattern2 = re.compile(r"[\s,]" + "[\n]{1}")
         while True:
             if pattern2.search(text) is not None:
@@ -319,7 +462,7 @@ def get_semeval2017_data(
     return data, labels
 
 
-def remove(text):
+def remove(text: str):
     text_len = len(text.split())
     remove_chars = "[’!\"#$%&'()*+,./:;<=>?@，。?★、…【】《》？“”‘’！[\\]^_`{|}~]+"
     text = re.sub(remove_chars, "", text)
@@ -328,146 +471,3 @@ def remove(text):
         return True
     else:
         return False
-
-
-def generate_doc_pairs(doc, candidates, idx):
-    count = 0
-    doc_pairs = []
-
-    en_input = tokenizer(
-        doc,
-        max_length=MAX_LEN,
-        padding="max_length",
-        truncation=True,
-        return_tensors="pt",
-    )
-    en_input_ids = en_input["input_ids"]
-    en_input_mask = en_input["attention_mask"]
-
-    for id, can_and_pos in enumerate(candidates):
-        candidate = can_and_pos[0]
-        # Remove stopwords in a candidate
-        if remove(candidate):
-            count += 1
-            continue
-
-        de_input = temp_de + candidate + " ."
-        de_input_ids = tokenizer(
-            de_input,
-            max_length=30,
-            padding="max_length",
-            truncation=True,
-            return_tensors="pt",
-        )["input_ids"]
-        de_input_ids[0, 0] = 0
-        de_input_len = (de_input_ids[0] == tokenizer.eos_token_id).nonzero()[
-            0
-        ].item() - 2
-
-        #         for i in de_input_ids[0]:
-        #             print(tokenizer.decode(i))
-        #         print(de_input_len)
-
-        #         x = tokenizer(temp_de, return_tensors="pt")["input_ids"]
-        #         for i in x[0]:
-        #             print(tokenizer.decode(i))
-        #         exit(0)
-        dic = {
-            "de_input_len": de_input_len,
-            "candidate": candidate,
-            "idx": idx,
-            "pos": can_and_pos[1][0],
-        }
-
-        doc_pairs.append([en_input_ids, en_input_mask, de_input_ids, dic])
-        # print(tokenizer.decode(en_input_ids[0]))
-        # print(tokenizer.decode(de_input_ids[0]))
-        # print(candidate)
-        # print(de_input_len)
-        # print()
-        # exit(0)
-    return doc_pairs, count
-
-
-def data_process(dataset_name):
-    """
-    Core API in data.py which returns the dataset
-    """
-
-    # init(setting_dict)
-
-    # if dataset_name == "SemEval2017":
-    #     data, referneces = get_semeval2017_data(
-    #         dataset_dir + "/docsutf8", dataset_dir + "/keys"
-    #     )
-    # elif dataset_name == "DUC2001":
-    #     data, referneces = get_duc2001_data(dataset_dir)
-    # elif dataset_name == "nus":
-    #     data, referneces = get_long_data(dataset_dir + "/nus_test.json")
-    # elif dataset_name == "krapivin":
-    #     data, referneces = get_long_data(dataset_dir + "/krapivin_test.json")
-    # elif dataset_name == "kp20k":
-    #     data, referneces = get_short_data(dataset_dir + "/kp20k_valid200_test.json")
-    # elif dataset_name == "SemEval2010":
-    #     data, referneces = get_short_data(dataset_dir + "/semeval_test.json")
-    # else:
-    #     data, referneces = get_inspec_data(dataset_dir)
-
-    data = load_data(dataset_name)
-
-    docs_pairs = []
-    doc_list = []
-    labels = []
-    labels_stemed = []
-    t_n = 0
-    candidate_num = 0
-    porter = nltk.PorterStemmer()
-
-    for idx, (doc_id, text, gold_kp) in enumerate(islice(data, 1)):
-        text = text.lower()
-        text = clean_text(text, database="Duc2001")
-        text = text.strip("\n")
-
-        # Get stemmed labels and document segments
-        labels.append([ref.replace(" \n", "") for ref in gold_kp])
-        labels_s = []
-        for l in gold_kp:
-            tokens = l.split()
-            if len(tokens) > 0:
-                labels_s.append(" ".join(porter.stem(t) for t in tokens))
-
-        doc = " ".join(text.split()[:MAX_LEN])
-        labels_stemed.append(labels_s)
-        doc_list.append(doc)
-
-        # Statistic on empty docs
-        empty_doc = 0
-        # try:
-        #     text_obj = InputTextObj(en_model, doc)
-        # except Exception as e:
-        #     empty_doc += 1
-        #     logger.critical(e)
-        #     logger.critical(f"Empty doc: {doc_id}")
-        text_obj = InputTextObj(en_model, doc)
-        # Generate candidates (lower)
-        cans = text_obj.keyphrase_candidate
-        candidates = []
-        for can, pos in cans:
-            if enable_filter and (len(can.split()) > 4):
-                continue
-            candidates.append([can.lower(), pos])
-        candidate_num += len(candidates)
-
-        # Generate docs_paris for constructing dataset
-        # doc = doc.lower()
-        doc = temp_en + '"' + doc + '"'
-        doc_pairs, count = generate_doc_pairs(doc, candidates, idx)
-        docs_pairs.extend(doc_pairs)
-        t_n += count
-
-    logger.debug(f"candidate_num: {candidate_num}")
-    logger.debug(f"unmatched: {t_n}")
-    dataset = KPE_Dataset(docs_pairs)
-    logger.debug(f"examples: {dataset.total_examples}")
-
-    return dataset, doc_list, labels, labels_stemed
