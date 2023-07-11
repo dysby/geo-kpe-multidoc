@@ -22,33 +22,11 @@ class MaskRank(BaseKPModel):
     Uses KeyBert backend to retrieve models.
     """
 
-    def __init__(self, model, tagger):
+    def __init__(
+        self, model, tagger, candidate_embedding_strategy: str = "MaskAll", **kwargs
+    ):
         super().__init__(model, tagger)
         self.counter = 0
-
-    def extract_kp_from_corpus(
-        self,
-        corpus,
-        dataset: str = "DUC",
-        top_n: int = 15,
-        min_len: int = 5,
-        stemming: bool = False,
-        lemmatize: bool = False,
-        **kwargs,
-    ) -> List[List[Tuple]]:
-        """
-        Concrete method that extracts key-phrases from a list of given documents, with optional arguments
-        relevant to its specific functionality
-        """
-        self.counter = 0
-
-        stemmer = PorterStemmer() if stemming else None
-        lemmer = choose_lemmatizer(dataset) if lemmatize else None
-
-        return [
-            self.extract_kp_from_doc(doc, top_n, min_len, stemmer, lemmer, **kwargs)
-            for doc, _ in corpus
-        ]
 
     def embed_doc(self, doc: Document, stemmer: Callable = None) -> np.ndarray:
         """

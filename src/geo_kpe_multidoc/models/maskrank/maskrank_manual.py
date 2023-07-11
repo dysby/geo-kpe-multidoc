@@ -46,6 +46,8 @@ class LongformerMaskRank(BaseKPModel):
         tagger: POS_tagger_spacy,
         device=None,
         name="",
+        candidate_embedding_strategy: str = "MaskAll",
+        **kwargs,
     ):
         # TODO: init super class
         self.candidate_selection_model = KPECandidateExtractionModel(tagger=tagger)
@@ -70,11 +72,21 @@ class LongformerMaskRank(BaseKPModel):
             embedder_cls = NystromformerSentenceEmbedder
         else:
             raise ValueError(
-                f'Model of type "{model.__class__.__name__}" not supported for SentenceEmbedder.'
+                f'Model of type "{model.__class__.__name__}" not supported for SentenceEmbedder'
             )
 
         self.model: SentenceEmbedder = embedder_cls(model, tokenizer)
-        self.name = f"MaskRank_{name}"
+
+        strategies: dict[str, CandidateMaskEmbeddingStrategy] = {
+            "MaskFirst": MaskFirst,
+            "MaskAll": MaskAll,
+            "MaskHighest": MaskHighest,
+            "MaskSubset": MaskSubset,
+        }
+
+        self.strategy = strategies[candidate_embedding_strategy]()
+
+        self.name = f"MaskRank-{self.strategy.__class__.__name__}-{name}"
 
     def _embed_doc(
         self,
@@ -185,15 +197,6 @@ class LongformerMaskRank(BaseKPModel):
 
         doc.candidate_set_embed = []
 
-        strategies: dict[str, CandidateMaskEmbeddingStrategy] = {
-            "MaskFirst": MaskFirst,
-            "MaskAll": MaskAll,
-            "MaskHighest": MaskHighest,
-            "MaskSubset": MaskSubset,
-        }
-
-        strategy = strategies[cand_mode]
-
         t = time()
-        strategy().candidate_embeddings(self.model, doc)
+        self.strategy.candidate_embeddings(self.model, doc)
         logger.debug(f"Embed Candidates in {time() -  t:.2f}s")
