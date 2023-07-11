@@ -22,7 +22,7 @@ from geo_kpe_multidoc.models.pre_processing.pre_processing_utils import (
     remove_whitespaces,
     select_stemmer,
 )
-from geo_kpe_multidoc.models.PromptRank.data import PromptRankExtractor
+from geo_kpe_multidoc.models.promptrank.data import PromptRankExtractor
 
 
 def get_PRF(num_c, num_e, num_s):
@@ -75,7 +75,9 @@ class PromptRank(BaseKPModel):
         self.temp_de = kwargs.get("temp_de", "This book mainly talks about ")
         self.enable_filter = kwargs.get("enable_filter", False)
         self.enable_pos = kwargs.get("enable_pos", True)
+        # \gamma in original paper
         self.position_factor = kwargs.get("position_factor", 1.2e8)
+        # \alpha in original paper
         self.length_factor = kwargs.get("length_factor", 0.6)
 
         self.stemmer = select_stemmer(kwargs.get("lang", "en"))
@@ -102,8 +104,8 @@ class PromptRank(BaseKPModel):
         doc_id_list = []
         pos_list = []
 
-        num_c_5 = num_c_10 = num_c_15 = 0
-        num_e_5 = num_e_10 = num_e_15 = 0
+        num_c = num_c_5 = num_c_10 = num_c_15 = 0
+        num_e = num_e_5 = num_e_10 = num_e_15 = 0
         num_s = 0
 
         template_len = (
@@ -238,17 +240,20 @@ class PromptRank(BaseKPModel):
                         num_c_5 += 1
                         num_c_10 += 1
                         num_c_15 += 1
-
+                        num_c += 1
                     elif j < 10 and j >= 5:
                         num_c_10 += 1
                         num_c_15 += 1
-
+                        num_c += 1
                     elif j < 15 and j >= 10:
                         num_c_15 += 1
+                        num_c += 1
+                    else:
+                        num_c += 1
                 j += 1
 
-            logger.info("TOP-K {}: {}".format(i, Matched))
-            logger.info("Reference {}: {}".format(i, labels[i]))
+            logger.debug("TOP-K {}: {}".format(i, Matched))
+            logger.debug("Reference {}: {}".format(i, labels[i]))
 
             if len(top_k[0:5]) == 5:
                 num_e_5 += 5
@@ -265,6 +270,7 @@ class PromptRank(BaseKPModel):
             else:
                 num_e_15 += len(top_k[0:15])
 
+            num_e += len(top_k)
             num_s += len(labels[i])
 
         p, r, f = get_PRF(num_c_5, num_e_5, num_s)
@@ -273,6 +279,8 @@ class PromptRank(BaseKPModel):
         print_PRF(p, r, f, 10)
         p, r, f = get_PRF(num_c_15, num_e_15, num_s)
         print_PRF(p, r, f, 15)
+        p, r, f = get_PRF(num_c, num_e, num_s)
+        print_PRF(p, r, f, "All")
 
     def extract_kp_from_doc(
         self,
