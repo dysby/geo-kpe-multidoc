@@ -64,8 +64,8 @@ class Document:
         self,
         raw_text: str,
         id: str,
-        dataset: str,
-        topic: str,
+        dataset: str = "",
+        topic: str = "",
         pre_processing_pipeline: List[Callable] = [],
     ):
         for f in pre_processing_pipeline:
