@@ -11,7 +11,7 @@ from torch.utils.data import DataLoader
 from tqdm import tqdm
 from transformers import T5ForConditionalGeneration, T5TokenizerFast
 
-from geo_kpe_multidoc.datasets.datasets import KPEDataset, load_data
+from geo_kpe_multidoc.datasets.datasets import KPEDataset, load_data, load_preprocessed
 from geo_kpe_multidoc.document import Document
 from geo_kpe_multidoc.models.base_KP_model import BaseKPModel
 from geo_kpe_multidoc.models.candidate_extract.candidate_extract_model import (
@@ -113,7 +113,8 @@ class PromptRank(BaseKPModel):
         )  # single space
         # print(template_len)
         # etting_dict["temp_en"] +
-        dataset = load_data("DUC2001")
+        # dataset = load_data("DUC2001")
+        dataset = load_preprocessed("DUC2001")
         (
             dataset,
             doc_list,

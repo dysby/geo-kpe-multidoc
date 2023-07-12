@@ -14,7 +14,7 @@ from tabulate import tabulate
 
 import wandb
 from geo_kpe_multidoc import GEO_KPE_MULTIDOC_DATA_PATH, GEO_KPE_MULTIDOC_OUTPUT_PATH
-from geo_kpe_multidoc.datasets.datasets import DATASETS, load_data
+from geo_kpe_multidoc.datasets.datasets import DATASETS, load_data, load_preprocessed
 from geo_kpe_multidoc.evaluation.evaluation_tools import (
     evaluate_kp_extraction,
     evaluate_kp_extraction_base,
@@ -308,7 +308,8 @@ def main():
 
     options = _args_to_options(args)
 
-    data = load_data(ds_name, GEO_KPE_MULTIDOC_DATA_PATH)
+    # data = load_data(ds_name)
+    data = load_preprocessed(ds_name)
     logger.info(f"Args: {args}")
     logger.info("Start Testing ...")
     logger.info(f"KP extraction for {len(data)} examples.")

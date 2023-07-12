@@ -1,6 +1,7 @@
 import io
 import itertools
 import json
+import pickle
 import re
 from os import path
 from typing import List, Tuple
@@ -157,7 +158,7 @@ def load_data(name, root_dir=GEO_KPE_MULTIDOC_DATA_PATH) -> KPEDataset:
             keys.append(kps_for_topic)
 
         if len(ids) == 0:
-            logger.warning(f"Extracted **zero** results")
+            logger.warning("Extracted **zero** results")
         return (ids, documents, keys)
 
     def _read_zip(filename) -> Tuple[List[str], List, List]:
@@ -197,3 +198,34 @@ def load_data(name, root_dir=GEO_KPE_MULTIDOC_DATA_PATH) -> KPEDataset:
         return KPEDataset(name, *_read_zip(path.join(root_dir, zipfile)))
     else:
         return KPEDataset(name, *_read_mdkpe(root_dir))
+
+
+def load_preprocessed(name, root_dir=GEO_KPE_MULTIDOC_DATA_PATH) -> KPEDataset:
+    subdir = "processed"
+
+    # DE-TeKET_processed.txt  ES-WICC_processed.txt  MKDUC01_processed.txt  PubMed_processed.txt
+    # DUC_processed.txt       FR-WIKI_processed.txt  NUS_processed.txt      SemEval_processed.txt
+    # ES-CACIC_processed.txt  Inspec_processed.txt   PT-KP_processed.txt
+
+    local_name = {
+        "DUC2001": "DUC",
+        "MKDUC01": "MKDUC01",
+        "110-PT-BN-KP": "PT-KP",
+        "cacic": "ES-CACIC",
+        "Inspec": "Inspec",
+        "Nguyen2007": "NUS",
+        "PubMed": "PubMed",
+        "SemEval2010": "SemEval",
+        "wicc": "ES-WICC",
+        "WikiNews": "FR-WIKI",
+    }
+
+    with open(
+        path.join(root_dir, subdir, f"{local_name[name]}_processed.txt"), mode="rb"
+    ) as f:
+        docs_and_keys = pickle.load(f)
+
+    ids = list(range(len(docs_and_keys)))
+    docs, keys = list(zip(*docs_and_keys))
+
+    return KPEDataset(name, ids, docs, keys)
