@@ -7,6 +7,7 @@ import pandas as pd
 import torch
 from loguru import logger
 from nltk.stem import StemmerI
+from tabulate import tabulate
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 from transformers import T5ForConditionalGeneration, T5TokenizerFast
@@ -275,14 +276,48 @@ class PromptRank(BaseKPModel):
             num_e += len(top_k)
             num_s += len(labels[i])
 
+        results = {
+            "Precision": 0.0,
+            "Recall": 0.0,
+            "F1": 0.0,
+            "MAP": 0.0,
+            "nDCG": 0.0,
+            # "P_5": 0.0,
+            # "R_5": 0.0,
+            "F1_5": 0.0,
+            # "P_10": 0.0,
+            # "R_10": 0.0,
+            "F1_10": 0.0,
+            # "P_15": 0.0,
+            # "R_15": 0.0,
+            "F1_15": 0.0,
+        }
+
         p, r, f = get_PRF(num_c_5, num_e_5, num_s)
-        print_PRF(p, r, f, 5)
+        # results["P_5"] = p
+        # results["R_5"] = r
+        results["F1_5"] = f
+        # print_PRF(p, r, f, 5)
         p, r, f = get_PRF(num_c_10, num_e_10, num_s)
-        print_PRF(p, r, f, 10)
+        # results["P_10"] = p
+        # results["R_10"] = r
+        results["F1_10"] = f
+        # print_PRF(p, r, f, 10)
         p, r, f = get_PRF(num_c_15, num_e_15, num_s)
-        print_PRF(p, r, f, 15)
+        # results["P_15"] = p
+        # results["R_15"] = r
+        results["F1_15"] = f
+        # print_PRF(p, r, f, 15)
         p, r, f = get_PRF(num_c, num_e, num_s)
-        print_PRF(p, r, f, "All")
+        results["Precision"] = p
+        results["Recall"] = r
+        results["F1"] = f
+        # print_PRF(p, r, f, "All")
+        print(
+            tabulate(
+                pd.DataFrame.from_records([results]), headers="keys", floatfmt=".2%"
+            )
+        )
 
     def extract_kp_from_doc(
         self,
