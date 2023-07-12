@@ -143,28 +143,12 @@ class PromptRankExtractor:
         return doc_pairs, count
 
     # def data_process(self, dataset: KPEDataset):
-    def data_process(self, dataset_name: str):
+    def data_process(self, dataset):
         """
         Core API in data.py which returns the dataset
         """
 
         # init(setting_dict)
-
-        if dataset_name == "SemEval2017":
-            data, referneces = get_semeval2017_data()
-        elif dataset_name == "DUC2001":
-            data, referneces = get_duc2001_data()
-        elif dataset_name == "NUS":
-            data, referneces = get_long_data()
-        elif dataset_name == "Krapivin2009":
-            data, referneces = get_long_data()
-        elif dataset_name == "kp20k":
-            data, referneces = get_short_data()
-        elif dataset_name == "SemEval2010":
-            data, referneces = get_short_data()
-        elif dataset_name == "Inspec":
-            data, referneces = get_inspec_data()
-
         docs_pairs = []
         doc_list = []
         labels = []
@@ -172,26 +156,46 @@ class PromptRankExtractor:
         t_n = 0
         candidate_num = 0
 
-        # Use with geo_kpe_multidoc.datasets.KPEDataset
-        # for idx, (doc_id, text, gold_kp) in enumerate(dataset):
-        #     text = text.lower()
-        #     text = clean_text(text, database="duc2001")
-        #     text = text.strip("\n")
         # Use with original data
-        for idx, (key, doc) in enumerate(data.items()):
-            # Get stemmed labels and document segments
-            # labels.append([ref.replace(" \n", "") for ref in gold_kp])
-            labels.append([ref.replace(" \n", "") for ref in referneces[key]])
-            labels_s = []
-            # for l in gold_kp:
-            for l in referneces[key]:
-                tokens = l.split()
-                # if len(tokens) > 0:
-                #     labels_s.append(" ".join(self.stemmer.stem(t) for t in tokens))
-                labels_s.append(" ".join(self.stemmer.stem(t) for t in tokens))
-            # Get stemmed labels and document segments
+        ###########################################3
+        # if dataset == "SemEval2017":
+        #     data, referneces = get_semeval2017_data()
+        # elif dataset == "DUC2001":
+        #     data, referneces = get_duc2001_data()
+        # elif dataset == "NUS":
+        #     data, referneces = get_long_data()
+        # elif dataset == "Krapivin2009":
+        #     data, referneces = get_long_data()
+        # elif dataset == "kp20k":
+        #     data, referneces = get_short_data()
+        # elif dataset == "SemEval2010":
+        #     data, referneces = get_short_data()
+        # elif dataset == "Inspec":
+        #     data, referneces = get_inspec_data()
+        # for idx, (key, doc) in enumerate(data.items()):
+        #     labels.append([ref.replace(" \n", "") for ref in referneces[key]])
+        #     labels_s = []
+        #     for l in referneces[key]:
+        #         tokens = l.split()
+        #         labels_s.append(" ".join(self.stemmer.stem(t) for t in tokens))
+        #     doc = " ".join(doc.split()[: self.max_len])
+        # Use with geo_kpe_multidoc.datasets.KPEDataset
+        #########################################################
+        for idx, (doc_id, text, gold_kp) in enumerate(dataset):
+            text = text.lower()
+            text = clean_text(text, database="duc2001")
+            text = text.strip("\n")
 
-            doc = " ".join(doc.split()[: self.max_len])
+            # Get stemmed labels and document segments
+            labels.append([ref.replace(" \n", "") for ref in gold_kp])
+            labels_s = []
+            for l in gold_kp:
+                tokens = l.split()
+                if len(tokens) > 0:
+                    labels_s.append(" ".join(self.stemmer.stem(t) for t in tokens))
+            doc = " ".join(text.split()[: self.max_len])
+            #########################################################
+
             labels_stemed.append(labels_s)
             doc_list.append(doc)
 
