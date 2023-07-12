@@ -114,7 +114,8 @@ class PromptRank(BaseKPModel):
         # print(template_len)
         # etting_dict["temp_en"] +
         # dataset = load_data("DUC2001")
-        dataset = load_preprocessed("DUC2001")
+        # dataset = load_preprocessed("DUC2001")
+        dataset = "DUC2001"
         (
             dataset,
             doc_list,

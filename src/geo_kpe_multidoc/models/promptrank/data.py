@@ -13,6 +13,7 @@ from torch.utils.data import Dataset
 from tqdm import tqdm
 from transformers import T5TokenizerFast
 
+from geo_kpe_multidoc import GEO_KPE_MULTIDOC_DATA_PATH
 from geo_kpe_multidoc.datasets.datasets import KPEDataset
 from geo_kpe_multidoc.models.pre_processing.pre_processing_utils import select_stemmer
 
@@ -141,29 +142,28 @@ class PromptRankExtractor:
             # exit(0)
         return doc_pairs, count
 
-    def data_process(self, dataset: KPEDataset):
+    # def data_process(self, dataset: KPEDataset):
+    def data_process(self, dataset_name: str):
         """
         Core API in data.py which returns the dataset
         """
 
         # init(setting_dict)
 
-        # if dataset_name == "SemEval2017":
-        #     data, referneces = get_semeval2017_data(
-        #         dataset_dir + "/docsutf8", dataset_dir + "/keys"
-        #     )
-        # elif dataset_name == "DUC2001":
-        #     data, referneces = get_duc2001_data(dataset_dir)
-        # elif dataset_name == "nus":
-        #     data, referneces = get_long_data(dataset_dir + "/nus_test.json")
-        # elif dataset_name == "krapivin":
-        #     data, referneces = get_long_data(dataset_dir + "/krapivin_test.json")
-        # elif dataset_name == "kp20k":
-        #     data, referneces = get_short_data(dataset_dir + "/kp20k_valid200_test.json")
-        # elif dataset_name == "SemEval2010":
-        #     data, referneces = get_short_data(dataset_dir + "/semeval_test.json")
-        # else:
-        #     data, referneces = get_inspec_data(dataset_dir)
+        if dataset_name == "SemEval2017":
+            data, referneces = get_semeval2017_data()
+        elif dataset_name == "DUC2001":
+            data, referneces = get_duc2001_data()
+        elif dataset_name == "NUS":
+            data, referneces = get_long_data()
+        elif dataset_name == "Krapivin2009":
+            data, referneces = get_long_data()
+        elif dataset_name == "kp20k":
+            data, referneces = get_short_data()
+        elif dataset_name == "SemEval2010":
+            data, referneces = get_short_data()
+        elif dataset_name == "Inspec":
+            data, referneces = get_inspec_data()
 
         docs_pairs = []
         doc_list = []
@@ -172,20 +172,26 @@ class PromptRankExtractor:
         t_n = 0
         candidate_num = 0
 
-        for idx, (doc_id, text, gold_kp) in enumerate(dataset):
-            text = text.lower()
-            text = clean_text(text, database="duc2001")
-            text = text.strip("\n")
-
+        # Use with geo_kpe_multidoc.datasets.KPEDataset
+        # for idx, (doc_id, text, gold_kp) in enumerate(dataset):
+        #     text = text.lower()
+        #     text = clean_text(text, database="duc2001")
+        #     text = text.strip("\n")
+        # Use with original data
+        for idx, (key, doc) in enumerate(data.items()):
             # Get stemmed labels and document segments
-            labels.append([ref.replace(" \n", "") for ref in gold_kp])
+            # labels.append([ref.replace(" \n", "") for ref in gold_kp])
+            labels.append([ref.replace(" \n", "") for ref in referneces[key]])
             labels_s = []
-            for l in gold_kp:
+            # for l in gold_kp:
+            for l in referneces[key]:
                 tokens = l.split()
-                if len(tokens) > 0:
-                    labels_s.append(" ".join(self.stemmer.stem(t) for t in tokens))
+                # if len(tokens) > 0:
+                #     labels_s.append(" ".join(self.stemmer.stem(t) for t in tokens))
+                labels_s.append(" ".join(self.stemmer.stem(t) for t in tokens))
+            # Get stemmed labels and document segments
 
-            doc = " ".join(text.split()[: self.max_len])
+            doc = " ".join(doc.split()[: self.max_len])
             labels_stemed.append(labels_s)
             doc_list.append(doc)
 
@@ -327,11 +333,13 @@ def clean_text(text="", database="inspec"):
     return text_new
 
 
-def get_long_data(file_path="data/nus/nus_test.json"):
+def get_long_data(file_path="nus/nus_test.json"):
     """Load file.jsonl ."""
     data = {}
     labels = {}
-    with codecs.open(file_path, "r", "utf-8") as f:
+    with codecs.open(
+        os.path.join(GEO_KPE_MULTIDOC_DATA_PATH, file_path), "r", "utf-8"
+    ) as f:
         json_text = f.readlines()
         for i, line in tqdm(enumerate(json_text), desc="Loading Doc ..."):
             try:
@@ -352,11 +360,13 @@ def get_long_data(file_path="data/nus/nus_test.json"):
     return data, labels
 
 
-def get_short_data(file_path="data/kp20k/kp20k_valid2k_test.json"):
+def get_short_data(file_path="kp20k/kp20k_valid2k_test.json"):
     """Load file.jsonl ."""
     data = {}
     labels = {}
-    with codecs.open(file_path, "r", "utf-8") as f:
+    with codecs.open(
+        os.path.join(GEO_KPE_MULTIDOC_DATA_PATH, file_path), "r", "utf-8"
+    ) as f:
         json_text = f.readlines()
         for i, line in tqdm(enumerate(json_text), desc="Loading Doc ..."):
             try:
@@ -376,11 +386,13 @@ def get_short_data(file_path="data/kp20k/kp20k_valid2k_test.json"):
     return data, labels
 
 
-def get_duc2001_data(file_path="data/DUC2001"):
+def get_duc2001_data(file_path="DUC2001"):
     pattern = re.compile(r"<TEXT>(.*?)</TEXT>", re.S)
     data = {}
     labels = {}
-    for dirname, dirnames, filenames in os.walk(file_path):
+    for dirname, dirnames, filenames in os.walk(
+        os.path.join(GEO_KPE_MULTIDOC_DATA_PATH, file_path)
+    ):
         for fname in filenames:
             if fname == "annotations.txt":
                 # left, right = fname.split('.')
@@ -401,16 +413,18 @@ def get_duc2001_data(file_path="data/DUC2001"):
                 text = re.findall(pattern, text)[0]
 
                 text = text.lower()
-                text = clean_text(text, database="Duc2001")
+                text = clean_text(text, database="duc2001")
                 data[fname] = text.strip("\n")
                 # data[fname] = text
     return data, labels
 
 
-def get_inspec_data(file_path="data/Inspec"):
+def get_inspec_data(file_path="Inspec"):
     data = {}
     labels = {}
-    for dirname, dirnames, filenames in os.walk(file_path):
+    for dirname, dirnames, filenames in os.walk(
+        os.path.join(GEO_KPE_MULTIDOC_DATA_PATH, file_path)
+    ):
         for fname in filenames:
             left, right = fname.split(".")
             if right == "abstr":
@@ -425,7 +439,7 @@ def get_inspec_data(file_path="data/Inspec"):
                 f = open(infile)
                 text = f.read()
                 text = text.replace("\n", " ")
-                text = clean_text(text, database="Inspec")
+                text = clean_text(text, database="inspec")
                 text = text.lower()
                 label = text.split("; ")
                 labels[left] = label
@@ -433,11 +447,13 @@ def get_inspec_data(file_path="data/Inspec"):
 
 
 def get_semeval2017_data(
-    data_path="data/SemEval2017/docsutf8", labels_path="data/SemEval2017/keys"
+    data_path="SemEval2017/docsutf8", labels_path="SemEval2017/keys"
 ):
     data = {}
     labels = {}
-    for dirname, dirnames, filenames in os.walk(data_path):
+    for dirname, dirnames, filenames in os.walk(
+        os.path.join(GEO_KPE_MULTIDOC_DATA_PATH, data_path)
+    ):
         for fname in filenames:
             left, right = fname.split(".")
             infile = os.path.join(dirname, fname)
@@ -446,10 +462,12 @@ def get_semeval2017_data(
             with codecs.open(infile, "r", "utf-8") as fi:
                 text = fi.read()
                 text = text.replace("%", "")
-            text = clean_text(text, database="Semeval2017")
+            text = clean_text(text, database="semeval2017")
             data[left] = text.lower()
             # f.close()
-    for dirname, dirnames, filenames in os.walk(labels_path):
+    for dirname, dirnames, filenames in os.walk(
+        os.path.join(GEO_KPE_MULTIDOC_DATA_PATH, labels_path)
+    ):
         for fname in filenames:
             left, right = fname.split(".")
             infile = os.path.join(dirname, fname)
