@@ -8,9 +8,10 @@ from typing import List, Tuple
 from zipfile import ZipFile
 
 from loguru import logger
-from torch.utils.data import Dataset
 
 from geo_kpe_multidoc import GEO_KPE_MULTIDOC_DATA_PATH
+from geo_kpe_multidoc.datasets.kpedataset import KPEDataset
+from geo_kpe_multidoc.datasets.promptrank_datasets import load_promptrankdataset
 
 # Datasets from https://github.com/LIAAD/KeywordExtractor-Datasets
 DATASETS = {
@@ -94,41 +95,9 @@ DATASETS = {
 }
 
 
-class KPEDataset(Dataset):
-    """Suported Evaluation Datasets"""
-
-    def __init__(self, name, ids, documents, keys, transform=None):
-        """
-        Parameters
-        ----------
-            name: str = Name of the Dataset
-            ids: Document or Topic names
-            documents: List of documents, one per id, or List of List of Documents per topic, 1 topic to many documents.
-            keys: List of keyphrases per document, or list of keyphrases per topic.
-            transform: Optional[Callable]: Optional transform to be applied
-                on a sample. NOT USED
-        """
-        self.name = name
-        self.ids = ids
-        self.documents = documents
-        self.keys = keys
-        self.transform = None
-
-    def __len__(self):
-        return len(self.documents)
-
-    def __getitem__(self, idx):
-        """
-        Returns:
-        --------
-            name: id of the document
-            document: txt content
-            keys: gold keyphrases for document
-        """
-        return self.ids[idx], self.documents[idx], self.keys[idx]
-
-
-def load_data(name, root_dir=GEO_KPE_MULTIDOC_DATA_PATH) -> KPEDataset:
+def load_dataset(
+    name, datasource="base", root_dir=GEO_KPE_MULTIDOC_DATA_PATH
+) -> KPEDataset:
     """
     name: Supported dataset name, must exist in DATASET dict
     root_dir: str = Data path.
@@ -144,7 +113,7 @@ def load_data(name, root_dir=GEO_KPE_MULTIDOC_DATA_PATH) -> KPEDataset:
 
         ids = []
         documents = []
-        keys = []
+        labels = []
         for topic in dataset:
             # TODO: simplify
             docs_content_for_topic = [
@@ -155,11 +124,11 @@ def load_data(name, root_dir=GEO_KPE_MULTIDOC_DATA_PATH) -> KPEDataset:
 
             ids.append(topic)
             documents.append(docs_content_for_topic)
-            keys.append(kps_for_topic)
+            labels.append(kps_for_topic)
 
         if len(ids) == 0:
             logger.warning("Extracted **zero** results")
-        return (ids, documents, keys)
+        return (ids, documents, labels)
 
     def _read_zip(filename) -> Tuple[List[str], List, List]:
         """
@@ -172,7 +141,7 @@ def load_data(name, root_dir=GEO_KPE_MULTIDOC_DATA_PATH) -> KPEDataset:
         """
         ids = []
         documents = []
-        keys = []
+        labels = []
 
         with ZipFile(filename, mode="r") as zf:
             for file in zf.namelist():
@@ -180,7 +149,7 @@ def load_data(name, root_dir=GEO_KPE_MULTIDOC_DATA_PATH) -> KPEDataset:
                     id = file.split("/")[-1][:-4]
                     ids.append(id)
                     with zf.open(file) as f:
-                        keys.append(
+                        labels.append(
                             [
                                 line.strip()
                                 for line in io.TextIOWrapper(f, encoding="utf8")
@@ -191,7 +160,12 @@ def load_data(name, root_dir=GEO_KPE_MULTIDOC_DATA_PATH) -> KPEDataset:
                     doc_file = doc_file[:-3] + "txt"
                     with zf.open(doc_file) as f:
                         documents.append(f.read().decode("utf8"))
-        return ids, documents, keys
+        return ids, documents, labels
+
+    if datasource == "preloaded":
+        return load_preprocessed(name)
+    elif datasource == "promptrank":
+        return load_promptrankdataset(name)
 
     zipfile = DATASETS[name].get("zip_file", None)
     if zipfile:
@@ -226,6 +200,6 @@ def load_preprocessed(name, root_dir=GEO_KPE_MULTIDOC_DATA_PATH) -> KPEDataset:
         docs_and_keys = pickle.load(f)
 
     ids = list(range(len(docs_and_keys)))
-    docs, keys = list(zip(*docs_and_keys))
+    docs, labels = list(zip(*docs_and_keys))
 
-    return KPEDataset(name, ids, docs, keys)
+    return KPEDataset(name, ids, docs, labels)

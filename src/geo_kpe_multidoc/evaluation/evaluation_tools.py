@@ -23,8 +23,18 @@ from geo_kpe_multidoc.models.pre_processing.pre_processing_utils import (
 )
 
 
-def postprocess_res_labels(
-    model_results: Dict, stemmer: StemmerI = None, lemmer: Callable = None
+def postprocess(kp, preprocessing):
+    kp = remove_hyphens_and_dots(kp.lower())
+    for transformation in preprocessing:
+        kp = transformation(kp)
+    return kp
+
+
+def postprocess_model_outputs(
+    model_results: Dict,
+    stemmer: StemmerI = None,
+    lemmer: Callable = None,
+    preprocessing: List[Callable] = None,
 ):
     """
     Code snippet to correctly model results
@@ -44,6 +54,14 @@ def postprocess_res_labels(
     for dataset in model_results:
         res[dataset] = []
         for doc in model_results[dataset]:
+            if preprocessing:
+                cand_score, cand = doc
+                cand_score = [
+                    (postprocess(kp, preprocessing), score) for kp, score in cand_score
+                ]
+                cand = [postprocess(kp, preprocessing) for kp in cand]
+                doc = (cand_score, cand)
+
             if stemmer:
                 res[dataset].append(
                     (
@@ -78,7 +96,10 @@ def postprocess_res_labels(
 
 
 def postprocess_dataset_labels(
-    corpus_true_labels, stemmer: StemmerI = None, lemmer: str = None
+    corpus_true_labels,
+    stemmer: StemmerI = None,
+    lemmer: str = None,
+    preprocessing: List[Callable] = None,
 ):
     """
     Code snippet to correctly format dataset true labels
@@ -98,42 +119,17 @@ def postprocess_dataset_labels(
         for i in range(len(corpus_true_labels[dataset])):
             doc_results = []
             for kp in corpus_true_labels[dataset][i]:
+                if preprocessing:
+                    kp = postprocess(kp, preprocessing)
+
                 # if lemmer:
                 #     kp = lemmatize(kp, lemmer)
-
-                # TODO: Multi Language SnowballStemmer
-                # copy from https://github.com/LIAAD/kep/blob/master/kep/utility.py
-                # ISO_to_language_stemming_SnowballStemmer = {'en': 'english',
-                #    'pt': 'portuguese',
-                #    'fr': 'french',
-                #    'es': 'spanish',
-                #    'it': 'italian',
-                #    'nl': 'dutch',
-                #    'de': 'german',
-                #    'da': 'danish',
-                #    'fi': 'finnish',
-                #    'da': 'danish',
-                #    'hu': 'hungarian',
-                #    'nb': 'norwegian',
-                #    'ro': 'romanian',
-                #    'ru': 'russian',
-                #    'sv': 'swedish'}
-                # if normalization == "stemming":
-                #     if lang == 'en':
-                #         # create a new instance of a porter stemmer
-                #         stemmer = SnowballStemmer("porter")
-                #     else:
-                #         # create a new instance of a porter stemmer
-                #         stemmer = SnowballStemmer(ISO_to_language_stemming_SnowballStemmer[lang],
-                #                                 ignore_stopwords=True)
-
                 if stemmer:
-                    kp = " ".join(
-                        # [stemmer.stem(w) for w in simplemma.simple_tokenizer(kp)]
-                        stemmer.stem(w)
-                        for w in kp.lower().split()
-                    )
+                    kp = " ".join(stemmer.stem(w) for w in kp.lower().split())
                 doc_results.append(kp)
+            # TODO: remove duplicates and discard empty
+            # doc_results = list(set(doc_results).discard(""))
+            doc_results = [kp for kp in doc_results if kp]
             res[dataset].append(doc_results)
     return res
 
@@ -425,7 +421,7 @@ def extract_keyphrases_docs(
         # TODO: remove preprocessing outside Document class
         # TODO: refactor processing gold to function
         # TODO: preprocessing hyphens and dots
-        if len(preprocessing) > 0:
+        if preprocessing:
             processed_gold_kp = []
             for kp in gold_kp:
                 kp = remove_hyphens_and_dots(kp.lower())

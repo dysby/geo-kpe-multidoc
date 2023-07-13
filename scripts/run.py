@@ -7,14 +7,8 @@ from os import path
 from time import time
 
 import pandas as pd
-from loguru import logger
-from matplotlib import pyplot as plt
-from pandas import DataFrame
-from tabulate import tabulate
-
-import wandb
-from geo_kpe_multidoc import GEO_KPE_MULTIDOC_DATA_PATH, GEO_KPE_MULTIDOC_OUTPUT_PATH
-from geo_kpe_multidoc.datasets.datasets import DATASETS, load_data, load_preprocessed
+from geo_kpe_multidoc import GEO_KPE_MULTIDOC_OUTPUT_PATH
+from geo_kpe_multidoc.datasets.datasets import DATASETS, load_dataset
 from geo_kpe_multidoc.evaluation.evaluation_tools import (
     evaluate_kp_extraction,
     evaluate_kp_extraction_base,
@@ -22,7 +16,7 @@ from geo_kpe_multidoc.evaluation.evaluation_tools import (
     extract_keyphrases_topics,
     model_scores_to_dataframe,
     postprocess_dataset_labels,
-    postprocess_res_labels,
+    postprocess_model_outputs,
 )
 from geo_kpe_multidoc.evaluation.report import (
     output_one_top_cands,
@@ -35,6 +29,13 @@ from geo_kpe_multidoc.models.pre_processing.pre_processing_utils import (
     remove_whitespaces,
     select_stemmer,
 )
+from geo_kpe_multidoc.models.promptrank.promptrank import PromptRank
+from loguru import logger
+from matplotlib import pyplot as plt
+from pandas import DataFrame
+from tabulate import tabulate
+
+import wandb
 
 
 def parse_args():
@@ -62,6 +63,14 @@ def parse_args():
         required=True,
         help="The input dataset name",
     )
+
+    parser.add_argument(
+        "--dataset_source",
+        type=str,
+        default="base",
+        help="Dataset sources [base, preloaded, promptrank]",
+    )
+
     parser.add_argument(
         "--doc_limit",
         default=-1,
@@ -79,10 +88,11 @@ def parse_args():
         "--rank_model",
         default="EmbedRank",
         type=str,
-        help="The Ranking Model [EmbedRank, MaskRank, and FusionRank], MDKPERank",
+        help="The Ranking Model",
         choices=[
             "EmbedRank",
             "MaskRank",
+            "PromptRank",
             "FusionRank",
             "MDKPERank",
             "ExtractionEvaluator",
@@ -295,6 +305,8 @@ def main():
         extract_eval = extract_keyphrases_topics
         if ds_name != "MKDUC01":
             logger.critical("Not Multi Document Ranking on single document dataset!")
+    elif isinstance(kpe_model, PromptRank):
+        extract_eval = extract_keyphrases_docs
     else:
         extract_eval = extract_keyphrases_docs
 
@@ -308,8 +320,8 @@ def main():
 
     options = _args_to_options(args)
 
-    # data = load_data(ds_name)
-    data = load_preprocessed(ds_name)
+    data = load_dataset(ds_name, datasource=args.dataset_source)
+
     logger.info(f"Args: {args}")
     logger.info("Start Testing ...")
     logger.info(f"KP extraction for {len(data)} examples.")
@@ -346,8 +358,12 @@ def main():
         )
 
         if stemmer:
-            model_results = postprocess_res_labels(model_results, stemmer, lemmer)
-            true_labels = postprocess_dataset_labels(true_labels, stemmer, lemmer)
+            model_results = postprocess_model_outputs(
+                model_results, stemmer, lemmer, options["preprocessing"]
+            )
+            true_labels = postprocess_dataset_labels(
+                true_labels, stemmer, lemmer, options["preprocessing"]
+            )
 
         # output_one_top_cands_geo(data.ids, model_results, true_labels)
         kpe_for_doc = output_one_top_cands(data.ids, model_results, true_labels)
@@ -395,6 +411,30 @@ def main():
             floatfmt=".2%",
         )
     )
+
+    with open("runs.resume.txt", "a") as f:
+        stamp = datetime.now().strftime(r"%Y%m%d-%H%M")
+        print(f"Date: {stamp}", file=f)
+        print(f"Args: {args}", file=f)
+        print(
+            tabulate(
+                performance_metrics[
+                    [
+                        "Precision",
+                        "Recall",
+                        "F1",
+                        "MAP",
+                        "nDCG",
+                        "F1_5",
+                        "F1_10",
+                        "F1_15",
+                    ]
+                ],
+                headers="keys",
+                floatfmt=".2%",
+            ),
+            file=f,
+        )
 
     save(dataset_kpe, performance_metrics, fig, args)
 

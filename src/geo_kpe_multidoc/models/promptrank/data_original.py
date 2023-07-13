@@ -4,6 +4,7 @@ import json
 import os
 import re
 from itertools import islice
+from typing import List
 
 import nltk
 import spacy
@@ -15,6 +16,7 @@ from transformers import T5TokenizerFast
 
 from geo_kpe_multidoc import GEO_KPE_MULTIDOC_DATA_PATH
 from geo_kpe_multidoc.datasets.datasets import KPEDataset
+from geo_kpe_multidoc.document import Document
 from geo_kpe_multidoc.models.pre_processing.pre_processing_utils import select_stemmer
 
 
@@ -24,9 +26,6 @@ class PromptRankExtractor:
         self.temp_en = kwargs.get("temp_en", "Book:")
         self.temp_de = kwargs.get("temp_de", "This book mainly talks about ")
         self.enable_filter = kwargs.get("enable_filter", False)
-        self.enable_pos = kwargs.get("enable_pos", True)
-        self.position_factor = kwargs.get("position_factor", 1.2e8)
-        self.length_factor = kwargs.get("length_factor", 0.6)
 
         self.tokenizer = T5TokenizerFast.from_pretrained(
             model_name, model_max_length=self.max_len
@@ -41,7 +40,7 @@ class PromptRankExtractor:
         self.GRAMMAR = """  NP:
                 {<NN.*|JJ>*<NN.*>}  # Adjective(s)(optional) + Noun(s)"""
 
-    def extract_candidates(self, tokens_tagged, no_subset=False):
+    def extract_candidates(self, tokens_tagged, no_subset=False) -> List[str]:
         """
         Based on part of speech return a list of candidate phrases
         :param text_obj: Input text Representation see @InputTextObj
@@ -141,6 +140,23 @@ class PromptRankExtractor:
             # print()
             # exit(0)
         return doc_pairs, count
+
+    def __call__(
+        self, doc: Document, min_len=0, lemmer_lang="en", **kwargs
+    ) -> List[str]:
+        text = " ".join(doc.raw_text.split()[: self.max_len])
+        text_obj = InputTextObj(self.en_model, text)
+        # Generate candidates (lower)
+        cans = self.extract_candidates(text_obj.tokens_tagged)
+
+        candidates = []
+        for can, pos in cans:
+            if self.enable_filter and (len(can.split()) > 4):
+                continue
+        candidates.append([can.lower(), pos])
+
+        candidates, positions = list(zip(*candidates))
+        return candidates, positions
 
     # def data_process(self, dataset: KPEDataset):
     def data_process(self, dataset):

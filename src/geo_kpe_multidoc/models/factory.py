@@ -18,6 +18,7 @@ from geo_kpe_multidoc.models.fusion_model import FusionModel
 from geo_kpe_multidoc.models.maskrank.maskrank_manual import LongformerMaskRank
 from geo_kpe_multidoc.models.maskrank.maskrank_model import MaskRank
 from geo_kpe_multidoc.models.mdkperank.mdkperank_model import MDKPERank
+from geo_kpe_multidoc.models.promptrank.promptrank import PromptRank
 
 
 def generateLongformerRanker(
@@ -174,6 +175,8 @@ def kpe_model_factory(args, BACKEND_MODEL_NAME, TAGGER_NAME) -> BaseKPModel:
             )
         else:
             kpe_model = MaskRank(BACKEND_MODEL_NAME, TAGGER_NAME)
+    elif args.rank_model == "PromptRank":
+        kpe_model = PromptRank(BACKEND_MODEL_NAME, TAGGER_NAME, **vars(args))
     elif args.rank_model == "MDKPERank":
         if "[longformer]" in BACKEND_MODEL_NAME:
             base_name = BACKEND_MODEL_NAME.replace("[longformer]", "")
