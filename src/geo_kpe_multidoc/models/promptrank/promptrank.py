@@ -295,6 +295,7 @@ class PromptRank(BaseKPModel):
             #         for i in x[0]:
             #             print(tokenizer.decode(i))
             #         exit(0)
+
             dic = {
                 "de_input_len": de_input_len,
                 "candidate": candidate,
