@@ -312,22 +312,25 @@ class PromptRank(BaseKPModel):
         num_e = num_e_5 = num_e_10 = num_e_15 = 0
         num_s = 0
 
-        for i, (top_k, labels_and_stems) in enumerate(
-            zip(dataset_top_k, dataset_labels)
-        ):
+        for top_k, labels in zip(dataset_top_k, dataset_labels):
             candidates_dedup = list(dict.fromkeys(map(str.lower, top_k)))
-
-            # logger.debug("Sorted_Candidate: {} \n".format(top_k_can))
+            # logger.debug("Sorted_Candidate: {} \n".format(top_k))
             # logger.debug("Candidates_Dedup: {} \n".format(candidates_dedup))
 
-            labels, labels_stemed = list(zip(*labels_and_stems))
+            # Get stemmed labels and document segments
+            labels_stemed = []
+            for label in labels:
+                tokens = label.split()
+                if len(tokens) > 0:
+                    labels_stemed.append(" ".join(self.stemmer.stem(t) for t in tokens))
 
             j = 0
             Matched = candidates_dedup[:15]
             for id, temp in enumerate(candidates_dedup[:15]):
                 tokens = temp.split()
                 tt = " ".join(self.stemmer.stem(t) for t in tokens)
-                if tt in labels_stemed[i] or temp in labels[i]:
+                # if tt in labels_stemed[i] or temp in labels[i]:
+                if tt in labels_stemed or temp in labels:
                     Matched[id] = [temp]
                     if j < 5:
                         num_c_5 += 1
@@ -364,7 +367,8 @@ class PromptRank(BaseKPModel):
                 num_e_15 += len(top_k[0:15])
 
             num_e += len(top_k)
-            num_s += len(labels[i])
+            # num_s += len(labels[i])
+            num_s += len(labels)
 
         results = {
             "Precision": 0.0,
@@ -403,6 +407,7 @@ class PromptRank(BaseKPModel):
         results["Recall"] = r
         results["F1"] = f
         # print_PRF(p, r, f, "All")
+        print("PromptRank Evaluation")
         print(
             tabulate(
                 pd.DataFrame.from_records([results]), headers="keys", floatfmt=".2%"

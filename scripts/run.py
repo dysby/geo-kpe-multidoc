@@ -7,6 +7,12 @@ from os import path
 from time import time
 
 import pandas as pd
+from loguru import logger
+from matplotlib import pyplot as plt
+from pandas import DataFrame
+from tabulate import tabulate
+
+import wandb
 from geo_kpe_multidoc import GEO_KPE_MULTIDOC_OUTPUT_PATH
 from geo_kpe_multidoc.datasets.datasets import DATASETS, load_dataset
 from geo_kpe_multidoc.evaluation.evaluation_tools import (
@@ -24,18 +30,13 @@ from geo_kpe_multidoc.evaluation.report import (
 )
 from geo_kpe_multidoc.models import MDKPERank
 from geo_kpe_multidoc.models.factory import kpe_model_factory
+from geo_kpe_multidoc.models.maskrank.maskrank_model import MaskRank
 from geo_kpe_multidoc.models.pre_processing.pre_processing_utils import (
     remove_new_lines_and_tabs,
     remove_whitespaces,
     select_stemmer,
 )
 from geo_kpe_multidoc.models.promptrank.promptrank import PromptRank
-from loguru import logger
-from matplotlib import pyplot as plt
-from pandas import DataFrame
-from tabulate import tabulate
-
-import wandb
 
 
 def parse_args():
@@ -357,22 +358,43 @@ def main():
             **options,
         )
 
+        # DEBUG PromptRank Original Evaluation
+        if isinstance(kpe_model, PromptRank):
+            # model_results, true_labels are aligned by key (dataset_name)
+            for dataset_model_results, dataset_true_labels in zip(
+                model_results.values(), true_labels.values()
+            ):
+                dataset_top_k = []
+                for cand_score, cand in dataset_model_results:
+                    top_k, score = list(zip(*cand_score))
+                    # append document top_k
+                    dataset_top_k.append(top_k)
+
+                dataset_labels = dataset_true_labels
+                kpe_model._evaluate(dataset_top_k, dataset_labels)
+
         if stemmer:
             model_results = postprocess_model_outputs(
-                model_results, stemmer, lemmer, options["preprocessing"]
+                model_results, stemmer, lemmer, options.get("preprocessing", [])
             )
             true_labels = postprocess_dataset_labels(
-                true_labels, stemmer, lemmer, options["preprocessing"]
+                true_labels, stemmer, lemmer, options.get("preprocessing", [])
             )
 
         # output_one_top_cands_geo(data.ids, model_results, true_labels)
         kpe_for_doc = output_one_top_cands(data.ids, model_results, true_labels)
 
         dataset_kpe = model_scores_to_dataframe(model_results, true_labels)
+
+        xlim = (
+            (dataset_kpe["score"].min(), dataset_kpe["score"].max())
+            if isinstance(kpe_model, [PromptRank, MaskRank])
+            else (0, 1)
+        )
         fig = plot_score_distribuitions_with_gold(
             results=dataset_kpe,
             title=args.experiment_name.replace("-", " "),
-            xlim=(0, 1),
+            xlim=xlim,
         )
 
         # mlflow.log_figure(fig, artifact_file="score_distribution.png")

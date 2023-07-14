@@ -573,6 +573,7 @@ def model_scores_to_dataframe(model_results, true_labels) -> pd.DataFrame:
             # TODO: Uniform score value class
             rows = [
                 {
+                    "dataset": dataset,
                     "doc": i,
                     "candidate": candidate,
                     "score": score.item() if isinstance(score, np.ndarray) else score,

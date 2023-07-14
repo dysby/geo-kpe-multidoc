@@ -13,6 +13,9 @@ from geo_kpe_multidoc.models.backend.select_backend import select_backend
 from geo_kpe_multidoc.models.candidate_extract.candidate_extract_model import (
     KPECandidateExtractionModel,
 )
+from geo_kpe_multidoc.models.candidate_extract.promptrank_extraction import (
+    PromptRankKPECandidateExtractionModel,
+)
 from geo_kpe_multidoc.models.pre_processing.pre_processing_utils import (
     filter_special_tokens,
     remove_punctuation,
@@ -168,8 +171,13 @@ class BaseKPModel:
 
 
 class ExtractionEvaluator(BaseKPModel):
-    def __init__(self, model, tagger):
-        self.candidate_selection_model = KPECandidateExtractionModel(tagger=tagger)
+    def __init__(self, model, tagger, extraction_variant="base"):
+        if extraction_variant == "base":
+            self.candidate_selection_model = KPECandidateExtractionModel(tagger=tagger)
+        else:
+            self.candidate_selection_model = PromptRankKPECandidateExtractionModel(
+                tagger=tagger
+            )
         self.counter = 1
 
     def extract_kp_from_doc(

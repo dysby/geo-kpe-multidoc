@@ -29,11 +29,15 @@ class PromptRankKPECandidateExtractionModel:
     :return keyphrase_candidate: list of list of candidate phrases: [tuple(string,tuple(start_index,end_index))]
     """
 
-    def __init__(self, tagger, **kwargs) -> None:
+    def __init__(self, tagger, grammar=None, **kwargs) -> None:
         self.tagger = POS_tagger_spacy(tagger)
 
-        self.grammar = """  NP:
+        self.grammar = (
+            grammar
+            if grammar
+            else """  NP:
                 {<NN.*|JJ>*<NN.*>}  # Adjective(s)(optional) + Noun(s)"""
+        )
 
         self.max_len = 512
         self.parser = RegexpParser(self.grammar)
