@@ -90,8 +90,8 @@ class PromptRank(BaseKPModel):
         self.stemmer = select_stemmer(kwargs.get("lang", "en"))
 
         # Dataloader
-        self.num_workers = 4
-        self.batch_size = 1
+        self.num_workers = 1  # Not used, because of Tokenizer paralelism warning
+        self.batch_size = 16
 
         self.counter = 1
 
@@ -116,10 +116,10 @@ class PromptRank(BaseKPModel):
         doc_candidate_input_features = self._input_features(doc)
         dataset = PromptRankDataset(doc_candidate_input_features)
 
-        dataloader = DataLoader(
-            dataset, num_workers=self.num_workers, batch_size=self.batch_size
-        )
-        dataloader = DataLoader(dataset)
+        # dataloader = DataLoader(
+        #     dataset, num_workers=self.num_workers, batch_size=self.batch_size
+        # )
+        dataloader = DataLoader(dataset, batch_size=self.batch_size)
 
         for id, (en_input_ids, en_input_mask, de_input_ids, dic) in enumerate(
             tqdm(dataloader, desc=f"Evaluating {doc.id}")
