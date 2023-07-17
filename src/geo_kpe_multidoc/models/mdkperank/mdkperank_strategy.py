@@ -204,6 +204,7 @@ class MmrRank(Ranker):
             documents_centroid,
             candidates_embeddings,
             candidates_embeddings.index,
+            top_n=len(candidates_embeddings),
             diversity=diversity,
         )
         # candidate to document similarity

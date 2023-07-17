@@ -39,7 +39,7 @@ class PromptRankKPECandidateExtractionModel:
                 {<NN.*|JJ>*<NN.*>}  # Adjective(s)(optional) + Noun(s)"""
         )
 
-        self.max_len = 512
+        self.max_len = kwargs.get("max_len", 512)
         self.parser = RegexpParser(self.grammar)
         self.language = kwargs.get("language", "english")
         # Limit candidate size

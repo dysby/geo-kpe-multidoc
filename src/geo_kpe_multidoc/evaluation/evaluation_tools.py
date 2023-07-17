@@ -464,8 +464,8 @@ def extract_keyphrases_docs(
 def extract_keyphrases_topics(
     dataset: KPEDataset,
     model: MDKPERank,
-    top_n=20,
-    min_len=5,
+    top_n=-1,
+    min_len=0,
     lemmer=None,
     n_docs_limit=-1,
     **kwargs,
