@@ -76,8 +76,9 @@ class MdPromptRank(BaseKPModel):
                 **kwargs,
             )
 
-            for (candidate, score), _ in ranking_p_doc[doc.id]:
-                scores_for_candidate.setdefault(candidate, []).append(score)
+            for top_k_score, _ in ranking_p_doc[doc.id]:
+                for candidate, score in top_k_score:
+                    scores_for_candidate.setdefault(candidate, []).append(score)
 
         top_n_scores = sorted(
             [
