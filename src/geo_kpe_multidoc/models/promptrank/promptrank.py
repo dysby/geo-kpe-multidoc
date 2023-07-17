@@ -15,7 +15,7 @@ from transformers import T5ForConditionalGeneration, T5TokenizerFast
 from geo_kpe_multidoc.datasets.promptrank_datasets import PromptRankDataset
 from geo_kpe_multidoc.document import Document
 from geo_kpe_multidoc.models.base_KP_model import BaseKPModel
-from geo_kpe_multidoc.models.candidate_extract.candidate_extract_model import (
+from geo_kpe_multidoc.models.candidate_extract.candidate_extract_bridge import (
     KPECandidateExtractionModel,
 )
 from geo_kpe_multidoc.models.candidate_extract.promptrank_extraction import (

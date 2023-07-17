@@ -117,7 +117,7 @@ class PromptRankKPECandidateExtractionModel:
 
             else:
                 count += 1
-
+        # What is this filter?
         if self.enable_filter:
             i = 0
             while i < len(keyphrase_candidate):
