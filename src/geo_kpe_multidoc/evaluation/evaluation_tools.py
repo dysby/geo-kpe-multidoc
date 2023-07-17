@@ -514,12 +514,10 @@ def extract_keyphrases_topics(
             **kwargs,
         )
 
-        model_results[dataset.name].append(
-            (
-                top_n_scores,
-                candidate_embeddings.index.tolist(),
-            )
-        )
+        # candidates = candidate_embeddings.index.tolist()
+        candidates, _ = list(zip(*top_n_scores))
+
+        model_results[dataset.name].append((top_n_scores, candidates))
 
         if len(preprocessing) > 0:
             processed_gold_kp = []
