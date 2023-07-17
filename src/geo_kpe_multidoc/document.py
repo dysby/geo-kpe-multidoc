@@ -47,6 +47,7 @@ class Document:
     candidate_set = []
     candidate_mentions = {}  #
     candidate_scores = []
+    candidate_positions = []
     # Tokenized document
     token_ids = []
     token_embeddings = []

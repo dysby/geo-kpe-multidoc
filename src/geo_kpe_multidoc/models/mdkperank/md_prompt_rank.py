@@ -60,7 +60,7 @@ class MdPromptRank(BaseKPModel):
                 doc.candidate_set.append(out_candidate)
                 # TODO: Multi-document PromptRank, how to set candidate position?
                 # set position to last token of the document
-                doc.candidate_position.append(
+                doc.candidate_positions.append(
                     (self.base_model.max_len, self.base_model.max_len)
                 )
 
