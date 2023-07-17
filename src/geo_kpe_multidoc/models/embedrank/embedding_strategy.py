@@ -88,8 +88,6 @@ class InContextEmbeddings:
                             .numpy()
                         )
                     embds.append(embd)
-
-                doc.candidate_set_embed.append(np.mean(embds, 0))
                 # TODO: problem with original 'andrew - would' vs PoS extracted 'andrew-would'
                 logger.debug(
                     f"Candidate {candidate} - mentions not found: {doc.candidate_mentions[candidate]}"
@@ -101,7 +99,8 @@ class InContextEmbeddings:
                     embds[i] = torch.mean(doc.token_embeddings[occurrence, :], dim=0)
 
                 embds = embds.numpy()
-                doc.candidate_set_embed.append(np.mean(embds, 0))
+
+            doc.candidate_set_embed.append(np.mean(embds, 0))
 
 
 class InAndOutContextEmbeddings:

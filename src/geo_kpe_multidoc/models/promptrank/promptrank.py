@@ -15,6 +15,9 @@ from transformers import T5ForConditionalGeneration, T5TokenizerFast
 from geo_kpe_multidoc.datasets.promptrank_datasets import PromptRankDataset
 from geo_kpe_multidoc.document import Document
 from geo_kpe_multidoc.models.base_KP_model import BaseKPModel
+from geo_kpe_multidoc.models.candidate_extract.candidate_extract_model import (
+    KPECandidateExtractionModel,
+)
 from geo_kpe_multidoc.models.candidate_extract.promptrank_extraction import (
     PromptRankKPECandidateExtractionModel,
 )
@@ -56,6 +59,7 @@ class PromptRank(BaseKPModel):
         self.candidate_selection_model = PromptRankKPECandidateExtractionModel(
             tagger=tagger, **kwargs
         )
+        # self.candidate_selection_model = KPECandidateExtractionModel(tagger=tagger)
 
         self.max_len = kwargs.get("max_len", 512)
         self.temp_en = kwargs.get("temp_en", "Book:")
@@ -234,7 +238,7 @@ class PromptRank(BaseKPModel):
         stemmer: Optional[StemmerI] = None,
         lemmer: Optional[Callable] = None,
         **kwargs,
-    ) -> Tuple[List[Tuple], List[str]]:
+    ) -> Tuple[List[Tuple[str, float]], List[str]]:
         candidates, positions = self.extract_candidates(doc, min_len, lemmer, **kwargs)
 
         top_n, candidate_set = self.top_n_candidates(

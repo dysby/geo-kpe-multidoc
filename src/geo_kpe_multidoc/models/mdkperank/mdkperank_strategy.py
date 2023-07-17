@@ -4,31 +4,42 @@ from operator import itemgetter
 import numpy as np
 import pandas as pd
 import umap
+from keybert._mmr import mmr
 from sklearn.cluster import HDBSCAN, KMeans
 from sklearn.metrics import pairwise_distances_argmin_min
 from sklearn.metrics.pairwise import cosine_distances, cosine_similarity
 from sklearn.preprocessing import normalize
 
-# TODO: Condorcet Fuse combines rankings by sorting the documents according to the pairwise relation r(d1) < r(d2),
-#       which is determined for each (d1, d2) by majority vote among the input rankings.
-# TODO: CombMNZ requires for each r a corresponding scoring function sr : D → R and a cutoff rank c
-#       which all contribute to the CombMNZ score: $CMNZscore(d \in D) = |{r \in R|r(d) \leq c}| \sum_{r|r(d) \leq c} S_r (d)$
+# TODO: Condorcet Fuse combines rankings by sorting the documents according to the
+#       pairwise relation r(d1) < r(d2), which is determined for each (d1, d2)
+#       by majority vote among the input rankings.
+# TODO: CombMNZ requires for each r a corresponding scoring function sr : D → R and a
+#       cutoff rank c which all contribute to the CombMNZ score:
+#       $CMNZscore(d \in D) = |{r \in R|r(d) \leq c}| \sum_{r|r(d) \leq c} S_r (d)$
 # TODO: Proposition-Level Clustering for Multi-Document Summarization (https://github.com/oriern/ProCluster)
-# TODO: DDP - Improving the Similarity Measure of Determinantal Point Processes for Extractive Multi-Document Summarization (https://github.com/ucfnlp/summarization-dpp-capsnet)
-# TODO: Efficiently Summarizing Text and Graph Encodings of Multi-Document Clusters (https://github.com/amazon-research/bartgraphsumm)
-#               we do co-reference resolution within each document and extract open information extraction triplets (OIE) at the sentence
-#               level from all input documents.2 Each OIE triplet consists of a subject, a predicate, and an object. Once we have all the triplets,
-#               in the second step, we build a graph with subjects and objects as nodes and the predicates as the edge relationship between the nodes.
-# TODO: Extractive multi-document summarization using multilayer networks
-#            modeling a set of documents as a multilayer network. Intra-document and Inter-document similarity
-# TODO: Improved Affinity Graph Based Multi-Document Summarization
-#            weight Intra-document and Inter-document similarity
+# TODO: DDP - Improving the Similarity Measure of Determinantal Point Processes for
+#       Extractive Multi-Document Summarization (https://github.com/ucfnlp/summarization-dpp-capsnet)
+# TODO: Efficiently Summarizing Text and Graph Encodings of Multi-Document Clusters
+#       (https://github.com/amazon-research/bartgraphsumm) we do co-reference
+#       resolution within each document and extract open information extraction
+#       triplets (OIE) at the sentence level from all input documents.2 Each OIE
+#       triplet consists of a subject, a predicate, and an object. Once we have all the
+#       triplets, in the second step, we build a graph with subjects and objects as
+#       nodes and the predicates as the edge relationship between the nodes.
+# TODO: Extractive multi-document summarization using multilayer networks modeling a
+#       set of documents as a multilayer network. Intra-document and Inter-document
+#       similarity.
+# TODO: Improved Affinity Graph Based Multi-Document Summarization weight
+#       Intra-document and Inter-document similarity
 # TODO: CoRank - (https://github.com/bshivangi47/Text-Summarization-using-Corank)
-# TODO: Extractive multi-document summarization using population-based multicriteria optimization
-# TODO: A Preliminary Exploration of Extractive Multi-Document Summarization in Hyperbolic Space
+# TODO: Extractive multi-document summarization using population-based multicriteria
+#       optimization
+# TODO: A Preliminary Exploration of Extractive Multi-Document Summarization in
+#       Hyperbolic Space
 # TODO: Graph (Graph-Based Text Summarization Using Modified TextRank)
-#           The graph is made sparse and partitioned into different clusters with the assumption that the
-#           sentences within a cluster are similar to each other and sentences of different cluster represent their dissimilarity.
+#       The graph is made sparse and partitioned into different clusters with
+#       the assumption that the sentences within a cluster are similar to each other
+#       and sentences of different cluster represent their dissimilarity.
 
 
 class Ranker:
@@ -175,7 +186,7 @@ class MrrRank(Ranker):
 
 
 class MmrRank(Ranker):
-    # TODO: Maximal Relevance in Multidoc???
+    # TODO: Maximal Marginal Relevance in Multidoc (query is mean of document embeddings)
     # Based on KeyBERT implementation
     def _rank(
         self,
@@ -185,7 +196,20 @@ class MmrRank(Ranker):
         *args,
         **kwargs,
     ):
-        top_n_scores = None
+        diversity = kwargs.get("mmr_diversity", 0.5)
+        # document centroid
+        documents_centroid = documents_embeddings.mean(axis=0).to_numpy()
+
+        top_n_scores = mmr(
+            documents_centroid,
+            candidates_embeddings,
+            candidates_embeddings.index,
+            diversity=diversity,
+        )
+        # candidate to document similarity
+        # candidate to candidate similarity
+        # maximal relevance
+
         return (
             documents_embeddings,
             candidates_embeddings,
