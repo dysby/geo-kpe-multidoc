@@ -192,7 +192,7 @@ def kpe_model_factory(args, BACKEND_MODEL_NAME, TAGGER_NAME) -> BaseKPModel:
                 candidate_embedding_strategy=args.candidate_mode,
             )
             kpe_model = MDKPERank(ranker, rank_strategy=args.md_strategy)
-    elif args.rank_model == "MdPromtRank":
+    elif args.rank_model == "MdPromptRank":
         base_model = PromptRank(BACKEND_MODEL_NAME, TAGGER_NAME, **vars(args))
         kpe_model = MdPromptRank(base_model)
     elif args.rank_model == "ExtractionEvaluator":
