@@ -1,5 +1,5 @@
 from operator import itemgetter
-from typing import List, Tuple
+from typing import Callable, List, Optional, Tuple
 
 from numpy import mean
 
@@ -26,7 +26,7 @@ class MdPromptRank(BaseKPModel):
         top_n: int = 15,
         min_len: int = 5,
         stemming: bool = False,
-        lemmatize: bool = False,
+        lemmer: Optional[Callable] = None,
         **kwargs,
     ) -> MDKPERankOutput:
         """
@@ -48,7 +48,9 @@ class MdPromptRank(BaseKPModel):
         topic_candidates = set()
         candidate_document_matrix = {}
         for doc in topic_docs:
-            doc_candidates, _ = self.base_model.extract_candidates(doc)
+            doc_candidates, _ = self.base_model.extract_candidates(
+                doc, min_len, lemmer=None, **kwargs
+            )
             topic_candidates.update(doc_candidates)
             for candidate in doc_candidates:
                 candidate_document_matrix.setdefault(candidate, set()).add(doc.id)
@@ -70,7 +72,7 @@ class MdPromptRank(BaseKPModel):
                 top_n=top_n,
                 min_len=min_len,
                 stemming=stemming,
-                lemmatize=lemmatize,
+                lemmer=lemmer,
                 **kwargs,
             )
 
