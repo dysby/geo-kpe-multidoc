@@ -143,7 +143,7 @@ class PromptRankKPECandidateExtractionModel:
 
         candidates, positions = list(zip(*candidates))
 
-        doc.candidate_set = candidates
+        doc.candidate_set = list(candidates)
         doc.candidate_positions = positions
 
         return candidates, positions

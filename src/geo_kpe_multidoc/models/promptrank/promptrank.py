@@ -56,10 +56,10 @@ class PromptRank(BaseKPModel):
             self.__class__.__name__, re.sub("[-/]", "_", model_name)
         )
 
-        # self.candidate_selection_model = PromptRankKPECandidateExtractionModel(
-        #     tagger=tagger, **kwargs
-        # )
-        self.candidate_selection_model = KPECandidateExtractionModel(tagger=tagger)
+        self.candidate_selection_model = PromptRankKPECandidateExtractionModel(
+            tagger=tagger, **kwargs
+        )
+        # self.candidate_selection_model = KPECandidateExtractionModel(tagger=tagger)
 
         self.max_len = kwargs.get("max_len", 512)
         self.temp_en = kwargs.get("temp_en", "Book:")
