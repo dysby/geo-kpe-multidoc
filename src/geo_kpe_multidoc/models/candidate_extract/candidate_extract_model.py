@@ -168,16 +168,17 @@ class KPECandidateExtractionModel:
 
         np_trees = self.parser.parse_sents(doc.tagged_text)
 
+        start = 0
         for tree in np_trees:
-            # temp_cand_set = [
-            #     " ".join(word for word, tag in subtree.leaves())
-            #     for subtree in tree.subtrees(filter=lambda t: t.label() == "NP")
-            # ]
-
             temp_cand_positions = []
             temp_cand_set = []
             for subtree in tree.subtrees(filter=lambda t: t.label() == "NP"):
-                temp_cand_set.append(" ".join(word for word, tag in subtree.leaves()))
+                if subtree.label() == "NP":
+                    new_cand = " ".join(word for word, tag in subtree.leaves())
+                    new_cand_position = (start, start + len(subtree.leaves()))
+                    temp_cand_set.append(new_cand)
+                    temp_cand_positions.append(new_cand_position)
+                start += len(subtree.leaves())
                 # start = subtree.leaves()[0][0].idx  # 1st token idx
                 # end = start + len(subtree.leaves())
                 # temp_cand_positions.append((start, end))
@@ -197,8 +198,8 @@ class KPECandidateExtractionModel:
                     for candidate in temp_cand_set
                 ]
 
-            # for candidate, position in zip(temp_cand_set, temp_cand_positions):
-            for candidate in temp_cand_set:
+            for candidate, position in zip(temp_cand_set, temp_cand_positions):
+                # for candidate in temp_cand_set:
                 # TODO: Remove min_len and max words
                 if len(candidate) > min_len:  # and len(candidate.split(" ")) <= 5:
                     # TODO: 'we insurer':{'US INSURERS'} but 'eastern us': {'eastern US'} ...
@@ -215,7 +216,7 @@ class KPECandidateExtractionModel:
                     )
                     doc.candidate_set.add(l_candidate)
                     doc.candidate_mentions.setdefault(l_candidate, set()).add(candidate)
-                    # doc.candidate_positions.setdefault(l_candidate, []).append(position)
+                    doc.candidate_positions.setdefault(l_candidate, []).append(position)
 
         # candidate_set = {kp.lower() for kp in candidate_set if len(kp.split()) <= 7}
         # TODO: limit candidate size
@@ -224,16 +225,16 @@ class KPECandidateExtractionModel:
 
         doc.candidate_set = sorted(doc.candidate_set, key=len, reverse=True)
         # keep only the first position of the candidate
-        # doc.candidate_positions = [
-        #     doc.candidate_positions[candidate][0] for candidate in doc.candidate_set
-        # ]
+        doc.candidate_positions = [
+            doc.candidate_positions[candidate][0] for candidate in doc.candidate_set
+        ]
 
         if cache_candidate_selection:
             self._save_cache(
                 doc.dataset, doc.id, doc.candidate_set, doc.candidate_mentions
             )
 
-        return doc.candidate_set, doc.candidate_mentions
+        return doc.candidate_set, doc.candidate_positions
 
     def _extract_candidates(
         self,

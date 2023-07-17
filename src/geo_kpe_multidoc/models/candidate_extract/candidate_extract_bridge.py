@@ -104,7 +104,9 @@ class KPECandidateExtractionModel:
         lemmer_lang: str = None,
         **kwargs,
     ):
-        self._extract_candidates_positions(doc, min_len, grammar, lemmer_lang, **kwargs)
+        return self._extract_candidates_positions(
+            doc, min_len, grammar, lemmer_lang, **kwargs
+        )
 
     def _pos_tag_doc(self, doc: Document, stemming, use_cache, **kwargs) -> None:
         (
