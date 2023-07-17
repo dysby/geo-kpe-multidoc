@@ -198,7 +198,7 @@ class MmrRank(Ranker):
     ):
         diversity = kwargs.get("mmr_diversity", 0.5)
         # document centroid
-        documents_centroid = documents_embeddings.mean(axis=0).to_numpy()
+        documents_centroid = documents_embeddings.mean(axis=0).to_numpy().reshape(1, -1)
 
         top_n_scores = mmr(
             documents_centroid,
