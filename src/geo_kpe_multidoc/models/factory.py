@@ -17,6 +17,7 @@ from geo_kpe_multidoc.models.embedrank.longembedrank import LongEmbedRank
 from geo_kpe_multidoc.models.fusion_model import FusionModel
 from geo_kpe_multidoc.models.maskrank.maskrank_manual import LongformerMaskRank
 from geo_kpe_multidoc.models.maskrank.maskrank_model import MaskRank
+from geo_kpe_multidoc.models.mdkperank.md_prompt_rank import MdPromptRank
 from geo_kpe_multidoc.models.mdkperank.mdkperank_model import MDKPERank
 from geo_kpe_multidoc.models.promptrank.promptrank import PromptRank
 
@@ -191,6 +192,9 @@ def kpe_model_factory(args, BACKEND_MODEL_NAME, TAGGER_NAME) -> BaseKPModel:
                 candidate_embedding_strategy=args.candidate_mode,
             )
             kpe_model = MDKPERank(ranker, rank_strategy=args.md_strategy)
+    elif args.rank_model == "MdPromtRank":
+        base_model = PromptRank(BACKEND_MODEL_NAME, TAGGER_NAME, **vars(args))
+        kpe_model = MdPromptRank(base_model)
     elif args.rank_model == "ExtractionEvaluator":
         kpe_model = ExtractionEvaluator(BACKEND_MODEL_NAME, TAGGER_NAME)
     elif args.rank_model == "FusionRank":

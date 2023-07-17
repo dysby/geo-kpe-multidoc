@@ -25,6 +25,7 @@ from geo_kpe_multidoc.evaluation.report import (
 from geo_kpe_multidoc.models import MDKPERank
 from geo_kpe_multidoc.models.factory import kpe_model_factory
 from geo_kpe_multidoc.models.maskrank.maskrank_model import MaskRank
+from geo_kpe_multidoc.models.mdkperank.md_prompt_rank import MdPromptRank
 from geo_kpe_multidoc.models.pre_processing.pre_processing_utils import (
     remove_new_lines_and_tabs,
     remove_whitespaces,
@@ -96,6 +97,7 @@ def parse_args():
             "PromptRank",
             "FusionRank",
             "MDKPERank",
+            "MdPromptRank",
             "ExtractionEvaluator",
         ],
     )
@@ -302,10 +304,10 @@ def main():
 
     kpe_model = kpe_model_factory(args, BACKEND_MODEL_NAME, TAGGER_NAME)
 
-    if isinstance(kpe_model, MDKPERank):
+    if isinstance(kpe_model, (MDKPERank, MdPromptRank)):
         extract_eval = extract_keyphrases_topics
         if ds_name != "MKDUC01":
-            logger.critical("Not Multi Document Ranking on single document dataset!")
+            logger.critical("Multi Document Ranking on single document dataset!")
     elif isinstance(kpe_model, PromptRank):
         extract_eval = extract_keyphrases_docs
     else:
