@@ -7,6 +7,12 @@ from os import path
 from time import time
 
 import pandas as pd
+from loguru import logger
+from matplotlib import pyplot as plt
+from pandas import DataFrame
+from tabulate import tabulate
+
+import wandb
 from geo_kpe_multidoc import GEO_KPE_MULTIDOC_OUTPUT_PATH
 from geo_kpe_multidoc.datasets.datasets import DATASETS, load_dataset
 from geo_kpe_multidoc.evaluation.evaluation_tools import (
@@ -32,12 +38,6 @@ from geo_kpe_multidoc.models.pre_processing.pre_processing_utils import (
     select_stemmer,
 )
 from geo_kpe_multidoc.models.promptrank.promptrank import PromptRank
-from loguru import logger
-from matplotlib import pyplot as plt
-from pandas import DataFrame
-from tabulate import tabulate
-
-import wandb
 
 
 def parse_args():
@@ -77,7 +77,7 @@ def parse_args():
         "--doc_limit",
         default=-1,
         type=int,
-        help="Max number of documents to process from Dataset.",
+        help="Max number of documents to process from Dataset",
     )
     parser.add_argument(
         "--doc_name",
@@ -85,7 +85,12 @@ def parse_args():
         type=str,
         help="Doc ID to test from Dataset.",
     )
-
+    parser.add_argument(
+        "--extraction_variant",
+        default="base",
+        type=str,
+        help="Set Extraction model variant [base, promptrank]",
+    )
     parser.add_argument(
         "--rank_model",
         default="EmbedRank",
@@ -129,7 +134,7 @@ def parse_args():
         "--pooling",
         type=str,
         default="mean",
-        help="Embedding Pooling strategy [mean, max]",
+        help="[NOT USED] Embedding Pooling strategy [mean, max]",
     )
     parser.add_argument(
         "--candidate_mode",

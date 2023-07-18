@@ -6,6 +6,7 @@ from typing import Callable, Dict, Iterable, List, Tuple
 
 import numpy as np
 import pandas as pd
+from nltk.stem.api import StemmerI
 
 from geo_kpe_multidoc.datasets.datasets import KPEDataset
 from geo_kpe_multidoc.document import Document
@@ -45,6 +46,25 @@ class MDKPERank(BaseKPModel):
 
         self.ranking_strategy = STRATEGIES[rank_strategy](**kwargs)
 
+    def _extract_doc_candidate_embeddings(
+        self,
+        doc,
+        top_n: int = -1,
+        min_len: int = 0,
+        stemmer: StemmerI = None,
+        lemmer=None,
+        **kwargs,
+    ):
+        self.base_model_embed.extract_candidates(doc, min_len, lemmer, **kwargs)
+
+        _, cand_embeds, candidate_set = self.base_model_embed.embed_candidates(
+            doc,
+            stemmer=stemmer,
+            **kwargs,
+        )
+
+        return (doc, cand_embeds, candidate_set)
+
     def extract_kp_from_doc(
         self, doc, top_n, min_len, stemmer=None, lemmer=None, **kwargs
     ) -> Tuple[Document, List[np.ndarray], List[str]]:  # Tuple[List[Tuple], List[str]]:
@@ -76,8 +96,8 @@ class MDKPERank(BaseKPModel):
     def extract_kp_from_topic_geo(
         self,
         topic_docs: List[Document],
-        top_n: int = 15,
-        min_len: int = 5,
+        top_n: int = -1,
+        min_len: int = 0,
         stemming: bool = False,
         lemmatize: bool = False,
         **kwargs,
@@ -269,8 +289,8 @@ class MDKPERank(BaseKPModel):
     def extract_kp_from_topic(
         self,
         topic_docs: List[Document],
-        top_n: int = 15,
-        min_len: int = 5,
+        top_n: int = -1,
+        min_len: int = 0,
         stemming: bool = False,
         lemmatize: bool = False,
         **kwargs,
@@ -380,8 +400,8 @@ class MDKPERank(BaseKPModel):
     def extract_kp_from_corpus(
         self,
         corpus: KPEDataset,
-        top_n: int = 15,
-        min_len: int = 5,
+        top_n: int = -1,
+        min_len: int = 0,
         stemming: bool = False,
         lemmatize: bool = False,
         **kwargs,

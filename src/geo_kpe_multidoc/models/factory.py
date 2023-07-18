@@ -196,7 +196,9 @@ def kpe_model_factory(args, BACKEND_MODEL_NAME, TAGGER_NAME) -> BaseKPModel:
         base_model = PromptRank(BACKEND_MODEL_NAME, TAGGER_NAME, **vars(args))
         kpe_model = MdPromptRank(base_model)
     elif args.rank_model == "ExtractionEvaluator":
-        kpe_model = ExtractionEvaluator(BACKEND_MODEL_NAME, TAGGER_NAME)
+        kpe_model = ExtractionEvaluator(
+            BACKEND_MODEL_NAME, TAGGER_NAME, extraction_variant=args.extraction_variant
+        )
     elif args.rank_model == "FusionRank":
         kpe_model = FusionModel(
             [
