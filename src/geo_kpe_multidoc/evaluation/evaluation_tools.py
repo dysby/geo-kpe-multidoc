@@ -421,17 +421,17 @@ def extract_keyphrases_docs(
         # TODO: remove preprocessing outside Document class
         # TODO: refactor processing gold to function
         # TODO: preprocessing hyphens and dots
-        if preprocessing:
-            processed_gold_kp = []
-            for kp in gold_kp:
-                kp = remove_hyphens_and_dots(kp.lower())
-                for transformation in preprocessing:
-                    kp = transformation(kp)
-                processed_gold_kp.append(kp)
-            # TODO: remove duplicates and discard empty
-            processed_gold_kp = set(processed_gold_kp)
-            processed_gold_kp.discard("")
-            gold_kp = processed_gold_kp
+        # if preprocessing:
+        #     processed_gold_kp = []
+        #     for kp in gold_kp:
+        #         kp = remove_hyphens_and_dots(kp.lower())
+        #         for transformation in preprocessing:
+        #             kp = transformation(kp)
+        #         processed_gold_kp.append(kp)
+        #     # TODO: remove duplicates and discard empty
+        #     processed_gold_kp = set(processed_gold_kp)
+        #     processed_gold_kp.discard("")
+        #     gold_kp = processed_gold_kp
 
         # Decision: lemmatize is not applied to gold
         # if lemmer:
@@ -519,17 +519,17 @@ def extract_keyphrases_topics(
 
         model_results[dataset.name].append((top_n_scores, candidates))
 
-        if len(preprocessing) > 0:
-            processed_gold_kp = []
-            for kp in gold_kp:
-                kp = remove_hyphens_and_dots(kp.lower())
-                for transformation in preprocessing:
-                    kp = transformation(kp)
-                processed_gold_kp.append(kp)
-            # TODO: remove duplicates and discard empty
-            processed_gold_kp = set(processed_gold_kp)
-            processed_gold_kp.discard("")
-            gold_kp = processed_gold_kp
+        # if len(preprocessing) > 0:
+        #     processed_gold_kp = []
+        #     for kp in gold_kp:
+        #         kp = remove_hyphens_and_dots(kp.lower())
+        #         for transformation in preprocessing:
+        #             kp = transformation(kp)
+        #         processed_gold_kp.append(kp)
+        #     # TODO: remove duplicates and discard empty
+        #     processed_gold_kp = set(processed_gold_kp)
+        #     processed_gold_kp.discard("")
+        #     gold_kp = processed_gold_kp
 
         true_labels[dataset.name].append(gold_kp)
 

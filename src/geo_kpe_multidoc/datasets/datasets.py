@@ -11,7 +11,9 @@ from loguru import logger
 
 from geo_kpe_multidoc import GEO_KPE_MULTIDOC_DATA_PATH
 from geo_kpe_multidoc.datasets.kpedataset import KPEDataset
+from geo_kpe_multidoc.datasets.preprocessing import clean_keywords, translate_parentesis
 from geo_kpe_multidoc.datasets.promptrank_datasets import load_promptrankdataset
+from geo_kpe_multidoc.models.pre_processing.pre_processing_utils import select_stemmer
 
 # Datasets from https://github.com/LIAAD/KeywordExtractor-Datasets
 DATASETS = {
@@ -163,15 +165,22 @@ def load_dataset(
         return ids, documents, labels
 
     if datasource == "preloaded":
-        return load_preprocessed(name)
+        dataset = load_preprocessed(name)
     elif datasource == "promptrank":
-        return load_promptrankdataset(name)
-
-    zipfile = DATASETS[name].get("zip_file", None)
-    if zipfile:
-        return KPEDataset(name, *_read_zip(path.join(root_dir, zipfile)))
+        dataset = load_promptrankdataset(name)
     else:
-        return KPEDataset(name, *_read_mdkpe(root_dir))
+        zipfile = DATASETS[name].get("zip_file", None)
+        if zipfile:
+            dataset = KPEDataset(name, *_read_zip(path.join(root_dir, zipfile)))
+        else:
+            dataset = KPEDataset(name, *_read_mdkpe(root_dir))
+
+    # normalize and stem labels
+    lang = DATASETS[name]["language"]
+    stemmer = select_stemmer(lang)
+    dataset.raw_labels = dataset.labels
+    dataset.labels = [clean_keywords(labels, stemmer) for labels in dataset.labels]
+    return dataset
 
 
 def load_preprocessed(name, root_dir=GEO_KPE_MULTIDOC_DATA_PATH) -> KPEDataset:
@@ -199,7 +208,21 @@ def load_preprocessed(name, root_dir=GEO_KPE_MULTIDOC_DATA_PATH) -> KPEDataset:
     ) as f:
         docs_and_keys = pickle.load(f)
 
-    ids = list(range(len(docs_and_keys)))
+    if name in ("Inspec", "SemEval2010"):
+        with open(
+            path.join(
+                root_dir, subdir, f"{local_name[name]}_processed.txt.mapping.ids.list"
+            ),
+            mode="r",
+            encoding="utf8",
+        ) as f:
+            mapping = f.read().strip()
+            ids = [doc_id[1:-2] for doc_id in mapping[1:-2].split()]
+    else:
+        ids = list(range(len(docs_and_keys)))
+
     docs, labels = list(zip(*docs_and_keys))
+
+    docs = [translate_parentesis(doc) for doc in docs]
 
     return KPEDataset(name, ids, docs, labels)

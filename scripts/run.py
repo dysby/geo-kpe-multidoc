@@ -379,11 +379,10 @@ def main():
             model_results = postprocess_model_outputs(
                 model_results, stemmer, lemmer, options.get("preprocessing", [])
             )
-            true_labels = postprocess_dataset_labels(
-                true_labels, stemmer, lemmer, options.get("preprocessing", [])
-            )
+            # true_labels = postprocess_dataset_labels(
+            #     true_labels, stemmer, lemmer, options.get("preprocessing", [])
+            # )
 
-        # output_one_top_cands_geo(data.ids, model_results, true_labels)
         kpe_for_doc = output_one_top_cands(data.ids, model_results, true_labels)
 
         dataset_kpe = model_scores_to_dataframe(model_results, true_labels)
