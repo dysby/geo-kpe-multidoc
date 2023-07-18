@@ -208,7 +208,7 @@ def load_preprocessed(name, root_dir=GEO_KPE_MULTIDOC_DATA_PATH) -> KPEDataset:
     ) as f:
         docs_and_keys = pickle.load(f)
 
-    if name in ("Inspec", "SemEval2010"):
+    if name in ("DUC", "Inspec", "SemEval2010"):
         with open(
             path.join(
                 root_dir, subdir, f"{local_name[name]}_processed.txt.mapping.ids.list"
