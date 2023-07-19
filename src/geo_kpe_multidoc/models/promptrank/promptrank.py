@@ -253,9 +253,8 @@ class PromptRank(BaseKPModel):
         lemmer: Optional[Callable] = None,
         **kwargs,
     ) -> Tuple[List[Tuple[str, float]], List[str]]:
-        candidates, positions = self.extract_candidates(doc, min_len, lemmer, **kwargs)
-
         # Because base KPE extractor does not return positions (it returns mentions)
+        self.extract_candidates(doc, min_len, lemmer, **kwargs)
         candidates = doc.candidate_set
         positions = doc.candidate_positions
 
