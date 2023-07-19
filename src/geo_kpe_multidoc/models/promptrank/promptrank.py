@@ -387,7 +387,7 @@ class PromptRank(BaseKPModel):
 
             num_e += len(top_k)
             # num_s += len(labels[i])
-            num_s += len(labels)
+            num_s += len(labels_stemmed)
 
         results = {
             "Precision": 0.0,
