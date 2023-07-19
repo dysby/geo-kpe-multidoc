@@ -122,7 +122,10 @@ class MeanRank(Ranker):
         score_per_document.index = candidates_embeddings.index
         score_per_document.columns = documents_embeddings.index
 
-        top_n_scores = score_per_document.mean(axis=1).sort_values(ascending=False)
+        top_n_scores = list(
+            score_per_document.mean(axis=1).sort_values(ascending=False).items()
+        )
+
         return (
             documents_embeddings,
             candidates_embeddings,
