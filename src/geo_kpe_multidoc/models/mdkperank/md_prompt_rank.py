@@ -1,12 +1,11 @@
 from operator import itemgetter
-from typing import Callable, List, Optional, Tuple
+from typing import Callable, List, Optional
 
 from numpy import mean
 
 from geo_kpe_multidoc.document import Document
 from geo_kpe_multidoc.models import BaseKPModel
-from geo_kpe_multidoc.models.mdkperank.mdkperank_model import MDKPERankOutput
-from geo_kpe_multidoc.models.mdkperank.mdkperank_strategy import STRATEGIES
+from geo_kpe_multidoc.models.mdkperank.mdkperank_model import MdKPEOutput
 from geo_kpe_multidoc.models.promptrank.promptrank import PromptRank
 
 
@@ -28,7 +27,7 @@ class MdPromptRank(BaseKPModel):
         stemming: bool = False,
         lemmer: Optional[Callable] = None,
         **kwargs,
-    ) -> MDKPERankOutput:
+    ) -> MdKPEOutput:
         """
         Extract keyphrases from list of documents
 
@@ -90,10 +89,10 @@ class MdPromptRank(BaseKPModel):
         )
         candidates, _ = list(zip(*top_n_scores))
 
-        return (
-            top_n_scores,
-            candidates,
-            candidate_document_matrix,
+        return MdKPEOutput(
+            top_n_scores=top_n_scores,
+            candidates=candidates,
+            candidate_document_matrix=candidate_document_matrix,
             # keyphrase_coordinates,
-            ranking_p_doc,
+            ranking_p_doc=ranking_p_doc,
         )

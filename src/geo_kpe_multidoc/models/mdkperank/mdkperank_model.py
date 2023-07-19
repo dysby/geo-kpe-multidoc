@@ -1,6 +1,6 @@
-from collections import namedtuple
 from dataclasses import dataclass
 from itertools import chain
+from operator import itemgetter
 from statistics import mean
 from typing import Callable, Dict, Iterable, List, Tuple
 
@@ -17,21 +17,13 @@ from ..embedrank import EmbedRank
 
 
 @dataclass
-class KpeModelScores:
-    candidates: List[str]
-    scores: List[float]
-
-    def __len__(self):
-        return len(self.candidates)
-
-    def __getitem__(self, index):
-        return self.candidates[index], self.scores[index]
-
-
-MDKPERankOutput = namedtuple(
-    "MDKPERankOutput",
-    "top_n_scores candidate_document_matrix documents_embeddings candidate_embeddings",
-)
+class MdKPEOutput:
+    top_n_scores: List = None
+    candidates: List[str] = None
+    candidate_document_matrix: pd.DataFrame = None
+    documents_embeddings: pd.DataFrame = None
+    candidate_embeddings: pd.DataFrame = None
+    ranking_p_doc: Dict[str, Tuple[List[Tuple[str, float]], List[str]]] = None
 
 
 class MDKPERank(BaseKPModel):
@@ -101,7 +93,7 @@ class MDKPERank(BaseKPModel):
         stemming: bool = False,
         lemmatize: bool = False,
         **kwargs,
-    ) -> List[KPEScore]:
+    ) -> MdKPEOutput:
         """
         Extract keyphrases from list of documents.
 
@@ -155,7 +147,7 @@ class MDKPERank(BaseKPModel):
         candidates = sorted(candidates.keys())
 
         # compute a candidate <- document score matrix
-        ranking_p_doc: Dict[Tuple[List[Tuple[str, float]], List[str]]] = {
+        ranking_p_doc: Dict[str, Tuple[List[Tuple[str, float]], List[str]]] = {
             doc.id: self.base_model_embed._rank_candidates(
                 doc.doc_embed, candidates_embeddings, candidates
             )
@@ -195,19 +187,18 @@ class MDKPERank(BaseKPModel):
 
         # Semantic score of per document extracted keyphrases for each document
         # d Documents times k_d Keyphrases, each document can have a different set of extracted keyphrases.
-        ranking_p_doc: Dict[Tuple[List[Tuple[str, float]], List[str]]] = {
+        ranking_p_doc: Dict[str, Tuple[List[Tuple[str, float]], List[str]]] = {
             doc.id: self.base_model_embed.rank_candidates(
                 doc.doc_embed, doc_cand_embeds, doc_cand_set
             )
             for doc, doc_cand_embeds, doc_cand_set in topic_res
         }
 
-        return (
-            top_n_scores,
-            candidates,
-            candidate_document_matrix,
-            # keyphrase_coordinates,
-            ranking_p_doc,
+        return MdKPEOutput(
+            top_n_scores=top_n_scores,
+            candidates=candidates,
+            candidate_document_matrix=candidate_document_matrix,
+            ranking_p_doc=ranking_p_doc,
         )
 
     def extract_from_topic_original(
@@ -280,7 +271,7 @@ class MDKPERank(BaseKPModel):
         scores = sorted(
             [(cand, scores_per_candidate[cand]) for cand in scores_per_candidate],
             reverse=True,
-            key=lambda x: x[1],
+            key=itemgetter(1),
         )
         cand_set = [cand[0] for cand in scores]
 
@@ -294,7 +285,7 @@ class MDKPERank(BaseKPModel):
         stemming: bool = False,
         lemmatize: bool = False,
         **kwargs,
-    ) -> MDKPERankOutput:
+    ) -> MdKPEOutput:
         """
         Extract keyphrases from list of documents
 
@@ -325,12 +316,11 @@ class MDKPERank(BaseKPModel):
             top_n_scores,
         ) = self.ranking_strategy(topic_res)
 
-        return MDKPERankOutput(
-            top_n_scores,
-            # score_per_document,
-            candidate_document_matrix,
-            documents_embeddings,
-            candidate_embeddings,
+        return MdKPEOutput(
+            top_n_scores=top_n_scores,
+            candidate_document_matrix=candidate_document_matrix,
+            documents_embeddings=documents_embeddings,
+            candidate_embeddings=candidate_embeddings,
         )
 
     def _rank_by_geo(
@@ -385,7 +375,7 @@ class MDKPERank(BaseKPModel):
         return sorted(
             [(cand, score) for cand, score in items],
             reverse=True,
-            key=lambda x: x[1],  # sort by score
+            key=itemgetter(1),  # sort by score
         )
 
     def _score_w_geo_association_I(S, N, I, lambda_=0.5, gamma=0.5):

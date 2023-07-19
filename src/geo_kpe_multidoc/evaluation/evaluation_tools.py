@@ -18,6 +18,8 @@ from geo_kpe_multidoc.document import Document
 from geo_kpe_multidoc.evaluation.metrics import MAP, f1_score, nDCG, precision, recall
 from geo_kpe_multidoc.models import EmbedRank, MaskRank, MDKPERank
 from geo_kpe_multidoc.models.embedrank.longembedrank import LongEmbedRank
+from geo_kpe_multidoc.models.mdkperank.md_prompt_rank import MdPromptRank
+from geo_kpe_multidoc.models.mdkperank.mdkperank_model import MdKPEOutput
 from geo_kpe_multidoc.models.pre_processing.pre_processing_utils import (
     remove_hyphens_and_dots,
 )
@@ -463,7 +465,7 @@ def extract_keyphrases_docs(
 
 def extract_keyphrases_topics(
     dataset: KPEDataset,
-    model: MDKPERank,
+    model: Union[MDKPERank, MdPromptRank],
     top_n=-1,
     min_len=0,
     lemmer=None,
@@ -488,13 +490,7 @@ def extract_keyphrases_topics(
 
     for i, (topic_id, docs, gold_kp) in enumerate(tqdm(loader, total=n_docs_limit)):
         logger.info(f"KPE for topic {topic_id}")
-        (
-            top_n_scores,
-            # score_per_document,
-            candidate_document_matrix,
-            documents_embeddings,
-            candidate_embeddings,
-        ) = model.extract_kp_from_topic(
+        outputs: MdKPEOutput = model.extract_kp_from_topic(
             # top_n_and_scores, candidates = model.extract_kp_from_topic(
             # top_n_and_scores, candidates = model.extract_kp_geo(
             # TODO: ***Warning*** this is only true for MultiDocument Dataset!
@@ -515,9 +511,9 @@ def extract_keyphrases_topics(
         )
 
         # candidates = candidate_embeddings.index.tolist()
-        candidates, _ = list(zip(*top_n_scores))
+        candidates, _ = list(zip(*outputs.top_n_scores))
 
-        model_results[dataset.name].append((top_n_scores, candidates))
+        model_results[dataset.name].append((outputs.top_n_scores, candidates))
 
         # if len(preprocessing) > 0:
         #     processed_gold_kp = []
@@ -546,11 +542,12 @@ def extract_keyphrases_topics(
                 {
                     "dataset": dataset.name,
                     "topic": topic_id,
-                    "top_n_scores": top_n_scores,
-                    "candidate_document_matrix": candidate_document_matrix,
+                    "top_n_scores": outputs.top_n_scores,
+                    "candidate_document_matrix": outputs.candidate_document_matrix,
                     "gold_kp": gold_kp,
-                    "documents_embeddings": documents_embeddings,
-                    "candidate_embeddings": candidate_embeddings,
+                    "documents_embeddings": outputs.documents_embeddings,
+                    "candidate_embeddings": outputs.candidate_embeddings,
+                    "ranking_p_doc": outputs.ranking_p_doc,
                 },
                 filename,
             )

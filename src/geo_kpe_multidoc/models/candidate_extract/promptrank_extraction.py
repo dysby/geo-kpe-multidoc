@@ -2,7 +2,6 @@ import re
 from typing import List, Tuple
 
 import nltk
-from loguru import logger
 from nltk import RegexpParser
 from nltk.corpus import stopwords
 
@@ -57,7 +56,7 @@ class PromptRankKPECandidateExtractionModel:
         return self._extract_candidates(doc, min_len, grammar, lemmer_lang, **kwargs)
 
     def _pos_tag_doc(self, doc: Document, **kwargs) -> None:
-        considered_tags = {"NN", "NNS", "NNP", "NNPS", "JJ"}
+        # considered_tags = {"NN", "NNS", "NNP", "NNPS", "JJ"}
 
         tokens = []
 
