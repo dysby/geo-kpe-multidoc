@@ -134,13 +134,20 @@ def lemmatize(text: Union[str, List], lang: str) -> Union[str, List]:
     if isinstance(text, List):
         return [
             " ".join(
-                [simplemma.lemmatize(w, lang, greedy=True) for w in line.split()]
+                [
+                    simplemma.lemmatize(w, lang)
+                    for w in remove_hyphens_and_dots(line).split()
+                ]
             ).lower()
             for line in text
         ]
-    return " ".join(
-        [simplemma.lemmatize(w, lang, greedy=True) for w in text.split()]
-    ).lower()
+    else:
+        return " ".join(
+            [
+                simplemma.lemmatize(w, lang)
+                for w in remove_hyphens_and_dots(text).split()
+            ]
+        ).lower()
 
 
 def select_stemmer(lang: str = "en") -> StemmerI:
