@@ -16,6 +16,9 @@ from geo_kpe_multidoc.datasets.promptrank_datasets import PromptRankDataset
 from geo_kpe_multidoc.document import Document
 from geo_kpe_multidoc.models.base_KP_model import BaseKPModel
 from geo_kpe_multidoc.models.candidate_extract.candidate_extract_bridge import (
+    KPECandidateExtractionModel as BridgeKPECandidateExtractionModel,
+)
+from geo_kpe_multidoc.models.candidate_extract.candidate_extract_model import (
     KPECandidateExtractionModel,
 )
 from geo_kpe_multidoc.models.candidate_extract.promptrank_extraction import (
@@ -56,10 +59,21 @@ class PromptRank(BaseKPModel):
             self.__class__.__name__, re.sub("[-/]", "_", model_name)
         )
 
-        self.candidate_selection_model = PromptRankKPECandidateExtractionModel(
-            tagger=tagger, **kwargs
+        extraction_variant = kwargs.get("extraction_variant", "promptrank")
+        if extraction_variant == "promptrank":
+            self.candidate_selection_model = PromptRankKPECandidateExtractionModel(
+                tagger=tagger, **kwargs
+            )
+        elif extraction_variant == "brigde":
+            self.candidate_selection_model = BridgeKPECandidateExtractionModel(
+                tagger=tagger
+            )
+        else:
+            self.candidate_selection_model = KPECandidateExtractionModel(tagger=tagger)
+
+        logger.info(
+            f"PromptRank model w/ {self.candidate_selection_model.__class__.__name__}"
         )
-        # self.candidate_selection_model = KPECandidateExtractionModel(tagger=tagger)
 
         self.max_len = kwargs.get("max_len", 512)
         self.temp_en = kwargs.get("temp_en", "Book:")
@@ -312,22 +326,22 @@ class PromptRank(BaseKPModel):
             )
         return doc_candidate_input_features
 
-    def _evaluate(self, dataset_top_k, dataset_labels):
+    def _evaluate(self, dataset_top_k, dataset_labels_stemmed):
         num_c = num_c_5 = num_c_10 = num_c_15 = 0
         num_e = num_e_5 = num_e_10 = num_e_15 = 0
         num_s = 0
 
-        for top_k, labels in zip(dataset_top_k, dataset_labels):
+        for top_k, labels_stemmed in zip(dataset_top_k, dataset_labels_stemmed):
             candidates_dedup = list(dict.fromkeys(map(str.lower, top_k)))
             # logger.debug("Sorted_Candidate: {} \n".format(top_k))
             # logger.debug("Candidates_Dedup: {} \n".format(candidates_dedup))
 
             # Get stemmed labels and document segments
-            labels_stemed = []
-            for label in labels:
-                tokens = label.split()
-                if len(tokens) > 0:
-                    labels_stemed.append(" ".join(self.stemmer.stem(t) for t in tokens))
+            # labels_stemed = []
+            # for label in labels:
+            #     tokens = label.split()
+            #     if len(tokens) > 0:
+            #         labels_stemed.append(" ".join(self.stemmer.stem(t) for t in tokens))
 
             j = 0
             Matched = candidates_dedup[:15]
@@ -335,7 +349,7 @@ class PromptRank(BaseKPModel):
                 tokens = temp.split()
                 tt = " ".join(self.stemmer.stem(t) for t in tokens)
                 # if tt in labels_stemed[i] or temp in labels[i]:
-                if tt in labels_stemed or temp in labels:
+                if tt in labels_stemmed:  # or temp in labels:
                     Matched[id] = [temp]
                     if j < 5:
                         num_c_5 += 1

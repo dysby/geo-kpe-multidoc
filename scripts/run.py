@@ -7,12 +7,6 @@ from os import path
 from time import time
 
 import pandas as pd
-from loguru import logger
-from matplotlib import pyplot as plt
-from pandas import DataFrame
-from tabulate import tabulate
-
-import wandb
 from geo_kpe_multidoc import GEO_KPE_MULTIDOC_OUTPUT_PATH
 from geo_kpe_multidoc.datasets.datasets import DATASETS, load_dataset
 from geo_kpe_multidoc.evaluation.evaluation_tools import (
@@ -38,6 +32,12 @@ from geo_kpe_multidoc.models.pre_processing.pre_processing_utils import (
     select_stemmer,
 )
 from geo_kpe_multidoc.models.promptrank.promptrank import PromptRank
+from loguru import logger
+from matplotlib import pyplot as plt
+from pandas import DataFrame
+from tabulate import tabulate
+
+import wandb
 
 
 def parse_args():
@@ -328,11 +328,11 @@ def main():
 
     options = _args_to_options(args)
 
-    data = load_dataset(ds_name, datasource=args.dataset_source)
+    dataset = load_dataset(ds_name, datasource=args.dataset_source)
 
     logger.info(f"Args: {args}")
     logger.info("Start Testing ...")
-    logger.info(f"KP extraction for {len(data)} examples.")
+    logger.info(f"KP extraction for {len(dataset)} examples.")
     logger.info(f"Options: {options}")
 
     n_docs_limit = args.doc_name if args.doc_name else args.doc_limit
@@ -357,7 +357,7 @@ def main():
         #     mlflow.log_param(parameter, value)
 
         model_results, true_labels = extract_eval(
-            data,
+            dataset,
             kpe_model,
             top_n=args.top_n,
             lemmer=lemmer,
@@ -388,7 +388,7 @@ def main():
             #     true_labels, stemmer, lemmer, options.get("preprocessing", [])
             # )
 
-        kpe_for_doc = output_one_top_cands(data.ids, model_results, true_labels)
+        kpe_for_doc = output_one_top_cands(dataset.ids, model_results, true_labels)
 
         dataset_kpe = model_scores_to_dataframe(model_results, true_labels)
 
