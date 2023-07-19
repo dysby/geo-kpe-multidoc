@@ -7,6 +7,12 @@ from os import path
 from time import time
 
 import pandas as pd
+from loguru import logger
+from matplotlib import pyplot as plt
+from pandas import DataFrame
+from tabulate import tabulate
+
+import wandb
 from geo_kpe_multidoc import GEO_KPE_MULTIDOC_OUTPUT_PATH
 from geo_kpe_multidoc.datasets.datasets import DATASETS, load_dataset
 from geo_kpe_multidoc.evaluation.evaluation_tools import (
@@ -25,19 +31,13 @@ from geo_kpe_multidoc.evaluation.report import (
 from geo_kpe_multidoc.models import MDKPERank
 from geo_kpe_multidoc.models.factory import kpe_model_factory
 from geo_kpe_multidoc.models.maskrank.maskrank_model import MaskRank
-from geo_kpe_multidoc.models.mdkperank.md_prompt_rank import MdPromptRank
+from geo_kpe_multidoc.models.mdkperank.mdpromptrank import MdPromptRank
 from geo_kpe_multidoc.models.pre_processing.pre_processing_utils import (
     remove_new_lines_and_tabs,
     remove_whitespaces,
     select_stemmer,
 )
 from geo_kpe_multidoc.models.promptrank.promptrank import PromptRank
-from loguru import logger
-from matplotlib import pyplot as plt
-from pandas import DataFrame
-from tabulate import tabulate
-
-import wandb
 
 
 def parse_args():

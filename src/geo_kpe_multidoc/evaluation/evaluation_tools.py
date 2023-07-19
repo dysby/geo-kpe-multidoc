@@ -18,8 +18,8 @@ from geo_kpe_multidoc.document import Document
 from geo_kpe_multidoc.evaluation.metrics import MAP, f1_score, nDCG, precision, recall
 from geo_kpe_multidoc.models import EmbedRank, MaskRank, MDKPERank
 from geo_kpe_multidoc.models.embedrank.longembedrank import LongEmbedRank
-from geo_kpe_multidoc.models.mdkperank.md_prompt_rank import MdPromptRank
 from geo_kpe_multidoc.models.mdkperank.mdkperank_model import MdKPEOutput
+from geo_kpe_multidoc.models.mdkperank.mdpromptrank import MdPromptRank
 from geo_kpe_multidoc.models.pre_processing.pre_processing_utils import (
     remove_hyphens_and_dots,
 )
@@ -547,7 +547,7 @@ def extract_keyphrases_topics(
                     "gold_kp": gold_kp,
                     "documents_embeddings": outputs.documents_embeddings,
                     "candidate_embeddings": outputs.candidate_embeddings,
-                    "ranking_p_doc": outputs.ranking_p_doc,
+                    "score_per_document": outputs.ranking_p_doc,
                 },
                 filename,
             )
