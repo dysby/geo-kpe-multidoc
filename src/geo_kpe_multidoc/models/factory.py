@@ -184,6 +184,7 @@ def kpe_model_factory(args, BACKEND_MODEL_NAME, TAGGER_NAME) -> BaseKPModel:
             kpe_model = MDKPERank(
                 generateLongformerRanker(LongEmbedRank, base_name, TAGGER_NAME, args),
                 rank_strategy=args.md_strategy,
+                **vars(args),
             )
         else:
             ranker = EmbedRank(
@@ -191,7 +192,7 @@ def kpe_model_factory(args, BACKEND_MODEL_NAME, TAGGER_NAME) -> BaseKPModel:
                 TAGGER_NAME,
                 candidate_embedding_strategy=args.candidate_mode,
             )
-            kpe_model = MDKPERank(ranker, rank_strategy=args.md_strategy)
+            kpe_model = MDKPERank(ranker, rank_strategy=args.md_strategy, **vars(args))
     elif args.rank_model == "MdPromptRank":
         base_model = PromptRank(BACKEND_MODEL_NAME, TAGGER_NAME, **vars(args))
         kpe_model = MdPromptRank(base_model)
