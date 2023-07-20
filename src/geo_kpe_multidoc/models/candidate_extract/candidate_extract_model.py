@@ -3,7 +3,6 @@ from pathlib import Path
 from typing import Callable, List, Tuple
 
 import joblib
-import tqdm
 from loguru import logger
 from nltk import RegexpParser
 
@@ -15,33 +14,6 @@ from geo_kpe_multidoc.models.pre_processing.pre_processing_utils import (
     remove_hyphens_and_dots,
     remove_whitespaces,
 )
-
-
-def extract_kp_from_doc(
-    extractor, doc, top_n, min_len, stemming, **kwargs
-) -> Tuple[List[Tuple], List[str]]:
-    """
-    Concrete method that extracts key-phrases from a given document, with optional arguments
-    relevant to its specific functionality
-    """
-
-    tagged_doc = extractor.pos_tag_doc(doc, **kwargs)
-    candidate_list = extractor.extract_candidates(tagged_doc, **kwargs)
-    print("doc finished\n")
-    return ([], candidate_list)
-
-
-def extract_kp_from_corpus(
-    extractor, corpus, top_n=5, min_len=0, stemming=False, **kwargs
-) -> List[List[Tuple]]:
-    """
-    Concrete method that extracts key-phrases from a list of given documents, with optional arguments
-    relevant to its specific functionality
-    """
-    return [
-        extractor.extract_kp_from_doc(doc[0], top_n, min_len, stemming, **kwargs)
-        for doc in tqdm(corpus)
-    ]
 
 
 class KPECandidateExtractionModel:
@@ -172,7 +144,8 @@ class KPECandidateExtractionModel:
         for tree in np_trees:
             temp_cand_positions = []
             temp_cand_set = []
-            for subtree in tree.subtrees(filter=lambda t: t.label() == "NP"):
+            # for subtree in tree.subtrees(filter=lambda t: t.label() == "NP"):
+            for subtree in tree.subtrees():
                 if subtree.label() == "NP":
                     new_cand = " ".join(word for word, tag in subtree.leaves())
                     new_cand_position = (start, start + len(subtree.leaves()))
