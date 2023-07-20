@@ -73,7 +73,16 @@ class MdPromptRank(BaseKPModel):
         ranking_p_doc = {}
         scores_for_candidate = {}
         for doc in topic_docs:
-            # top_candidates_n_scores, candidates
+            # append  missing candidates to check with doc
+            missing = list(topic_candidates - doc.candidate_set)
+            missing_position = [
+                (self.base_model.max_len, self.base_model.max_len)
+                for _ in range(len(missing))
+            ]
+
+            doc.candidate_set.extend(missing)
+            doc.candidate_positions.extend(missing_position)
+
             ranking_p_doc[doc.id] = self.base_model.top_n_candidates(
                 doc, doc.candidate_set, doc.candidate_positions, **kwargs
             )
