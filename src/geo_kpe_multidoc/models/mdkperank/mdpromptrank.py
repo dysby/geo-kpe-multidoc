@@ -1,7 +1,8 @@
 from operator import itemgetter
 from typing import Callable, List, Optional
 
-from numpy import mean
+import numpy as np
+import pandas as pd
 
 from geo_kpe_multidoc.document import Document
 from geo_kpe_multidoc.models import BaseKPModel
@@ -46,22 +47,27 @@ class MdPromptRank(BaseKPModel):
 
         topic_candidates = set()
         candidate_document_matrix = {}
+        doc_ids = set()
         for doc in topic_docs:
+            doc_ids.add(doc.id)
             doc_candidates, _ = self.base_model.extract_candidates(
                 doc, min_len, lemmer=None, **kwargs
             )
             topic_candidates.update(doc_candidates)
             for candidate in doc_candidates:
-                candidate_document_matrix.setdefault(candidate, set()).add(doc.id)
+                candidate_document_matrix.setdefault(candidate, []).append(doc.id)
 
-        for doc in topic_docs:
-            for out_candidate in topic_candidates.difference(set(doc.candidate_set)):
-                doc.candidate_set.append(out_candidate)
-                # TODO: Multi-document PromptRank, how to set candidate position?
-                # set position to last token of the document
-                doc.candidate_positions.append(
-                    (self.base_model.max_len, self.base_model.max_len)
-                )
+        # TODO: refactor out candidate_document_matrix to pd.DataFrame
+        df = (
+            pd.DataFrame.reindex(index=topic_candidates, columns=doc_ids)
+            .fillna(0)
+            .astype(int)
+        )
+        for cand, docs in candidate_document_matrix.items():
+            for doc in docs:
+                df.loc[cand, doc] += 1
+
+        candidate_document_matrix = df
 
         ranking_p_doc = {}
         scores_for_candidate = {}
@@ -76,7 +82,7 @@ class MdPromptRank(BaseKPModel):
 
         top_n_scores = sorted(
             [
-                (candidate, mean(scores))
+                (candidate, np.mean(scores))
                 for candidate, scores in scores_for_candidate.items()
             ],
             key=itemgetter(1),

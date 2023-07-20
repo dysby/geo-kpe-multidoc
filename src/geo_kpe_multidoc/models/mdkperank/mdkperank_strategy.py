@@ -191,6 +191,10 @@ class MrrRank(Ranker):
 class MmrRank(Ranker):
     # TODO: Maximal Marginal Relevance in Multidoc (query is mean of document embeddings)
     # Based on KeyBERT implementation
+
+    def __init__(self, **kwargs) -> None:
+        self.diversity = kwargs.get("mmr_diversity", 0.5)
+
     def _rank(
         self,
         candidates_embeddings: pd.DataFrame,
@@ -199,7 +203,6 @@ class MmrRank(Ranker):
         *args,
         **kwargs,
     ):
-        diversity = kwargs.get("mmr_diversity", 0.5)
         # document centroid
         documents_centroid = documents_embeddings.mean(axis=0).to_numpy().reshape(1, -1)
 
@@ -208,7 +211,7 @@ class MmrRank(Ranker):
             candidates_embeddings,
             candidates_embeddings.index,
             top_n=len(candidates_embeddings),
-            diversity=diversity,
+            diversity=self.diversity,
         )
         # candidate to document similarity
         # candidate to candidate similarity
