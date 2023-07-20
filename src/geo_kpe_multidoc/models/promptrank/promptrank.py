@@ -140,7 +140,8 @@ class PromptRank(BaseKPModel):
         dataloader = DataLoader(dataset, batch_size=self.batch_size)
 
         for id, (en_input_ids, en_input_mask, de_input_ids, dic) in enumerate(
-            tqdm(dataloader, desc=f"Evaluating {doc.id}")
+            dataloader
+            # tqdm(dataloader, desc=f"Evaluating {doc.id}")
         ):
             en_input_ids = en_input_ids.to(self.device)
             en_input_mask = en_input_mask.to(self.device)
