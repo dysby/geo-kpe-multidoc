@@ -51,7 +51,7 @@ class MdPromptRank(BaseKPModel):
         for doc in topic_docs:
             doc_ids.add(doc.id)
             doc_candidates, _ = self.base_model.extract_candidates(
-                doc, min_len, lemmer=None, **kwargs
+                doc, min_len, lemmer=lemmer, **kwargs
             )
             topic_candidates.update(doc_candidates)
             for candidate in doc_candidates:
@@ -59,7 +59,8 @@ class MdPromptRank(BaseKPModel):
 
         # TODO: refactor out candidate_document_matrix to pd.DataFrame
         df = (
-            pd.DataFrame.reindex(index=topic_candidates, columns=doc_ids)
+            pd.DataFrame()
+            .reindex(index=topic_candidates, columns=doc_ids)
             .fillna(0)
             .astype(int)
         )

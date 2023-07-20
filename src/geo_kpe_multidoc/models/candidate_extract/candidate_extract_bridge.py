@@ -6,7 +6,6 @@ from typing import Callable, List, Tuple
 
 import joblib
 import nltk
-import tqdm
 from loguru import logger
 from nltk import RegexpParser
 
@@ -20,7 +19,7 @@ from geo_kpe_multidoc.models.pre_processing.pre_processing_utils import (
 )
 
 
-class KPECandidateExtractionModel:
+class BridgeKPECandidateExtractionModel:
     """
     Keyphrase Candidate identification by grammar pos tag parsing
 

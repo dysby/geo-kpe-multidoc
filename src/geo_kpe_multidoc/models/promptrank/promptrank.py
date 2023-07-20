@@ -16,7 +16,7 @@ from geo_kpe_multidoc.datasets.promptrank_datasets import PromptRankDataset
 from geo_kpe_multidoc.document import Document
 from geo_kpe_multidoc.models.base_KP_model import BaseKPModel
 from geo_kpe_multidoc.models.candidate_extract.candidate_extract_bridge import (
-    KPECandidateExtractionModel as BridgeKPECandidateExtractionModel,
+    BridgeKPECandidateExtractionModel,
 )
 from geo_kpe_multidoc.models.candidate_extract.candidate_extract_model import (
     KPECandidateExtractionModel,
@@ -64,7 +64,7 @@ class PromptRank(BaseKPModel):
             self.candidate_selection_model = PromptRankKPECandidateExtractionModel(
                 tagger=tagger, **kwargs
             )
-        elif extraction_variant == "brigde":
+        elif extraction_variant == "bridge":
             self.candidate_selection_model = BridgeKPECandidateExtractionModel(
                 tagger=tagger
             )
