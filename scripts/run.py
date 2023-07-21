@@ -7,12 +7,6 @@ from os import path
 from time import time
 
 import pandas as pd
-from loguru import logger
-from matplotlib import pyplot as plt
-from pandas import DataFrame
-from tabulate import tabulate
-
-import wandb
 from geo_kpe_multidoc import GEO_KPE_MULTIDOC_OUTPUT_PATH
 from geo_kpe_multidoc.datasets.datasets import DATASETS, load_dataset
 from geo_kpe_multidoc.evaluation.evaluation_tools import (
@@ -21,7 +15,6 @@ from geo_kpe_multidoc.evaluation.evaluation_tools import (
     extract_keyphrases_docs,
     extract_keyphrases_topics,
     model_scores_to_dataframe,
-    postprocess_dataset_labels,
     postprocess_model_outputs,
 )
 from geo_kpe_multidoc.evaluation.report import (
@@ -38,6 +31,11 @@ from geo_kpe_multidoc.models.pre_processing.pre_processing_utils import (
     select_stemmer,
 )
 from geo_kpe_multidoc.models.promptrank.promptrank import PromptRank
+from loguru import logger
+from matplotlib import pyplot as plt
+from tabulate import tabulate
+
+import wandb
 
 
 def parse_args():
@@ -224,7 +222,9 @@ def parse_args():
     return parser.parse_args()
 
 
-def save(dataset_kpe: DataFrame, performance_metrics: DataFrame, fig: plt.Figure, args):
+def save(
+    dataset_kpe: pd.DataFrame, performance_metrics: pd.DataFrame, fig: plt.Figure, args
+):
     t = datetime.now().strftime(r"%Y%m%d-%H%M")
     filename = "-".join(["kpe", args.experiment_name, t]) + ".csv"
     dataset_kpe.to_csv(path.join(GEO_KPE_MULTIDOC_OUTPUT_PATH, filename))

@@ -208,6 +208,15 @@ def load_preprocessed(name, root_dir=GEO_KPE_MULTIDOC_DATA_PATH) -> KPEDataset:
     ) as f:
         docs_and_keys = pickle.load(f)
 
+    if name == "MKDUC01":
+        topics, topic_docs, topic_labels = list(zip(*docs_and_keys))
+
+        docs = [
+            [(i, translate_parentesis(doc)) for i, doc in enumerate(docs)]
+            for docs in topic_docs
+        ]
+        return KPEDataset(name, ids=topics, documents=docs, labels=topic_labels)
+
     if name in ("DUC", "Inspec", "SemEval2010"):
         with open(
             path.join(
@@ -222,7 +231,6 @@ def load_preprocessed(name, root_dir=GEO_KPE_MULTIDOC_DATA_PATH) -> KPEDataset:
         ids = list(range(len(docs_and_keys)))
 
     docs, labels = list(zip(*docs_and_keys))
-
     docs = [translate_parentesis(doc) for doc in docs]
 
     return KPEDataset(name, ids, docs, labels)
