@@ -20,6 +20,7 @@ from geo_kpe_multidoc.evaluation.evaluation_tools import (
 from geo_kpe_multidoc.evaluation.report import (
     output_one_top_cands,
     plot_score_distribuitions_with_gold,
+    table_latex,
 )
 from geo_kpe_multidoc.models import MDKPERank
 from geo_kpe_multidoc.models.factory import kpe_model_factory
@@ -245,6 +246,69 @@ def save(
     logger.info(f"Results saved in {filename}")
 
 
+def write_resume_txt(performance_metrics, args):
+    with open("runs.resume.txt", "a") as f:
+        stamp = datetime.now().strftime(r"%Y%m%d-%H%M")
+        print(f"Date: {stamp}", file=f)
+        print(f"Args: {args}", file=f)
+        print(
+            tabulate(
+                performance_metrics[
+                    [
+                        "Precision",
+                        "Recall",
+                        "F1",
+                        "MAP",
+                        "nDCG",
+                        "F1_5",
+                        "F1_10",
+                        "F1_15",
+                    ]
+                ],
+                headers="keys",
+                floatfmt=".2%",
+            ),
+            file=f,
+        )
+        print(
+            performance_metrics[
+                [
+                    "Precision",
+                    "Recall",
+                    "F1",
+                    "MAP",
+                    "nDCG",
+                    "F1_5",
+                    "F1_10",
+                    "F1_15",
+                ]
+            ],
+            file=f,
+        )
+
+    with open("runs.resume.latex.txt", "a") as f:
+        stamp = datetime.now().strftime(r"%Y%m%d-%H%M")
+        print(f"Date: {stamp}", file=f)
+        print(f"Args: {args}", file=f)
+        print(
+            table_latex(
+                performance_metrics[
+                    [
+                        "Recall",
+                        "nDCG",
+                        "F1_5",
+                        "F1_10",
+                        "F1_15",
+                    ]
+                ],
+                caption=str(args),
+                label=f"{args.experiment_name}-{stamp}".replace("_", " "),
+                percentage=True,
+            ),
+            file=f,
+        )
+
+
 def _args_to_options(args):
     options = dict()
 
@@ -378,7 +442,8 @@ def main():
                     dataset_top_k.append(top_k)
 
                 dataset_labels = dataset_true_labels
-                kpe_model._evaluate(dataset_top_k, dataset_labels)
+                # if no_stemming option is selected this will break
+                kpe_model._evaluate(dataset_top_k, dataset_labels, stemmer)
 
         if stemmer:
             model_results = postprocess_model_outputs(
@@ -440,29 +505,7 @@ def main():
         )
     )
 
-    with open("runs.resume.txt", "a") as f:
-        stamp = datetime.now().strftime(r"%Y%m%d-%H%M")
-        print(f"Date: {stamp}", file=f)
-        print(f"Args: {args}", file=f)
-        print(
-            tabulate(
-                performance_metrics[
-                    [
-                        "Precision",
-                        "Recall",
-                        "F1",
-                        "MAP",
-                        "nDCG",
-                        "F1_5",
-                        "F1_10",
-                        "F1_15",
-                    ]
-                ],
-                headers="keys",
-                floatfmt=".2%",
-            ),
-            file=f,
-        )
+    write_resume_txt(performance_metrics, args)
 
     save(dataset_kpe, performance_metrics, fig, args)
 

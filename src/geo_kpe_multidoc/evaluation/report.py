@@ -1,4 +1,5 @@
 import os
+import re
 from datetime import datetime
 from itertools import chain, zip_longest
 
@@ -159,18 +160,23 @@ def plot_non_versus_gold_density(
     plt.show()
 
 
-def print_latex(df, caption=None):
-    print(
-        df.style.format(precision=2, escape="latex")
-        .format_index(escape="latex")
-        .format_index(lambda s: s.replace("_", " ").capitalize(), axis=1)
-        .to_latex(
-            hrules=True,
-            environment="table",
-            position_float="centering",
-            # clines = "all;data",
-            caption=caption,
-        )
+def table_latex(df, caption=None, label=None, percentage=False):
+    s = df.style
+    if percentage:
+        s.format(":.2%")
+    else:
+        s.format(precision=3)
+
+    s.format_index(lambda s: re.sub("_(\d+)", r"_{\1}", s), axis=1)
+    return s.to_latex(
+        label=label,
+        caption=caption,
+        clines="skip-last;data",
+        # clines = "all;data",
+        convert_css=True,
+        position_float="centering",
+        multicol_align="|c|",
+        hrules=True,
     )
 
 

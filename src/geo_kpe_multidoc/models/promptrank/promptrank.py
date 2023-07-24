@@ -15,16 +15,14 @@ from transformers import T5ForConditionalGeneration, T5TokenizerFast
 from geo_kpe_multidoc.datasets.promptrank_datasets import PromptRankDataset
 from geo_kpe_multidoc.document import Document
 from geo_kpe_multidoc.models.base_KP_model import BaseKPModel
-from geo_kpe_multidoc.models.candidate_extract.candidate_extract_bridge import (
-    BridgeKPECandidateExtractionModel,
-)
-from geo_kpe_multidoc.models.candidate_extract.candidate_extract_model import (
-    KPECandidateExtractionModel,
-)
-from geo_kpe_multidoc.models.candidate_extract.promptrank_extraction import (
-    PromptRankKPECandidateExtractionModel,
-)
-from geo_kpe_multidoc.models.pre_processing.pre_processing_utils import select_stemmer
+from geo_kpe_multidoc.models.candidate_extract.candidate_extract_bridge import \
+    BridgeKPECandidateExtractionModel
+from geo_kpe_multidoc.models.candidate_extract.candidate_extract_model import \
+    KPECandidateExtractionModel
+from geo_kpe_multidoc.models.candidate_extract.promptrank_extraction import \
+    PromptRankKPECandidateExtractionModel
+from geo_kpe_multidoc.models.pre_processing.pre_processing_utils import \
+    select_stemmer
 
 
 def get_PRF(num_c, num_e, num_s):
@@ -104,8 +102,6 @@ class PromptRank(BaseKPModel):
         # DUC2001       0.4       0.89
         # NUS           0.2       0.89
         # Krapivin      0.5       0.89
-
-        self.stemmer = select_stemmer(kwargs.get("lang", "en"))
 
         # Dataloader
         self.num_workers = 1  # Not used, because of Tokenizer paralelism warning
@@ -330,7 +326,7 @@ class PromptRank(BaseKPModel):
             )
         return doc_candidate_input_features
 
-    def _evaluate(self, dataset_top_k, dataset_labels_stemmed):
+    def _evaluate(self, dataset_top_k, dataset_labels_stemmed, stemmer: StemmerI):
         num_c = num_c_5 = num_c_10 = num_c_15 = 0
         num_e = num_e_5 = num_e_10 = num_e_15 = 0
         num_s = 0
@@ -351,7 +347,7 @@ class PromptRank(BaseKPModel):
             Matched = candidates_dedup[:15]
             for id, temp in enumerate(candidates_dedup[:15]):
                 tokens = temp.split()
-                tt = " ".join(self.stemmer.stem(t) for t in tokens)
+                tt = " ".join(stemmer.stem(t) for t in tokens)
                 # if tt in labels_stemed[i] or temp in labels[i]:
                 if tt in labels_stemmed:  # or temp in labels:
                     Matched[id] = [temp]
