@@ -176,6 +176,9 @@ def parse_args():
         help="EmbedRank MMR diversity parameter value.",
     )
     parser.add_argument(
+        "--whitening", action="store_true", help="Apply whitening to the embeddings"
+    )
+    parser.add_argument(
         "--preprocessing",
         action="store_true",
         help="Preprocess text documents by removing pontuation",
@@ -255,10 +258,10 @@ def write_resume_txt(performance_metrics, args):
             tabulate(
                 performance_metrics[
                     [
-                        "Precision",
+                        # "Precision",
                         "Recall",
-                        "F1",
-                        "MAP",
+                        # "F1",
+                        # "MAP",
                         "nDCG",
                         "F1_5",
                         "F1_10",
@@ -268,21 +271,6 @@ def write_resume_txt(performance_metrics, args):
                 headers="keys",
                 floatfmt=".2%",
             ),
-            file=f,
-        )
-        print(
-            performance_metrics[
-                [
-                    "Precision",
-                    "Recall",
-                    "F1",
-                    "MAP",
-                    "nDCG",
-                    "F1_5",
-                    "F1_10",
-                    "F1_15",
-                ]
-            ],
             file=f,
         )
 
@@ -371,7 +359,7 @@ def main():
         args.tagger_name if args.tagger_name else DATASETS[ds_name].get("tagger")
     )
 
-    kpe_model = kpe_model_factory(args, BACKEND_MODEL_NAME, TAGGER_NAME)
+    kpe_model = kpe_model_factory(BACKEND_MODEL_NAME, TAGGER_NAME, **vars(args))
 
     if isinstance(kpe_model, (MDKPERank, MdPromptRank)):
         extract_eval = extract_keyphrases_topics

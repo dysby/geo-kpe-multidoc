@@ -23,6 +23,7 @@ from geo_kpe_multidoc.models.embedrank.embedding_strategy import (
     InContextEmbeddings,
 )
 from geo_kpe_multidoc.models.pre_processing.post_processing_utils import (
+    whitening_np,
     z_score_normalization,
 )
 from geo_kpe_multidoc.models.pre_processing.pre_processing_utils import tokenize_hf
@@ -47,6 +48,7 @@ class EmbedRank(BaseKPModel):
         tagger,
         pooling_strategy: str = "mean",
         candidate_embedding_strategy: str = "",
+        **kwargs,
     ):
         super().__init__(model, tagger)
         self.counter = 0
@@ -60,6 +62,8 @@ class EmbedRank(BaseKPModel):
         logger.info(
             f"Initialize EmbedRank w/ {self.candidate_embedding_strategy.__class__.__name__}"
         )
+
+        self.whitening = kwargs.get("whitening", False)
 
     def _embed_doc(
         self,
@@ -267,11 +271,19 @@ class EmbedRank(BaseKPModel):
         Here the ranking heuritic is applied according to model definition.
 
         EmbedRank selects the candidates that have more similarity to the document.
-        TODO: why does not have MMR? - copied mmr from top_n_candidates
         """
         mmr_mode = kwargs.get("mmr", False)
         mmr_diversity = kwargs.get("mmr_diversity", 0.8)
         top_n = len(candidate_set) if top_n == -1 else top_n
+
+        if self.whitening:
+            new_embedding = np.concatenate(
+                [candidate_set_embed, doc_embed.reshape(1, -1)]
+            )
+            whiten = whitening_np(new_embedding)
+
+            doc_embed = whiten[-1, :]
+            candidate_set_embed = whiten[:-1, :]
 
         doc_sim = []
         if mmr_mode:

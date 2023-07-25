@@ -163,7 +163,7 @@ def plot_non_versus_gold_density(
 def table_latex(df, caption=None, label=None, percentage=False):
     s = df.style
     if percentage:
-        s.format(":.2%")
+        s.format("{:.2%}")
     else:
         s.format(precision=3)
 

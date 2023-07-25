@@ -39,7 +39,7 @@ def whitening_torch(embeddings: torch.tensor) -> np.array:
     return np.array([embedding.detach().cpu().numpy() for embedding in embeddings])
 
 
-def whitening_np(embeddings: torch.tensor) -> np.array:
+def whitening_np(embeddings: np.array) -> np.array:
     vecs = embeddings
     mu = vecs.mean(axis=0, keepdims=True)
     cov = np.cov(vecs.T)

@@ -135,7 +135,7 @@ class MeanRank(Ranker):
 
 
 class MaxRank(Ranker):
-    """Compute the mean of keyphrase to documents similarity"""
+    """Each Candidate score is the maximum similarity to a single document in the multidocument set."""
 
     def _rank(
         self,
@@ -164,7 +164,10 @@ class MaxRank(Ranker):
 
 
 class MaxMaxRank(Ranker):
-    """Compute the mean of keyphrase to documents similarity"""
+    """Compute an alternative candidate embedding representation by Max pooling the
+    candidate contextualized embedding from each document. Set the candidate socre as
+    the maximum similarity to the  mean of keyphrase to documents similarity.
+    """
 
     def _extract_features(self, topic_extraction_features):
         documents_embeddings = {}

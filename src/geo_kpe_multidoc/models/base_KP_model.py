@@ -87,7 +87,7 @@ class BaseKPModel:
     Simple abstract class to encapsulate all KP models
     """
 
-    def __init__(self, model, tagger):
+    def __init__(self, model, tagger, **kwargs):
         if model != "":
             self.model = select_backend(model)
         self.name = "{}_{}".format(

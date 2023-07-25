@@ -1,7 +1,6 @@
 import re
 from typing import Callable, List, Optional, Tuple
 
-import joblib
 import numpy as np
 import pandas as pd
 import torch
@@ -9,20 +8,24 @@ from loguru import logger
 from nltk.stem import StemmerI
 from tabulate import tabulate
 from torch.utils.data import DataLoader
-from tqdm import tqdm
-from transformers import T5ForConditionalGeneration, T5TokenizerFast
+from transformers import (
+    LongT5ForConditionalGeneration,
+    T5ForConditionalGeneration,
+    T5TokenizerFast,
+)
 
 from geo_kpe_multidoc.datasets.promptrank_datasets import PromptRankDataset
 from geo_kpe_multidoc.document import Document
 from geo_kpe_multidoc.models.base_KP_model import BaseKPModel
-from geo_kpe_multidoc.models.candidate_extract.candidate_extract_bridge import \
-    BridgeKPECandidateExtractionModel
-from geo_kpe_multidoc.models.candidate_extract.candidate_extract_model import \
-    KPECandidateExtractionModel
-from geo_kpe_multidoc.models.candidate_extract.promptrank_extraction import \
-    PromptRankKPECandidateExtractionModel
-from geo_kpe_multidoc.models.pre_processing.pre_processing_utils import \
-    select_stemmer
+from geo_kpe_multidoc.models.candidate_extract.candidate_extract_bridge import (
+    BridgeKPECandidateExtractionModel,
+)
+from geo_kpe_multidoc.models.candidate_extract.candidate_extract_model import (
+    KPECandidateExtractionModel,
+)
+from geo_kpe_multidoc.models.candidate_extract.promptrank_extraction import (
+    PromptRankKPECandidateExtractionModel,
+)
 
 
 def get_PRF(num_c, num_e, num_s):
@@ -85,15 +88,22 @@ class PromptRank(BaseKPModel):
         self.length_factor = kwargs.get("length_factor", 0.6)
 
         self.device = "cuda" if torch.cuda.is_available() else "cpu"
-        self.model = T5ForConditionalGeneration.from_pretrained(model_name)
+
+        if "long" in model_name.lower():
+            self.model = LongT5ForConditionalGeneration.from_pretrained(model_name)
+            self.max_len = kwargs.get("max_len", 4096)
+        else:
+            self.model = T5ForConditionalGeneration.from_pretrained(model_name)
+        self.model.to(self.device)
+        self.model.eval()
+
         self.tokenizer = T5TokenizerFast.from_pretrained(
             model_name, model_max_length=self.max_len
         )
+
         self.template_len = (
             self.tokenizer(self.temp_de, return_tensors="pt")["input_ids"].shape[1] - 3
         )
-        self.model.to(self.device)
-        self.model.eval()
 
         # Dataset       \alpha  \gamma
         # Inspec        1         66.08

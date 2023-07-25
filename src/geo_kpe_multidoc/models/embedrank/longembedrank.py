@@ -43,6 +43,7 @@ class LongEmbedRank(EmbedRank):
         device=None,
         name="",
         candidate_embedding_strategy: str = "",
+        **kwargs,
     ):
         # TODO: init super class
         self.candidate_selection_model = KPECandidateExtractionModel(tagger=tagger)
@@ -85,6 +86,8 @@ class LongEmbedRank(EmbedRank):
         logger.info(
             f"Initialize EmbedRank w/ {self.candidate_embedding_strategy.__class__.__name__}"
         )
+
+        self.whitening = kwargs.get("whitening", False)
 
     def _embed_doc(
         self,
