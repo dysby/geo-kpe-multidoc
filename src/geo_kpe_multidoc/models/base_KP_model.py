@@ -42,13 +42,15 @@ def _search_mentions(model, candidate_mentions, token_ids):
         if isinstance(model, BaseEmbedder):
             # original tokenization by KeyBert/SentenceTransformer
             tokenized_candidate = tokenize_hf(mention, model)
+            model_special_ids = model.embedding_model.tokenizer.all_special_ids
         else:
             # tokenize via local SentenceEmbedder Class
             tokenized_candidate = model.tokenize(mention)
-
+            model_special_ids = model.tokenizer.all_special_ids
         # filt_ids = filter_special_tokens(tokenized_candidate["input_ids"])
         filt_ids = filter_tokenizer_special_tokens(
-            tokenized_candidate["input_ids"], model.tokenizer.all_special_ids
+            tokenized_candidate["input_ids"],
+            model_special_ids,
         )
 
         # Should not be Empty after filter
