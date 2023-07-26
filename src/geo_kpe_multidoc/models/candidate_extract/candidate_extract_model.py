@@ -30,7 +30,8 @@ class KPECandidateExtractionModel:
 
             SIFRank grammar '<NN.*|JJ>*<NN.*>'  ,  NN = NOUN, JJ = ADJ
 
-            Automatic Extraction of Relevant Keyphrases for the Study of Issue Competition
+            Automatic Extraction of Relevant Keyphrases for the Study of Issue
+            Competition
                 (<NOUN>+<ADJ>*<PREP>*)?<NOUN>+<ADJ>*
 
             UKE-CCRank
@@ -44,11 +45,14 @@ class KPECandidateExtractionModel:
                 GRAMMAR3 = NP:
                     {<NN.*|JJ|VBG|VBN>*<NN.*>}  # Adjective(s)(optional) + Noun(s)
 
-            HAKE: an Unsupervised Approach to Automatic Keyphrase Extraction for Multiple Domains
-                    {<NN | NNS | NNP | NNPS | VBN | JJ | JJS | RB>*<NN | NNS | NNP | NNPS | VBG>+}
-                    adverbial noun (tag RB) such as “double experience” (RB NN), and a verb in present participle (tag VBG) such as follows:
-                    “virtual desktop conferencing” (JJ NN VBG), where the VBG tag can be at the beginning, the middle,
-                    or at the end of the noun phrase.
+            HAKE: an Unsupervised Approach to Automatic Keyphrase Extraction for
+                Multiple Domains
+                {<NN | NNS | NNP | NNPS | VBN | JJ | JJS | RB>*<NN | NNS | NNP | NNPS | VBG>+}
+                adverbial noun (tag RB) such as “double experience” (RB NN), and a
+                verb in present participle (tag VBG) such as follows:
+                “virtual desktop conferencing” (JJ NN VBG), where the VBG tag can be at
+                the beginning, the middle,
+                or at the end of the noun phrase.
 
     """
 
@@ -72,7 +76,13 @@ class KPECandidateExtractionModel:
         grammar: str = None,
         lemmer_lang: str = None,
         **kwargs,
-    ):
+    ) -> Tuple[List[str], List[Tuple[int, int]]]:
+        """
+        Returns
+        -------
+        Tuple[List[str], List[Tuple[int, int]]]
+            List of candidate keyphrases and List of candidate positions (start, stop)
+        """
         return self._extract_candidates_simple(
             doc, min_len, grammar, lemmer_lang, **kwargs
         )
@@ -95,7 +105,8 @@ class KPECandidateExtractionModel:
         self, doc: str = "", stemming: bool = True, **kwargs
     ) -> List[List[Tuple]]:
         """
-        Method that handles POS_tagging of an entire document, pre-processing or stemming it in the process
+        Method that handles POS_tagging of an entire document, pre-processing or
+        stemming it in the process
         """
         tagged_doc = self.tagger.pos_tag_doc(doc)
         for sent in tagged_doc:
@@ -114,9 +125,10 @@ class KPECandidateExtractionModel:
         grammar: str = None,
         lemmer_lang: str = None,
         **kwargs,
-    ) -> List[str]:
+    ) -> Tuple[List[str], List[Tuple[int, int]]]:
         """
-        Method that uses Regex patterns on POS tags to extract unique candidates from a tagged document
+        Method that uses Regex patterns on POS tags to extract unique candidates
+        from a tagged document
         """
 
         cache_candidate_selection = kwargs.get("cache_candidate_selection", False)
@@ -177,7 +189,7 @@ class KPECandidateExtractionModel:
                 # for candidate in temp_cand_set:
                 # TODO: Remove min_len and max words
                 if len(candidate) > min_len:  # and len(candidate.split(" ")) <= 5:
-                    # TODO: 'we insurer':{'US INSURERS'} but 'eastern us': {'eastern US'} ...
+                    # TODO: 'we insurer':{'US INSURERS'} but 'eastern us':{'eastern US'}
                     # TODO: normalize hyphens and dots in candidate
                     l_candidate = (
                         lemmatize(
@@ -220,13 +232,10 @@ class KPECandidateExtractionModel:
         **kwargs,
     ):
         """
-        Method that uses Regex patterns on POS tags to extract unique candidates from a tagged document
-        and stores the sentences each candidate occurs in.
+        Uses Regex patterns on POS tags to extract unique candidates from
+        a tagged document and stores the sentences each candidate occurs in.
 
         len(candidate.split(" ")) <= 5 avoid too long candidate phrases
-
-
-
         Parameters
         ----------
                 min_len: minimum candidate length (chars)
@@ -246,8 +255,9 @@ class KPECandidateExtractionModel:
 
         # grammar by pos_ or by tag_?
         # here use use pos_, KeyphraseVectorizers use tag_
-        # A choice between using a coarse-grained tag set that is consistent across languages (.pos),
-        # or a fine-grained tag set (.tag) that is specific to a particular treebank, and hence a particular language.
+        # A choice between using a coarse-grained tag set that is consistent across
+        # languages (.pos), or a fine-grained tag set (.tag) that is specific to a
+        # particular treebank, and hence a particular language.
 
         np_trees = list(self.parser.parse_sents(doc.tagged_text))
 
@@ -257,13 +267,16 @@ class KPECandidateExtractionModel:
                 for subtree in tree.subtrees(filter=lambda t: t.label() == "NP")
             ]
 
-            # TODO: how to deal with `re-election campain`? join in line above will result in `re - election campain`.
-            #       Then the model will nevel find this candidate mentions because the original form is lost.
+            # TODO: how to deal with `re-election campain`? join in line above will
+            #       result in `re - election campain`. Then the model will nevel find
+            #       this candidate mentions because the original form is lost.
             #       This is a hack, to handle `-` and `.` in the middle of a candidate.
-            #       Check from `pos_tag_text_sents_words` where `-` are joined rto surrounding nouns.
+            #       Check from `pos_tag_text_sents_words` where `-` are joined to
+            #       surrounding nouns.
 
             for candidate in temp_cand_set:
-                # candidate max number of words is 5 because longer candidates may be overfitting
+                # candidate max number of words is 5 because longer candidates may
+                # be overfitting
                 # HACK: DEBUG
                 # if candidate in [
                 #     "cane crops",
@@ -278,7 +291,6 @@ class KPECandidateExtractionModel:
 
                 # TODO: Remove min_len and max words
                 if len(candidate) > min_len and len(candidate.split(" ")) <= 5:
-                    # TODO: 'we insurer':{'US INSURERS'} but 'eastern us': {'eastern US'} ...
                     l_candidate = (
                         lemmatize(candidate, lemmer_lang) if lemmer_lang else candidate
                     )
@@ -292,7 +304,8 @@ class KPECandidateExtractionModel:
 
     def __extract_candidates(self, doc: Document, **kwargs) -> List[str]:
         """
-        Method that uses Regex patterns on POS tags to extract unique candidates from a tagged document
+        Method that uses Regex patterns on POS tags to extract unique candidates from
+        a tagged document
         """
         use_cache = kwargs.get("pos_tag_memory", False)
         self._pos_tag_doc(
@@ -324,8 +337,8 @@ class KPECandidateExtractionModel:
         **kwargs,
     ):
         """
-        Method that uses Regex patterns on POS tags to extract unique candidates from a tagged document and
-        stores the sentences each candidate occurs in
+        Method that uses Regex patterns on POS tags to extract unique candidates
+        from a tagged document and stores the sentences each candidate occurs in
         """
         use_cache = kwargs.get("cache_pos_tags", False)
         if use_cache:

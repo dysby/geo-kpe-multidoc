@@ -185,6 +185,12 @@ def filter_special_tokens(input_ids: torch.Tensor) -> List[int]:
     return [i for i in input_ids.squeeze().tolist() if i not in SPECIAL_TOKEN_IDS]
 
 
+def filter_tokenizer_special_tokens(
+    input_ids: torch.Tensor, special_tokens: List[int]
+) -> List[int]:
+    return [i for i in input_ids.squeeze().tolist() if i not in special_tokens]
+
+
 def tokenize(text: str, model: BaseEmbedder) -> Tuple:
     tokenized = model.embedding_model.tokenizer(
         text, return_tensors="pt", return_attention_mask=True

@@ -176,6 +176,11 @@ def parse_args():
         help="EmbedRank MMR diversity parameter value.",
     )
     parser.add_argument(
+        "--add_query_prefix",
+        action="store_true",
+        help="Add support for e5 type models that require 'query: ' prefixed text",
+    )
+    parser.add_argument(
         "--whitening", action="store_true", help="Apply whitening to the embeddings"
     )
     parser.add_argument(
@@ -362,13 +367,11 @@ def main():
     kpe_model = kpe_model_factory(BACKEND_MODEL_NAME, TAGGER_NAME, **vars(args))
 
     if isinstance(kpe_model, (MDKPERank, MdPromptRank)):
-        extract_eval = extract_keyphrases_topics
+        extract_keyphases_pipeline = extract_keyphrases_topics
         if ds_name != "MKDUC01":
             logger.critical("Multi Document Ranking on single document dataset!")
-    elif isinstance(kpe_model, PromptRank):
-        extract_eval = extract_keyphrases_docs
     else:
-        extract_eval = extract_keyphrases_docs
+        extract_keyphases_pipeline = extract_keyphrases_docs
 
     stemmer = (
         None if args.no_stemming else select_stemmer(DATASETS[ds_name].get("language"))
@@ -392,23 +395,10 @@ def main():
     # -------------------------------------------------
     # --------------- Run Experiment ------------------
     # -------------------------------------------------
-    # mlflow.set_tracking_uri(
-    #     Path(GEO_KPE_MULTIDOC_OUTPUT_PATH).joinpath("mlruns").as_uri()
-    # )
-    # tags = {
-    #     "dataset": args.dataset_name,
-    #     "embed_model": args.embed_model,
-    #     "rank_model": args.rank_model,
-    # }
-
-    # with mlflow.start_run(run_name=args.experiment_name, tags=tags):
     with wandb.init(
         project="geo-kpe-multidoc", name=f"{args.experiment_name}", config=vars(args)
     ):
-        # for parameter, value in vars(args).items():
-        #     mlflow.log_param(parameter, value)
-
-        model_results, true_labels = extract_eval(
+        model_results, true_labels = extract_keyphases_pipeline(
             dataset,
             kpe_model,
             top_n=args.top_n,
@@ -437,10 +427,9 @@ def main():
             model_results = postprocess_model_outputs(
                 model_results, stemmer, lemmer, options.get("preprocessing", [])
             )
-            # true_labels = postprocess_dataset_labels(
-            #     true_labels, stemmer, lemmer, options.get("preprocessing", [])
-            # )
+            # True labels are preprocessed while loading Dataset.
 
+        # Print and Save Results
         kpe_for_doc = output_one_top_cands(dataset.ids, model_results, true_labels)
 
         dataset_kpe = model_scores_to_dataframe(model_results, true_labels)
@@ -486,7 +475,8 @@ def main():
     print(
         tabulate(
             performance_metrics[
-                ["Precision", "Recall", "F1", "MAP", "nDCG", "F1_5", "F1_10", "F1_15"]
+                # ["Precision", "Recall", "F1", "MAP", "nDCG", "F1_5", "F1_10", "F1_15"]
+                ["Recall", "nDCG", "F1_5", "F1_10", "F1_15"]
             ],
             headers="keys",
             floatfmt=".2%",

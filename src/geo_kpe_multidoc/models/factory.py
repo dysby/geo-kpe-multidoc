@@ -44,6 +44,7 @@ def generateLongformerRanker(
             tagger_model,
             device=device,
             name=backend_model_name.replace("/", "-"),
+            **kwargs,
         )
         return kpe_model
 
@@ -117,13 +118,16 @@ def generateBigBirdRanker(
         device=device,
         name=model_name,
         candidate_embedding_strategy=kwargs.get("candidate_mode"),
+        **kwargs,
     )
     return kpe_model
 
 
-def generateNystromformerRanker(backend_model_name, tagger_model, args):
+def generateNystromformerRanker(
+    backend_model_name, tagger_model, longformer_max_length, **kwargs
+):
     # Generate Nystromformer from Sentence Transformer
-    new_max_pos = args.longformer_max_length
+    new_max_pos = longformer_max_length
 
     base_name = backend_model_name.split("/")[-1]
 
@@ -143,7 +147,8 @@ def generateNystromformerRanker(backend_model_name, tagger_model, args):
         tagger_model,
         device=device,
         name=model_name,
-        candidate_embedding_strategy=args.candidate_mode,
+        candidate_embedding_strategy=kwargs.get("candidate_mode"),
+        **kwargs,
     )
     return kpe_model
 

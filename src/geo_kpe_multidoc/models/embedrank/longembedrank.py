@@ -86,7 +86,10 @@ class LongEmbedRank(EmbedRank):
         logger.info(
             f"Initialize EmbedRank w/ {self.candidate_embedding_strategy.__class__.__name__}"
         )
-
+        # TODO: Add support for e5 type models that require "query: " prefixed text.
+        self.add_query_prefix = (
+            "query: " if kwargs.get("add_query_prefix", False) else ""
+        )  # for intfloat/multilingual-e5-* models
         self.whitening = kwargs.get("whitening", False)
 
     def _embed_doc(
@@ -102,7 +105,7 @@ class LongEmbedRank(EmbedRank):
         The default value just embeds the document normally.
         """
         doc_embeddings = self.model.encode(
-            doc.raw_text,
+            self.add_query_prefix + doc.raw_text,
             global_attention_mask=doc.global_attention_mask,
             device=self.device,
             output_attentions=output_attentions,
@@ -112,7 +115,7 @@ class LongEmbedRank(EmbedRank):
         doc.token_embeddings = doc_embeddings["token_embeddings"].detach().cpu()
         doc.attention_mask = doc_embeddings["attention_mask"].detach().cpu()
         doc.attentions = (
-            doc_embeddings["attentions"].detach.cpu() if output_attentions else None
+            doc_embeddings["attentions"].detach().cpu() if output_attentions else None
         )
 
         return doc_embeddings["sentence_embedding"].detach().cpu().numpy()

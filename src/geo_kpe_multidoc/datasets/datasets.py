@@ -148,20 +148,26 @@ def load_dataset(
         with ZipFile(filename, mode="r") as zf:
             for file in zf.namelist():
                 if file[-4:] == ".key":  # optional filtering by filetype
-                    id = file.split("/")[-1][:-4]
-                    ids.append(id)
-                    with zf.open(file) as f:
-                        labels.append(
-                            [
-                                line.strip()
-                                for line in io.TextIOWrapper(f, encoding="utf8")
-                            ]
-                        )
-                    # replace keys dir with doc dir
                     doc_file = re.sub("keys", "docsutf8", file)
                     doc_file = doc_file[:-3] + "txt"
-                    with zf.open(doc_file) as f:
-                        documents.append(f.read().decode("utf8"))
+                    try:
+                        with zf.open(file) as kf:
+                            # replace keys dir with doc dir
+                            with zf.open(doc_file) as df:
+                                documents.append(df.read().decode("utf8"))
+                                labels.append(
+                                    [
+                                        line.strip()
+                                        for line in io.TextIOWrapper(
+                                            kf, encoding="utf8"
+                                        )
+                                    ]
+                                )
+                    except KeyError:
+                        # Error: There is no item named 'PubMed/docs_docsutf8/12915528.txt' in the archive
+                        continue
+                    id = file.split("/")[-1][:-4]
+                    ids.append(id)
         return ids, documents, labels
 
     if datasource == "preloaded":

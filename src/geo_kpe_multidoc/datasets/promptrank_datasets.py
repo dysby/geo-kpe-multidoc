@@ -3,8 +3,8 @@ import json
 import os
 import re
 
-import tqdm
 from torch.utils.data import Dataset
+from tqdm import tqdm
 
 from geo_kpe_multidoc import GEO_KPE_MULTIDOC_DATA_PATH
 from geo_kpe_multidoc.datasets.kpedataset import KPEDataset

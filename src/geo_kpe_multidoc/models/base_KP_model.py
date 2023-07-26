@@ -17,7 +17,7 @@ from geo_kpe_multidoc.models.candidate_extract.promptrank_extraction import (
     PromptRankKPECandidateExtractionModel,
 )
 from geo_kpe_multidoc.models.pre_processing.pre_processing_utils import (
-    filter_special_tokens,
+    filter_tokenizer_special_tokens,
     remove_punctuation,
     remove_whitespaces,
     tokenize_hf,
@@ -46,7 +46,10 @@ def _search_mentions(model, candidate_mentions, token_ids):
             # tokenize via local SentenceEmbedder Class
             tokenized_candidate = model.tokenize(mention)
 
-        filt_ids = filter_special_tokens(tokenized_candidate["input_ids"])
+        # filt_ids = filter_special_tokens(tokenized_candidate["input_ids"])
+        filt_ids = filter_tokenizer_special_tokens(
+            tokenized_candidate["input_ids"], model.tokenizer.all_special_ids
+        )
 
         # Should not be Empty after filter
         if filt_ids:
@@ -79,7 +82,8 @@ def candidate_embedding_from_tokens(
         return torch.mean(embds, dim=0)
     else:
         logger.warning(f"Did not find candidate occurrences: {candidate}")
-        return torch.mean(doc_token_embeddings[[], :], dim=0)
+        # return torch.mean(doc_token_embeddings[[], :], dim=0)
+        raise ValueError(f"Did not find candidate occurrences: {candidate}")
 
 
 class BaseKPModel:
@@ -100,19 +104,15 @@ class BaseKPModel:
 
     def pre_process(self, txt: str = "", **kwargs) -> str:
         """
-        Method that defines a pre_processing routine, removing punctuation and whitespaces
+        Clean text by removing punctuation and whitespaces
         """
         txt = remove_punctuation(txt)
         return remove_whitespaces(txt)[1:]
 
-    def _pos_tag_doc(self, doc: Document, stemming, use_cache, **kwargs) -> None:
-        self.candidate_selection_model._pos_tag_doc(doc, use_cache)
-        # doc.doc_sentences = [
-        #     sent.text for sent in doc.doc_sentences if sent.text.strip()
-        # ]
-
-    def extract_candidates(self, doc, min_len, lemmer, **kwargs) -> List[str]:
-        self.candidate_selection_model(
+    def extract_candidates(
+        self, doc, min_len, lemmer, **kwargs
+    ) -> Tuple[List[str], List[Tuple[int, int]]]:
+        return self.candidate_selection_model(
             doc=doc, min_len=min_len, lemmer_lang=lemmer, **kwargs
         )
 
@@ -134,8 +134,8 @@ class BaseKPModel:
         **kwargs,
     ) -> Tuple[List[Tuple], List[str]]:
         """
-        Concrete method that extracts key-phrases from a given document, with optional arguments
-        relevant to its specific functionality
+        Concrete method that extracts key-phrases from a given document, with optional
+        arguments relevant to its specific functionality
         """
         self.extract_candidates(doc, min_len, lemmer, **kwargs)
 
@@ -159,12 +159,13 @@ class BaseKPModel:
         **kwargs,
     ) -> List[List[Tuple]]:
         """
-        Concrete method that extracts key-phrases from a list of given documents, with optional arguments
-        relevant to its specific functionality
+        Extracts key-phrases from a list of given documents, with optional
+        arguments relevant to its specific functionality
 
         Parameters
         ----------
-            corpus: Dataset with topic id, list of documents (txt form) for topic, and list of keyphrases for topic.
+            corpus: Dataset with topic id, list of documents (txt form) for topic,
+            and list of keyphrases for topic.
 
         """
         raise NotImplementedError

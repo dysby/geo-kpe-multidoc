@@ -20,10 +20,15 @@ class CandidateEmbeddingStrategy(Protocol):
 
 
 class OutContextMentionsEmbedding:
+    def __init__(self, add_query_prefix=False, **kwargs) -> None:
+        self.add_query_prefix = "query: " if add_query_prefix else ""
+
     def candidate_embeddings(self, model, doc: Document):
         for candidate in doc.candidate_set:
             # TODO: refactor to batch encode
             for mention in doc.candidate_mentions[candidate]:
+                mention = self.add_query_prefix + mention
+
                 embds = []
                 # TODO: deal with subclassing LongEmbedRank
                 if isinstance(model, BaseEmbedder):
@@ -41,9 +46,13 @@ class OutContextMentionsEmbedding:
 
 
 class OutContextEmbedding:
+    def __init__(self, add_query_prefix=False, **kwargs) -> None:
+        self.add_query_prefix = "query: " if add_query_prefix else ""
+
     def candidate_embeddings(self, model, doc: Document):
         # TODO: refactor to batch encode
         for candidate in doc.candidate_set:
+            candidate = self.add_query_prefix + candidate
             if isinstance(model, BaseEmbedder):
                 embd = model.embed(candidate)
             else:
@@ -60,27 +69,31 @@ class OutContextEmbedding:
 
 
 class InContextEmbeddings:
+    def __init__(self, add_query_prefix=False, **kwargs) -> None:
+        self.add_query_prefix = "query: " if add_query_prefix else ""
+
     def candidate_embeddings(self, model, doc: Document):
         for candidate in doc.candidate_set:
-            mentions = _search_mentions(
+            mentions_positions = _search_mentions(
                 model, doc.candidate_mentions[candidate], doc.token_ids
             )
 
             # backoff procedure, if mentions not found.
-            # If this form is not present in token ids (remember max 4096), fallback to embedding without context.
-            # Can happen that tokenization gives different input_ids and the candidate form is not found in document
-            # input_ids.
+            # If this form is not present in token ids (remember max 4096), fallback to
+            # embedding without context. Can happen that tokenization gives different
+            # input_ids and the candidate form is not found in document input_ids.
             # candidate is beyond max position for emdedding
             # return a non-contextualized embedding.
-            if len(mentions) == 0:
-                # TODO: candidate -> mentions
+            if len(mentions_positions) == 0:
                 for mention in doc.candidate_mentions[candidate]:
                     embds = []
+                    q_mention = self.add_query_prefix + mention
+
                     if isinstance(model, BaseEmbedder):
-                        embd = model.embed(mention)
+                        embd = model.embed(q_mention)
                     else:
                         embd = (
-                            model.encode(mention, device=model.device)[
+                            model.encode(q_mention, device=model.device)[
                                 "sentence_embedding"
                             ]
                             .detach()
@@ -88,14 +101,13 @@ class InContextEmbeddings:
                             .numpy()
                         )
                     embds.append(embd)
-                # TODO: problem with original 'andrew - would' vs PoS extracted 'andrew-would'
                 logger.debug(
                     f"Candidate {candidate} - mentions not found: {doc.candidate_mentions[candidate]}"
                 )
             else:
                 _, embed_dim = doc.token_embeddings.size()
-                embds = torch.empty(size=(len(mentions), embed_dim))
-                for i, occurrence in enumerate(mentions):
+                embds = torch.empty(size=(len(mentions_positions), embed_dim))
+                for i, occurrence in enumerate(mentions_positions):
                     embds[i] = torch.mean(doc.token_embeddings[occurrence, :], dim=0)
 
                 embds = embds.numpy()
@@ -104,6 +116,9 @@ class InContextEmbeddings:
 
 
 class InAndOutContextEmbeddings:
+    def __init__(self, add_query_prefix=False, **kwargs) -> None:
+        self.add_query_prefix = "query: " if add_query_prefix else ""
+
     def candidate_embeddings(self, model, doc: Document):
         # TODO: temp to comparison of out context embeddings vs in context embeddings
         save_embeddings = False
@@ -113,18 +128,21 @@ class InAndOutContextEmbeddings:
         for candidate in doc.candidate_set:
             candidate_mentions_embeddings = []
             for mention in doc.candidate_mentions[candidate]:
+                q_mention = self.adds_query_prefix + mention
                 if isinstance(model, BaseEmbedder):
-                    mention_out_of_context_embedding = model.embed(mention)
+                    mention_out_of_context_embedding = model.embed(q_mention)
                 else:
                     mention_out_of_context_embedding = (
-                        model.encode(mention, device=model.device)["sentence_embedding"]
+                        model.encode(q_mention, device=model.device)[
+                            "sentence_embedding"
+                        ]
                         .detach()
                         .cpu()
                         .numpy()
                     )
 
-                mentions = _search_mentions(model, [mention], doc.token_ids)
-                if len(mentions) == 0:
+                mention_positions = _search_mentions(model, [mention], doc.token_ids)
+                if len(mention_positions) == 0:
                     # backoff procedure, if mention is not found.
                     candidate_mentions_embeddings.append(
                         mention_out_of_context_embedding
@@ -139,8 +157,8 @@ class InAndOutContextEmbeddings:
 
                 else:
                     _, embed_dim = doc.token_embeddings.size()
-                    embds = torch.empty(size=(len(mentions), embed_dim))
-                    for i, occurrence in enumerate(mentions):
+                    embds = torch.empty(size=(len(mention_positions), embed_dim))
+                    for i, occurrence in enumerate(mention_positions):
                         embds[i] = torch.mean(
                             doc.token_embeddings[occurrence, :], dim=0
                         )
@@ -178,6 +196,9 @@ class InAndOutContextEmbeddings:
 
 
 class GlobalAttentionCandidateStrategy(InContextEmbeddings):
+    def __init__(self, add_query_prefix=False, **kwargs) -> None:
+        super().__init__(add_query_prefix, **kwargs)
+
     def _set_global_attention_on_candidates(self, model, doc: Document):
         mentions = []
         for candidate in doc.candidate_set:
@@ -193,14 +214,18 @@ class GlobalAttentionCandidateStrategy(InContextEmbeddings):
         doc.global_attention_mask[:, mentions] = 1
 
     def candidate_embeddings(self, model, doc: Document):
-        self._set_global_attention_on_candidates(doc)
+        # TODO: maybe move document embedding into these strategy classes
+        # don't need to reset global attention on candidate positions
+        # because it is needed before when embedding the document
+        # self._set_global_attention_on_candidates(doc)
 
         super().candidate_embeddings(model, doc)
 
 
 class GlobalAttentionDilatedStrategy(InContextEmbeddings):
-    def __init__(self, dilated: int = 128) -> None:
-        self.dilated = dilated
+    def __init__(self, dilation: int = 128, **kwargs) -> None:
+        self.dilation = dilation
+        super().__init__(**kwargs)
 
     def candidate_embeddings(self, model, doc: Document):
         input_size = doc.global_attention_mask.size(1)

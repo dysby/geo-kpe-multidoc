@@ -1,5 +1,4 @@
 import os
-from itertools import chain
 from operator import itemgetter
 from pathlib import Path
 from time import time
@@ -16,11 +15,11 @@ from sklearn.metrics.pairwise import cosine_similarity
 
 from geo_kpe_multidoc import GEO_KPE_MULTIDOC_CACHE_PATH
 from geo_kpe_multidoc.document import Document
-from geo_kpe_multidoc.models.base_KP_model import BaseKPModel, _search_mentions
+from geo_kpe_multidoc.models.base_KP_model import BaseKPModel
 from geo_kpe_multidoc.models.embedrank.embedding_strategy import (
     STRATEGIES,
     CandidateEmbeddingStrategy,
-    InContextEmbeddings,
+    GlobalAttentionCandidateStrategy,
 )
 from geo_kpe_multidoc.models.pre_processing.post_processing_utils import (
     whitening_np,
@@ -47,7 +46,7 @@ class EmbedRank(BaseKPModel):
         model,
         tagger,
         pooling_strategy: str = "mean",
-        candidate_embedding_strategy: str = "",
+        candidate_embedding_strategy: str = "mentions_no_context",
         **kwargs,
     ):
         super().__init__(model, tagger)
@@ -56,9 +55,23 @@ class EmbedRank(BaseKPModel):
         # self.model.embedding_model.max_seq_length = 384
 
         # TODO: deal with global_attention and global_attention_dilated
-        strategy = STRATEGIES.get(candidate_embedding_strategy, InContextEmbeddings)
+        dilation = 128
+        if "dilated" in candidate_embedding_strategy:
+            dilation = int("".join(filter(str.isdigit, candidate_embedding_strategy)))
+            candidate_embedding_strategy = candidate_embedding_strategy[
+                : candidate_embedding_strategy.index("dilated") + len("dilated")
+            ]
+        strategy = STRATEGIES.get(candidate_embedding_strategy)
         self.pooling_strategy = pooling_strategy
-        self.candidate_embedding_strategy: CandidateEmbeddingStrategy = strategy()
+
+        # TODO: Add support for e5 type models that require "query: " prefixed text.
+        self.add_query_prefix = (
+            "query: " if kwargs.get("add_query_prefix", False) else ""
+        )  # for intfloat/multilingual-e5-* models
+
+        self.candidate_embedding_strategy: CandidateEmbeddingStrategy = strategy(
+            add_query_prefix=self.add_query_prefix, dilation=dilation
+        )
         logger.info(
             f"Initialize EmbedRank w/ {self.candidate_embedding_strategy.__class__.__name__}"
         )
@@ -89,7 +102,9 @@ class EmbedRank(BaseKPModel):
             )
 
         doc_embeddings = self.model.embedding_model.encode(
-            doc.raw_text, show_progress_bar=False, output_value=None
+            self.add_query_prefix + doc.raw_text,
+            show_progress_bar=False,
+            output_value=None,
         )
 
         doc.token_ids = doc_embeddings["input_ids"].squeeze().tolist()
@@ -125,19 +140,19 @@ class EmbedRank(BaseKPModel):
                 doc.candidate_set_embed, doc.raw_text, self.model
             )
 
-    def _set_global_attention_on_candidates(self, doc: Document):
-        mentions = []
-        for candidate in doc.candidate_set:
-            # mentions_positions, _ = self._search_mentions(doc, candidate)
-            mentions_positions = _search_mentions(
-                self.model, doc.candidate_mentions[candidate], doc.token_ids
-            )
-            if len(mentions_positions) > 0:
-                # candidate mentions where found in document token_ids
-                mentions.extend(mentions_positions)
-        mentions = tuple(set(chain(*mentions)))
-        logger.debug(f"Global Attention in {len(mentions)} tokens")
-        doc.global_attention_mask[:, mentions] = 1
+    # def _set_global_attention_on_candidates(self, doc: Document):
+    #     mentions = []
+    #     for candidate in doc.candidate_set:
+    #         # mentions_positions, _ = self._search_mentions(doc, candidate)
+    #         mentions_positions = _search_mentions(
+    #             self.model, doc.candidate_mentions[candidate], doc.token_ids
+    #         )
+    #         if len(mentions_positions) > 0:
+    #             # candidate mentions where found in document token_ids
+    #             mentions.extend(mentions_positions)
+    #     mentions = tuple(set(chain(*mentions)))
+    #     logger.debug(f"Global Attention in {len(mentions)} tokens")
+    #     doc.global_attention_mask[:, mentions] = 1
 
     def embed_candidates(
         self, doc: Document, stemmer, **kwargs
@@ -166,18 +181,20 @@ class EmbedRank(BaseKPModel):
         # Set Global Attention CLS token for all modes
         if isinstance(self.model, BaseEmbedder):
             # original tokenization by KeyBert/SentenceTransformer
-            tokenized_doc = tokenize_hf(doc.raw_text, self.model)
+            tokenized_doc = tokenize_hf(
+                self.add_query_prefix + doc.raw_text, self.model
+            )
         elif isinstance(self.model, LongformerSentenceEmbedder):
             # tokenize via local SentenceEmbedder Class
             tokenized_doc = self.model.tokenize(
-                doc.raw_text,
+                self.add_query_prefix + doc.raw_text,
                 padding=True,
                 pad_to_multiple_of=self.model.attention_window,
             )
         else:
             # BIGBIRD
             # tokenize via local SentenceEmbedder Class
-            tokenized_doc = self.model.tokenize(doc.raw_text)
+            tokenized_doc = self.model.tokenize(self.add_query_prefix + doc.raw_text)
 
         doc.token_ids = tokenized_doc["input_ids"].squeeze().tolist()
         doc.global_attention_mask = torch.zeros(tokenized_doc["input_ids"].shape)
@@ -189,15 +206,18 @@ class EmbedRank(BaseKPModel):
         # # Global attention on periods
         # global_attention_mask[(input_ids == self.tokenizer.convert_tokens_to_ids('.'))] = 1
 
-        if "global_attention" in cand_mode:
-            if "dilated" in cand_mode:
-                dilation = int("".join(filter(str.isdigit, cand_mode)))
-                input_size = doc.global_attention_mask.size(1)
-                indices = torch.arange(0, input_size, dilation)
-                doc.global_attention_mask.index_fill_(1, indices, 1)
-                # cand_mode = cand_mode[: cand_mode.index("dilated") + 7]  # remove digits
-            else:
-                self._set_global_attention_on_candidates(doc)
+        if isinstance(
+            self.candidate_embedding_strategy, GlobalAttentionCandidateStrategy
+        ):
+            # # if "global_attention" in cand_mode:
+            # if "dilated" in cand_mode:
+            #     dilation = int("".join(filter(str.isdigit, cand_mode)))
+            #     input_size = doc.global_attention_mask.size(1)
+            #     indices = torch.arange(0, input_size, dilation)
+            #     doc.global_attention_mask.index_fill_(1, indices, 1)
+            #     # cand_mode = cand_mode[: cand_mode.index("dilated") + 7]  # remove digits
+            # else:
+            self.candidate_embedding_strategy._set_global_attention_on_candidates(doc)
 
         output_attentions = "attention_rank" in cand_mode
 
