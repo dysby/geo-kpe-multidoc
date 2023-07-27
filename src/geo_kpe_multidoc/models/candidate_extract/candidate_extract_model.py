@@ -64,7 +64,7 @@ class KPECandidateExtractionModel:
         self.parser = RegexpParser(self.grammar)
         self.single_word_grammar = {"PROPN", "NOUN", "ADJ"}
 
-        self.join_hyphen_in_candidate = False
+        self.join_hyphen_in_candidate = True
         # Or use in POS Tagging class (pos_tagging.py)
         self.join_hyphen_pos = False
         self.join_hyphen_pos_valid = False
