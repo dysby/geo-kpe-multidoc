@@ -14,11 +14,12 @@ class CandidateMaskEmbeddingStrategy(Protocol):
 class MaskFirst:
     occurrences = 1
 
-    def candidate_embeddings(self, model, doc: Document):
+    def candidate_embeddings(
+        self, model, doc: Document, mask_token: str, text_prefix: str = ""
+    ):
         # if cand_mode == "MaskFirst" or cand_mode == "MaskAll":
         #     occurences = 1 if cand_mode == "MaskFirst" else 0
         # TODO: does not work (candidate is not found)
-
         escaped_docs = []
 
         for _, mentions in doc.candidate_mentions.items():
@@ -28,13 +29,13 @@ class MaskFirst:
             for mention in sorted(mentions, key=len, reverse=True):
                 if mention in text:
                     found_candidate = True
-                    text = text.replace(mention, "<mask>", self.occurrences)
+                    text = text.replace(mention, mask_token, self.occurrences)
                     if self.occurrences == 1:
                         break
 
             if not found_candidate:
                 logger.debug(f"Mentions '{mentions}' - not in text")
-            escaped_docs.append(text)
+            escaped_docs.append(text_prefix + text)
 
         embd = model.encode_batch(escaped_docs)
         doc.candidate_set_embed = [embd[i] for i in range(len(embd))]
@@ -51,14 +52,18 @@ class MaskAll(MaskFirst):
 
 
 class MaskHighest:
-    def candidate_embeddings(self, model, doc: Document):
+    def candidate_embeddings(
+        self, model, doc: Document, mask_token: str, text_prefix: str = ""
+    ):
         for candidate in doc.candidate_set:
             candidate = re.escape(candidate)
             candidate_embeds = []
 
+            # TODO: what if not found?
+            # TODO: refactor to batch processing
             for match in re.finditer(candidate, doc.raw_text):
-                masked_text = f"{doc.raw_text[:match.span()[0]]}<mask>{doc.raw_text[match.span()[1]:]}"
-                candidate_embeds.append(model.encode(masked_text))
+                masked_text = f"{doc.raw_text[:match.span()[0]]}{mask_token}{doc.raw_text[match.span()[1]:]}"
+                candidate_embeds.append(model.encode(text_prefix + masked_text))
                 # if attention == "global_attention":
                 #     candidate_embeds.append(self._embed_global(masked_text))
                 # else:
@@ -68,7 +73,9 @@ class MaskHighest:
 
 
 class MaskSubset:
-    def candidate_embeddings(self, model, doc: Document):
+    def candidate_embeddings(
+        self, model, doc: Document, mask_token: str, text_prefix: str = ""
+    ):
         doc.candidate_set = sorted(
             doc.candidate_set, reverse=True, key=lambda x: len(x)
         )
@@ -102,6 +109,6 @@ class MaskSubset:
 
             masked_doc = doc.raw_text
             for i in range(len(subset_pos)):
-                masked_doc = f"{masked_doc[:(subset_pos[i][0] + i*(len_candidate - 5))]}<mask>{masked_doc[subset_pos[i][1] + i*(len_candidate - 5):]}"
+                masked_doc = f"{masked_doc[:(subset_pos[i][0] + i*(len_candidate - 5))]}{mask_token}{masked_doc[subset_pos[i][1] + i*(len_candidate - 5):]}"
 
-            doc.candidate_set_embed.append(model.embed(masked_doc))
+            doc.candidate_set_embed.append(model.embed(text_prefix + masked_doc))

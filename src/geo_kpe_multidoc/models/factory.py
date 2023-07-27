@@ -15,7 +15,7 @@ from geo_kpe_multidoc.models.base_KP_model import BaseKPModel, ExtractionEvaluat
 from geo_kpe_multidoc.models.embedrank.embedrank_model import EmbedRank
 from geo_kpe_multidoc.models.embedrank.longembedrank import LongEmbedRank
 from geo_kpe_multidoc.models.fusion_model import FusionModel
-from geo_kpe_multidoc.models.maskrank.maskrank_manual import LongformerMaskRank
+from geo_kpe_multidoc.models.maskrank.longmaskrank import LongformerMaskRank
 from geo_kpe_multidoc.models.maskrank.maskrank_model import MaskRank
 from geo_kpe_multidoc.models.mdkperank.mdkperank_model import MDKPERank
 from geo_kpe_multidoc.models.mdkperank.mdpromptrank import MdPromptRank

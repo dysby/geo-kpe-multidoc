@@ -45,7 +45,7 @@ class MaskRank(BaseKPModel):
         return doc_embeddings["sentence_embedding"].detach().cpu().numpy()
 
     def _embed_global(self, model):
-        raise NotImplemented
+        raise NotImplementedError
 
     def embed_candidates(
         self,

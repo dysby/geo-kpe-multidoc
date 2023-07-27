@@ -356,8 +356,31 @@ class EmbedRank(BaseKPModel):
 
         self.embed_candidates(doc, stemmer, **kwargs)
 
+        # candidate_score[:top_n], candidate_set
         ranking = self._rank_candidates(
             doc.doc_embed, doc.candidate_set_embed, doc.candidate_set, top_n, **kwargs
         )
+
+        # DEBUG: check score distribution of found vs not found mentions
+        # candidates_out_score = []
+        # candidates_in_score = []
+        # for candidate, score in ranking[0]:
+        #     if candidate in doc.candidate_mentions_not_found:
+        #         candidates_out_score.append(score)
+        #     else:
+        #         candidates_in_score.append(score)
+
+        # import matplotlib.pyplot as plt
+        # import pandas as pd
+
+        # _, ax = plt.subplots()
+        # density = False
+        # pd.Series(candidates_out_score, name="out_score").hist(
+        #     ax=ax, alpha=0.5, bins=20, density=density, color="orange"
+        # )
+        # pd.Series(candidates_in_score, name="in_score").hist(
+        #     ax=ax, alpha=0.5, bins=20, density=density, color="blue"
+        # )
+        # plt.show()
 
         return ranking

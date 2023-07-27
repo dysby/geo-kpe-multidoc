@@ -73,6 +73,9 @@ class InContextEmbeddings:
         self.add_query_prefix = "query: " if add_query_prefix else ""
 
     def candidate_embeddings(self, model, doc: Document):
+        # DEBUG:
+        # doc.candidate_mentions_not_found = set()
+
         for candidate in doc.candidate_set:
             mentions_positions = _search_mentions(
                 model, doc.candidate_mentions[candidate], doc.token_ids
@@ -101,6 +104,8 @@ class InContextEmbeddings:
                             .numpy()
                         )
                     embds.append(embd)
+
+                # doc.candidate_mentions_not_found.add(candidate)
                 logger.debug(
                     f"Candidate {candidate} - mentions not found: {doc.candidate_mentions[candidate]}"
                 )

@@ -149,14 +149,20 @@ def plot_score_distribuitions_with_gold(
 
 
 def plot_non_versus_gold_density(
-    gold_values: pd.Series, not_gold_values: pd.Series, title: str = None, density=False
+    gold_values: pd.Series,
+    not_gold_values: pd.Series,
+    title: str = None,
+    density=False,
+    legend=None,
 ):
     _, ax = plt.subplots()
+
+    legend = legend if legend else ["gold", "non-gold"]
 
     gold_values.hist(ax=ax, alpha=0.5, bins=20, density=density, color="orange")
     not_gold_values.hist(ax=ax, alpha=0.5, bins=20, density=density, color="blue")
     ax.set_title(title)
-    plt.legend(["gold", "non-gold"])
+    plt.legend(legend)
     plt.show()
 
 

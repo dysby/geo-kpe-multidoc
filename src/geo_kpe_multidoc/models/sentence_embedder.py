@@ -646,3 +646,68 @@ def batch_to_device(batch, target_device: torch.device):
         if isinstance(batch[key], torch.Tensor):
             batch[key] = batch[key].to(target_device)
     return batch
+
+
+# # copy from MSFT e5/mteb_eval.py
+
+# def _transform_func(tokenizer: PreTrainedTokenizerFast,
+#                     examples: Dict[str, List]) -> BatchEncoding:
+#     if args.prompt:
+#         examples['input_texts'] = [args.prompt + t for t in examples['input_texts']]
+#     batch_dict = tokenizer(examples['input_texts'],
+#                            max_length=512,
+#                            padding=True,
+#                            truncation=True)
+
+#     return batch_dict
+
+
+# class DenseEncoder(torch.nn.Module):
+#     def __init__(self, **kwargs):
+#         super().__init__()
+#         self.encoder = AutoModel.from_pretrained(args.model_name_or_path)
+#         self.tokenizer = AutoTokenizer.from_pretrained(args.model_name_or_path)
+#         self.gpu_count = torch.cuda.device_count()
+
+#         self.encoder.eval()
+#         self.encoder.cuda()
+
+#         if self.gpu_count > 1:
+#             self.encoder = torch.nn.DataParallel(self.encoder)
+
+#     @torch.no_grad()
+#     def encode(self, sentences, **kwargs) -> np.ndarray:
+#         """ Returns a list of embeddings for the given sentences.
+#         Args:
+#             sentences (`List[str]`): List of sentences to encode
+#             batch_size (`int`): Batch size for the encoding
+
+#         Returns:
+#             `List[np.ndarray]` or `List[tensor]`: List of embeddings for the given sentences
+#         """
+
+#         dataset: Dataset = Dataset.from_dict({'input_texts': sentences})
+#         dataset.set_transform(partial(_transform_func, self.tokenizer))
+
+#         data_collator = DataCollatorWithPadding(self.tokenizer, pad_to_multiple_of=8)
+#         data_loader = DataLoader(
+#             dataset,
+#             batch_size=128 * self.gpu_count,
+#             shuffle=False,
+#             drop_last=False,
+#             num_workers=2,
+#             collate_fn=data_collator,
+#             pin_memory=True)
+
+#         encoded_embeds = []
+#         for batch_dict in tqdm.tqdm(data_loader, desc='encoding', mininterval=10, disable=len(sentences) < 128):
+#             batch_dict = move_to_cuda(batch_dict)
+
+#             with torch.cuda.amp.autocast():
+#                 outputs: BaseModelOutput = self.encoder(**batch_dict)
+#                 embeds = pool(outputs.last_hidden_state, batch_dict['attention_mask'], args.pool_type)
+#                 if args.l2_normalize:
+#                     embeds = F.normalize(embeds, p=2, dim=-1)
+#                 encoded_embeds.append(embeds.cpu().numpy())
+
+#         return np.concatenate(encoded_embeds, axis=0)

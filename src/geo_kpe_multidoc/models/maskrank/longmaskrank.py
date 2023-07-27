@@ -84,6 +84,11 @@ class LongformerMaskRank(BaseKPModel):
             "MaskSubset": MaskSubset,
         }
 
+        # TODO: Add support for e5 type models that require "query: " prefixed text.
+        self.add_query_prefix = (
+            "query: " if kwargs.get("add_query_prefix", False) else ""
+        )  # for intfloat/multilingual-e5-* models
+
         self.strategy = strategies[candidate_embedding_strategy]()
 
         self.name = f"MaskRank-{self.strategy.__class__.__name__}-{name}"
@@ -101,7 +106,7 @@ class LongformerMaskRank(BaseKPModel):
         The default value just embeds the document normally.
         """
         doc_embeddings = self.model.encode(
-            doc.raw_text,
+            self.add_query_prefix + doc.raw_text,
             global_attention_mask=doc.global_attention_mask,
             device=self.device,
             output_attentions=output_attentions,
@@ -123,7 +128,8 @@ class LongformerMaskRank(BaseKPModel):
         This method is key for each ranking model.
         Here the ranking heuritic is applied according to model definition.
 
-        MaskRank selects the candidates that have embeddings of masked document form far from emedings of the original document.
+        MaskRank selects the candidates that have embeddings of masked document form far
+        from emedings of the source document.
         Looking for 1 - similarity.
         """
         cand_mode = kwargs.get("cand_mode", "MaskAll")
