@@ -29,7 +29,7 @@ DATASETS = {
         "language": "en",
         "tagger": "en_core_web_trf",
     },
-    "110-PT-BN-KP": {
+    "PT-KP": {
         "zip_file": "110-PT-BN-KP.zip",
         "language": "pt",
         "tagger": "pt_core_news_lg",
@@ -40,7 +40,11 @@ DATASETS = {
         "language": "en",
         "tagger": "en_core_web_trf",
     },
-    "cacic": {"zip_file": "cacic.zip", "language": "es", "tagger": "es_dep_news_trf"},
+    "ES-CACIC": {
+        "zip_file": "cacic.zip",
+        "language": "es",
+        "tagger": "es_dep_news_trf",
+    },
     "citeulike180": {
         "zip_file": "citeulike180.zip",
         "language": "en",
@@ -55,7 +59,7 @@ DATASETS = {
         "language": "en",
         "tagger": "en_core_web_trf",
     },
-    "Nguyen2007": {
+    "NUS": {
         "zip_file": "Nguyen2007.zip",
         "language": "en",
         "tagger": "en_core_web_trf",
@@ -86,15 +90,23 @@ DATASETS = {
         "language": "en",
         "tagger": "en_core_web_trf",
     },
-    "wicc": {"zip_file": "wicc.zip", "language": "es", "tagger": "es_dep_news_trf"},
+    "ES-WICC": {"zip_file": "wicc.zip", "language": "es", "tagger": "es_dep_news_trf"},
     "wiki20": {"zip_file": "wiki20.zip", "language": "en", "tagger": "en_core_web_trf"},
-    "WikiNews": {
+    "FR-WIKI": {
         "zip_file": "WikiNews.zip",
         "language": "fr",
         "tagger": "fr_dep_news_trf",
     },
     "www": {"zip_file": "www.zip", "language": "en", "tagger": "en_core_web_trf"},
+    "DE-TeKET": {"language": "de", "tagger": "de_dep_news_trf"},
 }
+
+# pos_taggers = {
+#     "PT-KP": "pt_core_news_lg",
+#     "ES-WICC": "es_dep_news_trf",
+#     "FR-WIKI": "fr_dep_news_trf",
+#     "DE-TeKET": "de_core_news_trf",
+# }
 
 
 def load_dataset(
@@ -199,14 +211,16 @@ def load_preprocessed(name, root_dir=GEO_KPE_MULTIDOC_DATA_PATH) -> KPEDataset:
     local_name = {
         "DUC2001": "DUC",
         "MKDUC01": "MKDUC01",
-        "110-PT-BN-KP": "PT-KP",
-        "cacic": "ES-CACIC",
+        # "110-PT-BN-KP": "PT-KP",
+        "PT-KP": "PT-KP",
+        "ES-CACIC": "ES-CACIC",
         "Inspec": "Inspec",
-        "Nguyen2007": "NUS",
+        "NUS": "NUS",
         "PubMed": "PubMed",
         "SemEval2010": "SemEval",
-        "wicc": "ES-WICC",
-        "WikiNews": "FR-WIKI",
+        "ES-WICC": "ES-WICC",
+        "FR-WIKI": "FR-WIKI",
+        "DE-TeKET": "DE-TeKET",
     }
 
     with open(
