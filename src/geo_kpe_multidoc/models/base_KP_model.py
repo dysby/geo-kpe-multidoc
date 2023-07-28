@@ -202,13 +202,17 @@ class ExtractionEvaluator(BaseKPModel):
         **kwargs,
     ) -> Tuple[List[Tuple], List[str]]:
         """
-        Shallow Model for Candidate Extraction Evalutation
+        Shallow model for candidate extraction evalutation
         """
         self.extract_candidates(doc, min_len, lemmer, **kwargs)
 
         top_n = len(doc.candidate_set) if top_n == -1 else top_n
 
-        top_n_scores = [(candidate, 0.5) for candidate in doc.candidate_set[:top_n]]
+        # remove duplicates from promptrank keeping relative positions...
+        # candidate selection keeps candidates sorted by its position in source document
+        top_n_scores = [
+            (k, v) for k, v in dict.fromkeys(doc.candidate_set, 0.5).items()
+        ]
 
         logger.debug(f"Document #{self.counter} processed")
         self.counter += 1
