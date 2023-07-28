@@ -7,11 +7,6 @@ from os import path
 from time import time
 
 import pandas as pd
-from loguru import logger
-from matplotlib import pyplot as plt
-from tabulate import tabulate
-
-import wandb
 from geo_kpe_multidoc import GEO_KPE_MULTIDOC_OUTPUT_PATH
 from geo_kpe_multidoc.datasets.datasets import DATASETS, load_dataset
 from geo_kpe_multidoc.evaluation.evaluation_tools import (
@@ -37,6 +32,11 @@ from geo_kpe_multidoc.models.pre_processing.pre_processing_utils import (
     select_stemmer,
 )
 from geo_kpe_multidoc.models.promptrank.promptrank import PromptRank
+from loguru import logger
+from matplotlib import pyplot as plt
+from tabulate import tabulate
+
+import wandb
 
 
 # fmt: off
@@ -66,7 +66,7 @@ def parse_args():
     parser.add_argument( "--longformer_attention_window", type=int, default=512, help="Longformer: sliding chunk Attention Window size",)
     parser.add_argument( "--longformer_only_copy_to_max_position", type=int, default=None, help="Longformer: only copy first positions of Pretrained Model position embedding weights",)
     parser.add_argument( "--add_query_prefix", action="store_true", help="Add support for e5 type models that require 'query: ' prefixed text",)
-    parser.add_argument( "--candidate_mode", default="", type=str, help="The method for candidate mode (no_context, mentions_no_context, global_attention, global_attention_dilated_nnn, attention_rank).",)
+    parser.add_argument( "--candidate_mode", default="mentions_no_context", type=str, help="The method for candidate mode (no_context, mentions_no_context, global_attention, global_attention_dilated_nnn, attention_rank).",)
     parser.add_argument( "--md_strategy", default="MEAN", type=str, help="Candidate ranking method for Multi-document extraction",)
     parser.add_argument( "--embedrank_mmr", action="store_true", help="boolean flag to use EmbedRank MMR")
     parser.add_argument( "--mmr_diversity", type=float, default=None, help="EmbedRank MMR diversity parameter value.",)
@@ -221,7 +221,11 @@ def main():
         args.tagger_name if args.tagger_name else DATASETS[ds_name].get("tagger")
     )
 
-    kpe_model = kpe_model_factory(BACKEND_MODEL_NAME, TAGGER_NAME, **vars(args))
+    LANGUAGE = DATASETS[ds_name].get("language")
+
+    kpe_model = kpe_model_factory(
+        BACKEND_MODEL_NAME, TAGGER_NAME, language=LANGUAGE, **vars(args)
+    )
 
     if isinstance(kpe_model, (MDKPERank, MdPromptRank)):
         extract_keyphases_pipeline = extract_keyphrases_topics

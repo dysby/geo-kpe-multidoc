@@ -56,7 +56,7 @@ class KPECandidateExtractionModel:
 
     """
 
-    def __init__(self, tagger, grammar=None):
+    def __init__(self, tagger, language, grammar=None, **kwargs):
         self.tagger = POS_tagger_spacy(tagger)
         self.grammar = (
             grammar if grammar else """NP: {<PROPN|NOUN|ADJ>*<PROPN|NOUN>+<ADJ>*}"""

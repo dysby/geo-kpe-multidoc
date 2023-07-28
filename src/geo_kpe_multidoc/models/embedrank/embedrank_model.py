@@ -35,10 +35,15 @@ class EmbedRank(BaseKPModel):
     the KeyBert backend to retrieve models
 
     cand_mode:
-        {mentions}?{no_context}+            - candidate embeddings from non contextualized form
-        {global_attention}+{dilated_(n)}?   - get embeddings using longformer global attention in all doc tokens where a candidate is present.
-                                            If dilated mode is selected a sparse pattern is used, considering global attention on every n position.
-        in_n_out_context                    - add non contextualized form embedding to mentions embeddings and do the average as candidade embedding.
+        {mentions}?{no_context}+            - candidate embeddings from non
+                            contextualized form
+        {global_attention}+{dilated_(n)}?   - get embeddings using longformer global
+                            attention in all doc tokens where a candidate is present.
+                            If dilated mode is selected a sparse pattern is used,
+                            considering global attention on every n position.
+        in_n_out_context                    - add non contextualized form embedding to
+                            mentions embeddings and do the average as candidade
+                            embedding.
     """
 
     def __init__(
@@ -49,7 +54,7 @@ class EmbedRank(BaseKPModel):
         candidate_embedding_strategy: str = "mentions_no_context",
         **kwargs,
     ):
-        super().__init__(model, tagger)
+        super().__init__(model, tagger, **kwargs)
         self.counter = 0
         # manualy set SentenceTransformer max seq lenght1
         # self.model.embedding_model.max_seq_length = 384
@@ -64,7 +69,7 @@ class EmbedRank(BaseKPModel):
         strategy = STRATEGIES.get(candidate_embedding_strategy)
         self.pooling_strategy = pooling_strategy
 
-        # TODO: Add support for e5 type models that require "query: " prefixed text.
+        # TODO: Add support for e5 type models that require "query: " prompted text.
         self.add_query_prefix = (
             "query: " if kwargs.get("add_query_prefix", False) else ""
         )  # for intfloat/multilingual-e5-* models

@@ -99,8 +99,15 @@ class BaseKPModel:
         self.name = "{}_{}".format(
             str(self.__str__).split()[3], re.sub("-", "_", model)
         )
-
-        self.candidate_selection_model = KPECandidateExtractionModel(tagger=tagger)
+        extraction_variant = kwargs.get("extraction_variant", "base")
+        if extraction_variant == "promptrank":
+            self.candidate_selection_model = PromptRankKPECandidateExtractionModel(
+                tagger=tagger, **kwargs
+            )
+        else:
+            self.candidate_selection_model = KPECandidateExtractionModel(
+                tagger=tagger, **kwargs
+            )
 
         self.counter = 1
 
@@ -174,12 +181,14 @@ class BaseKPModel:
 
 
 class ExtractionEvaluator(BaseKPModel):
-    def __init__(self, model, tagger, extraction_variant="base"):
-        if extraction_variant == "base":
-            self.candidate_selection_model = KPECandidateExtractionModel(tagger=tagger)
-        else:
+    def __init__(self, model, tagger, extraction_variant="base", **kwargs):
+        if extraction_variant == "promptrank":
             self.candidate_selection_model = PromptRankKPECandidateExtractionModel(
-                tagger=tagger
+                tagger=tagger, **kwargs
+            )
+        else:
+            self.candidate_selection_model = KPECandidateExtractionModel(
+                tagger=tagger, **kwargs
             )
         self.counter = 1
 

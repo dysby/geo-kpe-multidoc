@@ -5,6 +5,7 @@ import nltk
 from nltk import RegexpParser
 from nltk.corpus import stopwords
 
+from geo_kpe_multidoc.datasets.language import ISO_to_language
 from geo_kpe_multidoc.document import Document
 from geo_kpe_multidoc.models.pre_processing.pos_tagging import POS_tagger_spacy
 
@@ -28,7 +29,7 @@ class PromptRankKPECandidateExtractionModel:
     :return keyphrase_candidate: list of list of candidate phrases: [tuple(string,tuple(start_index,end_index))]
     """
 
-    def __init__(self, tagger, grammar=None, **kwargs) -> None:
+    def __init__(self, tagger, language, grammar=None, **kwargs) -> None:
         self.tagger = POS_tagger_spacy(tagger)
 
         self.grammar = (
@@ -40,7 +41,7 @@ class PromptRankKPECandidateExtractionModel:
 
         self.max_len = kwargs.get("max_len", 512)
         self.parser = RegexpParser(self.grammar)
-        self.language = kwargs.get("language", "english")
+        self.language = ISO_to_language[language]
         # Limit candidate size
         self.stopword_dict = set(stopwords.words(self.language))
         self.enable_filter = kwargs.get("enable_filter", False)
