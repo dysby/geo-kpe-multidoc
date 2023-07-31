@@ -25,7 +25,7 @@ class MaskRank(BaseKPModel):
     def __init__(
         self, model, tagger, candidate_embedding_strategy: str = "MaskAll", **kwargs
     ):
-        super().__init__(model, tagger)
+        super().__init__(model, tagger, **kwargs)
         self.counter = 0
 
     def embed_doc(self, doc: Document, stemmer: Callable = None) -> np.ndarray:

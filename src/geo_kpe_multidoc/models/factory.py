@@ -52,7 +52,7 @@ def generateLongformerRanker(
 
     new_max_pos = longformer_max_length
     attention_window = longformer_attention_window
-    copy_from_position = kwargs.get("longformer_only_copy_to_max_position", None)
+    copy_from_position = kwargs.get("longformer_only_copy_to_max_position")
 
     base_name = backend_model_name.split("/")[-1]
 

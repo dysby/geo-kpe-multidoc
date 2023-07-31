@@ -210,7 +210,13 @@ class KPECandidateExtractionModel:
         # TODO: lemmatize and save mentions
         # candidate_set = {kp.lower() for kp in candidate_set}
 
-        doc.candidate_set = sorted(doc.candidate_set, key=len, reverse=True)
+        # keep candidates sorted by 1st position
+        doc.candidate_set = list(
+            sorted(
+                doc.candidate_positions, key=lambda item: item[0][0][0], reverse=True
+            )
+        )
+        # doc.candidate_set = sorted(doc.candidate_set, key=len, reverse=True)
         # keep only the first position of the candidate
         doc.candidate_positions = [
             doc.candidate_positions[candidate][0] for candidate in doc.candidate_set

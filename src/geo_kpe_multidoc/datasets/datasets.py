@@ -187,7 +187,7 @@ def load_dataset(
     elif datasource == "promptrank":
         dataset = load_promptrankdataset(name)
     else:
-        zipfile = DATASETS[name].get("zip_file", None)
+        zipfile = DATASETS[name].get("zip_file")
         if zipfile:
             dataset = KPEDataset(name, *_read_zip(path.join(root_dir, zipfile)))
         else:

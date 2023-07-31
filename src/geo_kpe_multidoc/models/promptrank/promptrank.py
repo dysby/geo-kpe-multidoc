@@ -4,15 +4,12 @@ from typing import Callable, List, Optional, Tuple
 import numpy as np
 import pandas as pd
 import torch
+import transformers
 from loguru import logger
 from nltk.stem import StemmerI
 from tabulate import tabulate
 from torch.utils.data import DataLoader
-from transformers import (
-    LongT5ForConditionalGeneration,
-    T5ForConditionalGeneration,
-    T5TokenizerFast,
-)
+from transformers import AutoConfig, AutoTokenizer
 
 from geo_kpe_multidoc.datasets.promptrank_datasets import PromptRankDataset
 from geo_kpe_multidoc.document import Document
@@ -76,11 +73,12 @@ class PromptRank(BaseKPModel):
             f"PromptRank model w/ {self.candidate_selection_model.__class__.__name__}"
         )
 
-        self.max_len = kwargs.get("max_len", 512)
-        self.temp_en = kwargs.get("temp_en", "Book:")
-        self.temp_de = kwargs.get("temp_de", "This book mainly talks about ")
+        # hack kwargs.max_seq_len is None...
+        self.max_len = kwargs.get("max_seq_len") or 512
+        self.temp_en = kwargs.get("encoder_prompt") or "Book: "
+        self.temp_de = kwargs.get("decoder_prompt") or "This book mainly talks about "
         self.enable_filter = kwargs.get("enable_filter", False)
-        self.enable_pos = kwargs.get("enable_pos", True)
+        self.enable_pos = not kwargs.get("no_position_feature", False)
         # \gamma in original paper
         # DUC 0.89
         self.position_factor = kwargs.get("position_factor", 1.2e8)
@@ -89,17 +87,29 @@ class PromptRank(BaseKPModel):
 
         self.device = "cuda" if torch.cuda.is_available() else "cpu"
 
-        if "long" in model_name.lower():
-            self.model = LongT5ForConditionalGeneration.from_pretrained(model_name)
-            self.max_len = kwargs.get("max_len", 4096)
+        base_model_config = AutoConfig.from_pretrained(model_name)
+        conditional_generation_class = next(
+            (
+                c
+                for c in base_model_config.architectures
+                if "ForConditionalGeneration" in c
+            ),
+            None,
+        )
+        if conditional_generation_class:
+            self.model = getattr(
+                transformers, conditional_generation_class
+            ).from_pretrained(model_name)
+            self.tokenizer = AutoTokenizer.from_pretrained(
+                model_name, model_max_length=self.max_len
+            )
         else:
-            self.model = T5ForConditionalGeneration.from_pretrained(model_name)
+            raise ValueError(
+                f"{model_name} is not compatible with a Conditional Generation Architecture."
+            )
+
         self.model.to(self.device)
         self.model.eval()
-
-        self.tokenizer = T5TokenizerFast.from_pretrained(
-            model_name, model_max_length=self.max_len
-        )
 
         self.template_len = (
             self.tokenizer(self.temp_de, return_tensors="pt")["input_ids"].shape[1] - 3

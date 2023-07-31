@@ -298,7 +298,11 @@ class EmbedRank(BaseKPModel):
         EmbedRank selects the candidates that have more similarity to the document.
         """
         mmr_mode = kwargs.get("mmr", False)
-        mmr_diversity = kwargs.get("mmr_diversity", 0.8)
+        mmr_diversity = (
+            kwargs.get("mmr_diversity")
+            if kwargs.get("mmr_diversity") is not None
+            else 0.8
+        )
         top_n = len(candidate_set) if top_n == -1 else top_n
 
         if self.whitening:

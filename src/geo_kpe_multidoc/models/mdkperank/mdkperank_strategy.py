@@ -292,7 +292,8 @@ class MmrRank(Ranker):
     # Based on KeyBERT implementation
 
     def __init__(self, **kwargs) -> None:
-        self.diversity = kwargs.get("mmr_diversity", 0.5)
+        # TODO: Not compatible with 0 diversity
+        self.diversity = kwargs.get("mmr_diversity") or 0.5
 
     def _rank(
         self,
