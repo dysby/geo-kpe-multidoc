@@ -50,7 +50,9 @@ class LongformerMaskRank(BaseKPModel):
         **kwargs,
     ):
         # TODO: init super class
-        self.candidate_selection_model = KPECandidateExtractionModel(tagger=tagger)
+        self.candidate_selection_model = KPECandidateExtractionModel(
+            tagger=tagger, **kwargs
+        )
         self.counter = 1
 
         if device is None:
