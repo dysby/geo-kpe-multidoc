@@ -237,7 +237,7 @@ def load_preprocessed(name, root_dir=GEO_KPE_MULTIDOC_DATA_PATH) -> KPEDataset:
         ]
         return KPEDataset(name, ids=topics, documents=docs, labels=topic_labels)
 
-    if name in ("DUC", "Inspec", "SemEval2010"):
+    if name in ("DUC2001", "Inspec", "SemEval2010"):
         with open(
             path.join(
                 root_dir, subdir, f"{local_name[name]}_processed.txt.mapping.ids.list"

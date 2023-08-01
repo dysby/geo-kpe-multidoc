@@ -201,6 +201,12 @@ class KPECandidateExtractionModel:
                         if lemmer_lang
                         else candidate.lower()
                     )
+
+                    if not l_candidate:
+                        # logger.debug(f"Lemmatized '{candidate}' is empty string.")
+                        # '-' ...
+                        continue
+
                     doc.candidate_set.add(l_candidate)
                     doc.candidate_mentions.setdefault(l_candidate, set()).add(candidate)
                     doc.candidate_positions.setdefault(l_candidate, []).append(position)
@@ -213,7 +219,8 @@ class KPECandidateExtractionModel:
         # keep candidates sorted by 1st position
         doc.candidate_set = list(
             sorted(
-                doc.candidate_positions, key=lambda item: item[0][0][0], reverse=True
+                doc.candidate_positions,
+                key=lambda item: doc.candidate_positions[item][0][0],
             )
         )
         # doc.candidate_set = sorted(doc.candidate_set, key=len, reverse=True)

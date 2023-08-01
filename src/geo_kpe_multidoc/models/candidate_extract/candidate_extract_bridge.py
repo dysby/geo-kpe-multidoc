@@ -158,11 +158,21 @@ class BridgeKPECandidateExtractionModel:
                 if lemmer_lang
                 else candidate.lower()
             )
+
+            if not l_candidate:
+                continue
             doc.candidate_set.add(l_candidate)
             doc.candidate_mentions.setdefault(l_candidate, set()).add(candidate)
             doc.candidate_positions.setdefault(l_candidate, []).append(start_end)
 
-        doc.candidate_set = sorted(doc.candidate_set, key=len, reverse=True)
+        # keep candidates sorted by 1st position
+        doc.candidate_set = list(
+            sorted(
+                doc.candidate_positions,
+                key=lambda item: doc.candidate_positions[item][0][0],
+            )
+        )
+        # doc.candidate_set = sorted(doc.candidate_set, key=len, reverse=True)
         # keep only the first position of the candidate
         doc.candidate_positions = [
             doc.candidate_positions[candidate][0] for candidate in doc.candidate_set
