@@ -28,6 +28,7 @@ def generateLongformerRanker(
     tagger_model,
     longformer_max_length,
     longformer_attention_window,
+    generate_position_embeddings=False,
     **kwargs,
 ):
     # Load AllenAi Longformer
@@ -78,6 +79,7 @@ def generateLongformerRanker(
         new_max_pos,
         attention_window,
         copy_from_position,
+        generate_new=generate_position_embeddings,
     )
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
