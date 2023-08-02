@@ -67,7 +67,9 @@ class PromptRank(BaseKPModel):
                 tagger=tagger
             )
         else:
-            self.candidate_selection_model = KPECandidateExtractionModel(tagger=tagger)
+            self.candidate_selection_model = KPECandidateExtractionModel(
+                tagger=tagger, **kwargs
+            )
 
         logger.info(
             f"PromptRank model w/ {self.candidate_selection_model.__class__.__name__}"
