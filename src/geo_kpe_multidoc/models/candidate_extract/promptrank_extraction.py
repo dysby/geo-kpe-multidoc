@@ -8,6 +8,11 @@ from nltk.corpus import stopwords
 from geo_kpe_multidoc.datasets.language import ISO_to_language
 from geo_kpe_multidoc.document import Document
 from geo_kpe_multidoc.models.pre_processing.pos_tagging import POS_tagger_spacy
+from geo_kpe_multidoc.models.pre_processing.pre_processing_utils import (
+    lemmatize,
+    remove_hyphens_and_dots,
+    remove_whitespaces,
+)
 
 
 def remove_special(text: str):
@@ -40,6 +45,7 @@ class PromptRankKPECandidateExtractionModel:
         )
 
         self.max_len = kwargs.get("max_len", 512)
+        self.min_len = kwargs.get("min_len", 0)
         self.parser = RegexpParser(self.grammar)
         self.language = ISO_to_language[language]
         # Limit candidate size
@@ -139,7 +145,26 @@ class PromptRankKPECandidateExtractionModel:
                 #    count += 1
                 continue
 
-            candidates.append([can.lower(), pos])
+            if len(can) < self.min_len:
+                continue
+
+            # Adictional processing if lemmatization is enabled
+            l_candidate = (
+                lemmatize(
+                    remove_whitespaces(remove_hyphens_and_dots(can.lower())),
+                    lemmer_lang,
+                )
+                if lemmer_lang
+                else can.lower()
+            )
+
+            if not l_candidate:
+                # candidates like '-' are lemmatized to empty string
+                continue
+
+            candidates.append([l_candidate, pos])
+            # add mentions for Embedrank compability
+            doc.candidate_mentions.setdefault(l_candidate, set()).add(can)
 
         candidates, positions = list(zip(*candidates))
 
