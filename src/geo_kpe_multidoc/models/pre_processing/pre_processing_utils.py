@@ -152,6 +152,10 @@ def lemmatize(text: Union[str, List], lang: str) -> Union[str, List]:
         ).lower()
 
 
+def stemming(text, stemmer):
+    return " ".join([stemmer.stem(w) for w in text.split()])
+
+
 def select_stemmer(lang: str = "en") -> StemmerI:
     # TODO: Multi Language SnowballStemmer
     # copy from https://github.com/LIAAD/kep/blob/master/kep/utility.py
