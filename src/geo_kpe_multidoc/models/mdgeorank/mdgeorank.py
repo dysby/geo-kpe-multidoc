@@ -275,7 +275,10 @@ class MdGeoRank:
 
             candidate_scores["in_gold"] = False
             for i, kp in enumerate(candidate_scores.index):
-                if stemming(remove_hyphens_and_dots(kp)) in gold_stem:
+                if (
+                    stemming(remove_hyphens_and_dots(kp), stemmer=self.stemmer)
+                    in gold_stem
+                ):
                     candidate_scores.loc[kp, "in_gold"] = True
 
             # number of documents where the candidate is present, within the current topic.
