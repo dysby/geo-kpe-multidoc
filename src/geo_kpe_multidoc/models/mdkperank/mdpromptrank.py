@@ -12,7 +12,7 @@ from geo_kpe_multidoc.models.promptrank.promptrank import PromptRank
 
 class MdPromptRank(BaseKPModel):
     def __init__(self, base_model: PromptRank, rank_strategy: str = "MEAN", **kwargs):
-        self.base_model: PromptRank = base_model
+        self.base_model = base_model
         # TODO: what how to join MaskRank
         # self.base_model_mask = MaskRank(model, tagger)
         self.name = (
@@ -25,7 +25,6 @@ class MdPromptRank(BaseKPModel):
         topic_docs: List[Document],
         top_n: int = 15,
         min_len: int = 5,
-        stemming: bool = False,
         lemmer: Optional[Callable] = None,
         **kwargs,
     ) -> MdKPEOutput:

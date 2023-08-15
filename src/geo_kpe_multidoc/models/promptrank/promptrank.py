@@ -14,15 +14,6 @@ from transformers import AutoConfig, AutoTokenizer
 from geo_kpe_multidoc.datasets.promptrank_datasets import PromptRankDataset
 from geo_kpe_multidoc.document import Document
 from geo_kpe_multidoc.models.base_KP_model import BaseKPModel
-from geo_kpe_multidoc.models.candidate_extract.candidate_extract_bridge import (
-    BridgeKPECandidateExtractionModel,
-)
-from geo_kpe_multidoc.models.candidate_extract.candidate_extract_model import (
-    KPECandidateExtractionModel,
-)
-from geo_kpe_multidoc.models.candidate_extract.promptrank_extraction import (
-    PromptRankKPECandidateExtractionModel,
-)
 
 
 def get_PRF(num_c, num_e, num_s):
@@ -50,27 +41,12 @@ class PromptRank(BaseKPModel):
     from https://github.com/HLT-NLP/PromptRank
     """
 
-    def __init__(
-        self, model_name="google/flan-t5-small", tagger="en_core_web_trf", **kwargs
-    ):
+    def __init__(self, model_name, candidate_selection_model, **kwargs):
         self.name = "{}_{}".format(
             self.__class__.__name__, re.sub("[-/]", "_", model_name)
         )
 
-        extraction_variant = kwargs.get("extraction_variant", "promptrank")
-        if extraction_variant == "promptrank":
-            self.candidate_selection_model = PromptRankKPECandidateExtractionModel(
-                tagger=tagger, **kwargs
-            )
-        elif extraction_variant == "bridge":
-            self.candidate_selection_model = BridgeKPECandidateExtractionModel(
-                tagger=tagger
-            )
-        else:
-            self.candidate_selection_model = KPECandidateExtractionModel(
-                tagger=tagger, **kwargs
-            )
-
+        self.candidate_selection_model = candidate_selection_model
         logger.info(
             f"PromptRank model w/ {self.candidate_selection_model.__class__.__name__}"
         )
@@ -139,7 +115,7 @@ class PromptRank(BaseKPModel):
         )
 
     def top_n_candidates(
-        self, doc: Document, candidates, positions, **kwargs
+        self, doc, candidate_list, positions, top_n, **kwargs
     ) -> List[Tuple]:
         # input
         # doc_list, labels_stemed, labels,  model, dataloader

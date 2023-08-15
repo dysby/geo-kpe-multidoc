@@ -2,7 +2,7 @@ import os
 from operator import itemgetter
 from pathlib import Path
 from time import time
-from typing import Callable, List, Optional, Tuple
+from typing import List, Tuple
 
 import joblib
 import numpy as np
@@ -10,7 +10,6 @@ import torch
 from keybert._mmr import mmr
 from keybert.backend._base import BaseEmbedder
 from loguru import logger
-from nltk.stem.api import StemmerI
 from sklearn.metrics.pairwise import cosine_similarity
 
 from geo_kpe_multidoc import GEO_KPE_MULTIDOC_CACHE_PATH
@@ -49,12 +48,12 @@ class EmbedRank(BaseKPModel):
     def __init__(
         self,
         model,
-        tagger,
+        candidate_selection_model,
         pooling_strategy: str = "mean",
         candidate_embedding_strategy: str = "mentions_no_context",
         **kwargs,
     ):
-        super().__init__(model, tagger, **kwargs)
+        super().__init__(model, candidate_selection_model, **kwargs)
         self.counter = 0
         # manualy set SentenceTransformer max seq lenght1
         # self.model.embedding_model.max_seq_length = 384
@@ -86,7 +85,6 @@ class EmbedRank(BaseKPModel):
     def _embed_doc(
         self,
         doc: Document,
-        stemmer: Callable = None,
         doc_mode: str = "",
         post_processing: List[str] = None,
         output_attentions=None,
@@ -125,7 +123,6 @@ class EmbedRank(BaseKPModel):
     def _aggregate_candidate_mention_embeddings(
         self,
         doc: Document,
-        stemmer: Optional[StemmerI] = None,
         cand_mode: str = "",
         post_processing: List[str] = None,
     ):
@@ -160,7 +157,7 @@ class EmbedRank(BaseKPModel):
     #     doc.global_attention_mask[:, mentions] = 1
 
     def embed_candidates(
-        self, doc: Document, stemmer, **kwargs
+        self, doc: Document, **kwargs
     ) -> Tuple[List[np.ndarray], List[str]]:
         """
         TODO: Why embed_(n)_candidates?
@@ -226,17 +223,15 @@ class EmbedRank(BaseKPModel):
 
         output_attentions = "attention_rank" in cand_mode
 
-        t = time()
+        start = time()
         doc.doc_embed = self._embed_doc(
-            doc, stemmer, doc_mode, post_processing, output_attentions=output_attentions
+            doc, doc_mode, post_processing, output_attentions
         )
-        logger.debug(f"Embed Doc in {time() -  t:.2f}s")
+        logger.debug(f"Embed Doc in {time() -  start:.2f}s")
 
-        t = time()
-        self._aggregate_candidate_mention_embeddings(
-            doc, stemmer, cand_mode, post_processing
-        )
-        logger.debug(f"Embed Candidates in {time() -  t:.2f}s")
+        start = time()
+        self._aggregate_candidate_mention_embeddings(doc, cand_mode, post_processing)
+        logger.debug(f"Embed Candidates in {time() -  start:.2f}s")
 
         if use_cache:
             self._save_embeddings_in_cache(doc)
@@ -348,12 +343,7 @@ class EmbedRank(BaseKPModel):
         return candidate_score[:top_n], candidate_set
 
     def top_n_candidates(
-        self,
-        doc: Document,
-        top_n: int = 5,
-        min_len: int = 5,
-        stemmer: Callable = None,
-        **kwargs,
+        self, doc, candidate_list, positions, top_n, **kwargs
     ) -> List[Tuple]:
         doc_mode = kwargs.get("doc_mode", "")
         cand_mode = kwargs.get("cand_mode", "")
@@ -363,7 +353,7 @@ class EmbedRank(BaseKPModel):
         #     logger.error(f"Getting Embeddings for word sentence (not used?)")
         #     self.embed_sents_words(doc, stemmer, use_cache)
 
-        self.embed_candidates(doc, stemmer, **kwargs)
+        self.embed_candidates(doc, **kwargs)
 
         # candidate_score[:top_n], candidate_set
         ranking = self._rank_candidates(

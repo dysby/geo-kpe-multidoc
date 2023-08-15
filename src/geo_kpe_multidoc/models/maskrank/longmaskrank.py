@@ -1,13 +1,10 @@
-import re
 from operator import itemgetter
 from time import time
-from typing import Callable, Dict, List, Optional, Protocol, Set, Tuple
+from typing import List, Tuple
 
 import numpy as np
 import torch
 from loguru import logger
-from nltk.stem import PorterStemmer
-from nltk.stem.api import StemmerI
 from sklearn.metrics.pairwise import cosine_similarity
 from transformers import (
     BigBirdModel,
@@ -19,9 +16,6 @@ from transformers import (
 
 from geo_kpe_multidoc.document import Document
 from geo_kpe_multidoc.models.base_KP_model import BaseKPModel
-from geo_kpe_multidoc.models.candidate_extract.candidate_extract_model import (
-    KPECandidateExtractionModel,
-)
 from geo_kpe_multidoc.models.maskrank.mask_strategy import (
     CandidateMaskEmbeddingStrategy,
     MaskAll,
@@ -29,7 +23,6 @@ from geo_kpe_multidoc.models.maskrank.mask_strategy import (
     MaskHighest,
     MaskSubset,
 )
-from geo_kpe_multidoc.models.pre_processing.pos_tagging import POS_tagger_spacy
 from geo_kpe_multidoc.models.sentence_embedder import (
     BigBirdSentenceEmbedder,
     LongformerSentenceEmbedder,
@@ -43,21 +36,19 @@ class LongformerMaskRank(BaseKPModel):
         self,
         model: PreTrainedModel,
         tokenizer: PreTrainedTokenizerBase,
-        tagger: POS_tagger_spacy,
+        candidate_selection_model,
         device=None,
         name="",
         candidate_embedding_strategy: str = "MaskAll",
         **kwargs,
     ):
         # TODO: init super class
-        self.candidate_selection_model = KPECandidateExtractionModel(
-            tagger=tagger, **kwargs
-        )
+        self.candidate_selection_model = candidate_selection_model
         self.counter = 1
 
         if device is None:
             device = "cuda" if torch.cuda.is_available() else "cpu"
-            logger.info("LongEmbedRank use pytorch device: {}".format(device))
+            logger.info(f"LongEmbedRank use pytorch device: {device}")
             # if torch.cuda.device_count() > 1:
             #     device = "cuda" if torch.cuda.is_available() else "cpu"
             #     logger.info("LongEmbedRank use pytorch device: {}".format(device))
@@ -88,7 +79,7 @@ class LongformerMaskRank(BaseKPModel):
 
         # TODO: Add support for e5 type models that require "query: " prefixed text.
         self.add_query_prefix = (
-            "query: " if kwargs.get("add_query_prefix", False) else ""
+            "query: " if kwargs.get("add_query_prefix") else ""
         )  # for intfloat/multilingual-e5-* models
 
         self.strategy = strategies[candidate_embedding_strategy]()
@@ -98,7 +89,6 @@ class LongformerMaskRank(BaseKPModel):
     def _embed_doc(
         self,
         doc: Document,
-        stemmer: Callable = None,
         doc_mode: str = "",
         post_processing: List[str] = None,
         output_attentions=False,
@@ -164,9 +154,9 @@ class LongformerMaskRank(BaseKPModel):
     def top_n_candidates(
         self,
         doc: Document,
+        candidate_list,
+        positions=None,
         top_n: int = 5,
-        min_len: int = 5,
-        stemmer: Callable = None,
         **kwargs,
     ) -> List[Tuple]:
         cand_mode = kwargs.get("cand_mode", "MaskAll")
@@ -177,7 +167,7 @@ class LongformerMaskRank(BaseKPModel):
         # logger.info(f"Embed Doc in {time() -  t:.2f}s")
 
         # t = time()
-        self.embed_candidates(doc, stemmer, cand_mode, attention)
+        self.embed_candidates(doc, cand_mode, attention)
         # logger.info(f"Embed Candidates in {time() -  t:.2f}s")
 
         return self._rank_candidates(
@@ -187,7 +177,6 @@ class LongformerMaskRank(BaseKPModel):
     def embed_candidates(
         self,
         doc: Document,
-        stemmer: Callable = None,
         cand_mode: str = "MaskAll",
         attention: str = "",
     ):
@@ -199,12 +188,12 @@ class LongformerMaskRank(BaseKPModel):
 
             The default value is MaskAll.
         """
-        t = time()
+        start = time()
         doc.doc_embed = self._embed_doc(doc)
-        logger.debug(f"Embed Doc in {time() -  t:.2f}s")
+        logger.debug(f"Embed Doc in {time() -  start:.2f}s")
 
         doc.candidate_set_embed = []
 
-        t = time()
+        start = time()
         self.strategy.candidate_embeddings(self.model, doc)
-        logger.debug(f"Embed Candidates in {time() -  t:.2f}s")
+        logger.debug(f"Embed Candidates in {time() -  start:.2f}s")

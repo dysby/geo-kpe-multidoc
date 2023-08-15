@@ -12,6 +12,15 @@ from geo_kpe_multidoc.models.backend.roberta2longformer.roberta2nyströmformer i
     convert_roberta_to_nystromformer,
 )
 from geo_kpe_multidoc.models.base_KP_model import BaseKPModel, ExtractionEvaluator
+from geo_kpe_multidoc.models.candidate_extract.candidate_extract_bridge import (
+    BridgeKPECandidateExtractionModel,
+)
+from geo_kpe_multidoc.models.candidate_extract.candidate_extract_model import (
+    KPECandidateExtractionModel,
+)
+from geo_kpe_multidoc.models.candidate_extract.promptrank_extraction import (
+    PromptRankKPECandidateExtractionModel,
+)
 from geo_kpe_multidoc.models.embedrank.embedrank_model import EmbedRank
 from geo_kpe_multidoc.models.embedrank.longembedrank import LongEmbedRank
 from geo_kpe_multidoc.models.fusion_model import FusionModel
@@ -25,7 +34,7 @@ from geo_kpe_multidoc.models.promptrank.promptrank import PromptRank
 def generateLongformerRanker(
     ranker_class: BaseKPModel,
     backend_model_name,
-    tagger_model,
+    candidate_selection_model,
     longformer_max_length,
     longformer_attention_window,
     generate_position_embeddings=False,
@@ -42,7 +51,7 @@ def generateLongformerRanker(
         kpe_model = ranker_class(
             model,
             tokenizer,
-            tagger_model,
+            candidate_selection_model=candidate_selection_model,
             device=device,
             name=backend_model_name.replace("/", "-"),
             **kwargs,
@@ -86,7 +95,7 @@ def generateLongformerRanker(
     kpe_model = ranker_class(
         longformer_model,
         longformer_tokenizer,
-        tagger=tagger_model,
+        candidate_selection_model=candidate_selection_model,
         device=device,
         name=model_name,
         candidate_embedding_strategy=kwargs.get("candidate_mode"),
@@ -96,7 +105,7 @@ def generateLongformerRanker(
 
 
 def generateBigBirdRanker(
-    backend_model_name, tagger_model, longformer_max_length, **kwargs
+    backend_model_name, candidate_selection_model, longformer_max_length, **kwargs
 ):
     # Generate BigBird from Sentence Transformer
     new_max_pos = longformer_max_length
@@ -116,7 +125,7 @@ def generateBigBirdRanker(
     kpe_model = LongEmbedRank(
         bigbird_model,
         bigbird_tokenizer,
-        tagger_model,
+        candidate_selection_model=candidate_selection_model,
         device=device,
         name=model_name,
         candidate_embedding_strategy=kwargs.get("candidate_mode"),
@@ -126,7 +135,7 @@ def generateBigBirdRanker(
 
 
 def generateNystromformerRanker(
-    backend_model_name, tagger_model, longformer_max_length, **kwargs
+    backend_model_name, candidate_selection_model, longformer_max_length, **kwargs
 ):
     # Generate Nystromformer from Sentence Transformer
     new_max_pos = longformer_max_length
@@ -146,7 +155,7 @@ def generateNystromformerRanker(
     kpe_model = LongEmbedRank(
         bigbird_model,
         bigbird_tokenizer,
-        tagger_model,
+        candidate_selection_model=candidate_selection_model,
         device=device,
         name=model_name,
         candidate_embedding_strategy=kwargs.get("candidate_mode"),
@@ -156,32 +165,48 @@ def generateNystromformerRanker(
 
 
 def kpe_model_factory(BACKEND_MODEL_NAME, TAGGER_NAME, **kwargs) -> BaseKPModel:
+    # Extraction Model
+
+    extraction_variant = kwargs.get("extraction_variant", "promptrank")
+    if extraction_variant == "promptrank":
+        candidate_selection_model = PromptRankKPECandidateExtractionModel(
+            tagger=TAGGER_NAME, **kwargs
+        )
+    elif extraction_variant == "bridge":
+        candidate_selection_model = BridgeKPECandidateExtractionModel(
+            tagger=TAGGER_NAME
+        )
+    else:
+        candidate_selection_model = KPECandidateExtractionModel(
+            tagger=TAGGER_NAME, **kwargs
+        )
+
+    # Ranking Model
     rank_class = kwargs.get("rank_model", "EmbedRank")
     if rank_class == "EmbedRank":
         if "[longformer]" in BACKEND_MODEL_NAME:
             kpe_model = generateLongformerRanker(
                 LongEmbedRank,
                 BACKEND_MODEL_NAME.replace("[longformer]", ""),
-                TAGGER_NAME,
+                candidate_selection_model=candidate_selection_model,
                 **kwargs,
             )
         elif "[bigbird]" in BACKEND_MODEL_NAME:
             kpe_model = generateBigBirdRanker(
                 BACKEND_MODEL_NAME.replace("[bigbird]", ""),
-                TAGGER_NAME,
+                candidate_selection_model=candidate_selection_model,
                 **kwargs,
             )
         elif "[nystromformer]" in BACKEND_MODEL_NAME:
             kpe_model = generateNystromformerRanker(
                 BACKEND_MODEL_NAME.replace("[nystromformer]", ""),
-                TAGGER_NAME,
+                candidate_selection_model=candidate_selection_model,
                 **kwargs,
             )
         else:
             kpe_model = EmbedRank(
                 BACKEND_MODEL_NAME,
-                TAGGER_NAME,
-                candidate_embedding_strategy=kwargs["candidate_mode"],
+                candidate_selection_model=candidate_selection_model,
                 **kwargs,
             )
     elif rank_class == "MaskRank":
@@ -189,46 +214,69 @@ def kpe_model_factory(BACKEND_MODEL_NAME, TAGGER_NAME, **kwargs) -> BaseKPModel:
             kpe_model = generateLongformerRanker(
                 LongformerMaskRank,
                 BACKEND_MODEL_NAME.replace("[longformer]", ""),
-                TAGGER_NAME,
+                candidate_selection_model=candidate_selection_model,
                 **kwargs,
             )
         else:
-            kpe_model = MaskRank(BACKEND_MODEL_NAME, TAGGER_NAME, **kwargs)
+            kpe_model = MaskRank(
+                BACKEND_MODEL_NAME,
+                candidate_selection_model=candidate_selection_model,
+                **kwargs,
+            )
     elif rank_class == "PromptRank":
-        kpe_model = PromptRank(BACKEND_MODEL_NAME, TAGGER_NAME, **kwargs)
+        kpe_model = PromptRank(
+            BACKEND_MODEL_NAME,
+            candidate_selection_model=candidate_selection_model,
+            **kwargs,
+        )
     elif rank_class == "MDKPERank":
         if "[longformer]" in BACKEND_MODEL_NAME:
             base_name = BACKEND_MODEL_NAME.replace("[longformer]", "")
-            kpe_model = MDKPERank(
+            single_doc_ranker = (
                 generateLongformerRanker(
-                    LongEmbedRank, base_name, TAGGER_NAME, **kwargs
+                    LongEmbedRank,
+                    base_name,
+                    candidate_selection_model=candidate_selection_model,
+                    **kwargs,
                 ),
-                rank_strategy=kwargs["md_strategy"],
-                **kwargs,
             )
         else:
-            ranker = EmbedRank(
+            single_doc_ranker = EmbedRank(
                 BACKEND_MODEL_NAME,
-                TAGGER_NAME,
+                candidate_selection_model=candidate_selection_model,
                 candidate_embedding_strategy=kwargs["candidate_mode"],
                 **kwargs,
             )
-            kpe_model = MDKPERank(ranker, rank_strategy=kwargs["md_strategy"], **kwargs)
+        kpe_model = MDKPERank(
+            single_doc_ranker, rank_strategy=kwargs["md_strategy"], **kwargs
+        )
     elif rank_class == "MdPromptRank":
-        base_model = PromptRank(BACKEND_MODEL_NAME, TAGGER_NAME, **kwargs)
-        kpe_model = MdPromptRank(base_model)
+        single_doc_ranker = PromptRank(
+            BACKEND_MODEL_NAME,
+            candidate_selection_model=candidate_selection_model,
+            **kwargs,
+        )
+        kpe_model = MdPromptRank(single_doc_ranker)
     elif rank_class == "ExtractionEvaluator":
-        kpe_model = ExtractionEvaluator(BACKEND_MODEL_NAME, TAGGER_NAME, **kwargs)
+        kpe_model = ExtractionEvaluator(
+            BACKEND_MODEL_NAME,
+            candidate_selection_model=candidate_selection_model,
+            **kwargs,
+        )
     elif rank_class == "FusionRank":
         kpe_model = FusionModel(
             [
                 EmbedRank(
                     BACKEND_MODEL_NAME,
-                    TAGGER_NAME,
+                    candidate_selection_model=candidate_selection_model,
                     candidate_embedding_strategy=kwargs["candidate_mode"],
                     **kwargs,
                 ),
-                MaskRank(BACKEND_MODEL_NAME, TAGGER_NAME, **kwargs),
+                MaskRank(
+                    BACKEND_MODEL_NAME,
+                    candidate_selection_model=candidate_selection_model,
+                    **kwargs,
+                ),
             ],
             averaging_strategy=kwargs["ensemble_mode"],
             # models_weights=args.weights,

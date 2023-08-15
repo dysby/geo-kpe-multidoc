@@ -93,21 +93,13 @@ class BaseKPModel:
     Simple abstract class to encapsulate all KP models
     """
 
-    def __init__(self, model, tagger, **kwargs):
+    def __init__(self, model, candidate_selection_model, **kwargs):
         if model != "":
             self.model = select_backend(model)
         self.name = "{}_{}".format(
             str(self.__str__).split()[3], re.sub("-", "_", model)
         )
-        extraction_variant = kwargs.get("extraction_variant", "base")
-        if extraction_variant == "promptrank":
-            self.candidate_selection_model = PromptRankKPECandidateExtractionModel(
-                tagger=tagger, **kwargs
-            )
-        else:
-            self.candidate_selection_model = KPECandidateExtractionModel(
-                tagger=tagger, **kwargs
-            )
+        self.candidate_selection_model = candidate_selection_model
 
         self.counter = 1
 
@@ -126,7 +118,7 @@ class BaseKPModel:
         )
 
     def top_n_candidates(
-        self, doc, candidate_list, top_n, min_len, **kwargs
+        self, doc, candidate_list, positions, top_n, **kwargs
     ) -> List[Tuple]:
         """
         Abstract method to retrieve top_n candidates
@@ -138,7 +130,7 @@ class BaseKPModel:
         doc: Document,
         top_n,
         min_len,
-        stemmer: Optional[StemmerI] = None,
+        # stemmer: Optional[StemmerI] = None,
         lemmer: Optional[Callable] = None,
         **kwargs,
     ) -> Tuple[List[Tuple], List[str]]:
@@ -148,9 +140,7 @@ class BaseKPModel:
         """
         self.extract_candidates(doc, min_len, lemmer, **kwargs)
 
-        top_n, candidate_set = self.top_n_candidates(
-            doc, top_n, min_len, stemmer, **kwargs
-        )
+        top_n, candidate_set = self.top_n_candidates(doc, top_n, min_len, **kwargs)
 
         logger.debug(f"Document #{self.counter} processed")
         self.counter += 1
@@ -163,7 +153,6 @@ class BaseKPModel:
         dataset,
         top_n=5,
         min_len=0,
-        stemming=True,
         lemmatize=False,
         **kwargs,
     ) -> List[List[Tuple]]:
@@ -181,15 +170,8 @@ class BaseKPModel:
 
 
 class ExtractionEvaluator(BaseKPModel):
-    def __init__(self, model, tagger, extraction_variant="base", **kwargs):
-        if extraction_variant == "promptrank":
-            self.candidate_selection_model = PromptRankKPECandidateExtractionModel(
-                tagger=tagger, **kwargs
-            )
-        else:
-            self.candidate_selection_model = KPECandidateExtractionModel(
-                tagger=tagger, **kwargs
-            )
+    def __init__(self, model, candidate_selection_model, **kwargs):
+        self.candidate_selection_model = candidate_selection_model
         self.counter = 1
 
     def extract_kp_from_doc(

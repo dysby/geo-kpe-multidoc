@@ -43,7 +43,6 @@ class MDKPERank(BaseKPModel):
         doc,
         top_n: int = -1,
         min_len: int = 0,
-        stemmer: StemmerI = None,
         lemmer=None,
         **kwargs,
     ):
@@ -51,14 +50,13 @@ class MDKPERank(BaseKPModel):
 
         _, cand_embeds, candidate_set = self.base_model_embed.embed_candidates(
             doc,
-            stemmer=stemmer,
             **kwargs,
         )
 
         return (doc, cand_embeds, candidate_set)
 
     def extract_kp_from_doc(
-        self, doc, top_n, min_len, stemmer=None, lemmer=None, **kwargs
+        self, doc, top_n, min_len, lemmer=None, **kwargs
     ) -> Tuple[Document, List[np.ndarray], List[str]]:  # Tuple[List[Tuple], List[str]]:
         """
         Extracts key-phrases from a given document, with optional arguments
@@ -69,7 +67,6 @@ class MDKPERank(BaseKPModel):
 
         _, cand_embeds, candidate_set = self.base_model_embed.embed_candidates(
             doc,
-            stemmer=stemmer,
             **kwargs,
         )
 
@@ -201,88 +198,11 @@ class MDKPERank(BaseKPModel):
             ranking_p_doc=ranking_p_doc,
         )
 
-    def extract_from_topic_original(
-        self,
-        topic,
-        dataset: str = "MKDUC01",
-        top_n: int = 15,
-        min_len: int = 5,
-        stemming: bool = False,
-        lemmatize: bool = False,
-        **kwargs,
-    ) -> List[List[Tuple]]:
-        """_summary_
-
-        Parameters
-        ----------
-        topic : _type_
-            _description_
-        dataset : str, optional
-            _description_, by default "MKDUC01"
-        top_n : int, optional
-            _description_, by default 15
-        min_len : int, optional
-            _description_, by default 5
-        stemming : bool, optional
-            _description_, by default False
-        lemmatize : bool, optional
-            _description_, by default False
-
-        Returns
-        -------
-        List[List[Tuple]]
-            _description_
-        """
-        topic_res = [
-            self.extract_kp_from_doc(doc, -1, min_len, stemming, lemmatize, **kwargs)
-            for doc in topic[0]
-        ]
-        cands = {}
-        for doc in topic_res:
-            doc_abs = doc[0]
-            cand_embeds = doc[1]
-            cand_set = doc[2]
-
-            for i in range(len(cand_set)):
-                if cand_set[i] not in cands:
-                    cands[cand_set[i]] = []
-                cands[cand_set[i]].append(cand_embeds[i])
-
-        cand_embeds = []
-        cand_set = []
-        for cand in cands:
-            cand_embeds.append(np.mean(cands[cand], 0))
-            cand_set.append(cand)
-
-        res_p_doc = [
-            doc[0].evaluate_n_candidates(cand_embeds, cand_set) for doc in topic_res
-        ]
-        scores_per_candidate = {}
-
-        for doc in res_p_doc:
-            for cand_t in doc[0]:
-                if cand_t[0] not in scores_per_candidate:
-                    scores_per_candidate[cand_t[0]] = []
-                scores_per_candidate[cand_t[0]].append(cand_t[1])
-
-        for cand in scores_per_candidate:
-            scores_per_candidate[cand] = mean(scores_per_candidate[cand])
-
-        scores = sorted(
-            [(cand, scores_per_candidate[cand]) for cand in scores_per_candidate],
-            reverse=True,
-            key=itemgetter(1),
-        )
-        cand_set = [cand[0] for cand in scores]
-
-        return scores, cand_set
-
     def extract_kp_from_topic(
         self,
         topic_docs: List[Document],
         top_n: int = -1,
         min_len: int = 0,
-        stemming: bool = False,
         lemmatize: bool = False,
         **kwargs,
     ) -> MdKPEOutput:
@@ -302,12 +222,27 @@ class MDKPERank(BaseKPModel):
                 doc,
                 top_n=top_n,
                 min_len=min_len,
-                stemming=stemming,
                 lemmatize=lemmatize,
                 **kwargs,
             )
             for doc in topic_docs
         ]
+
+        # if self.whitening:
+        #     documents_embeddings = {}
+        #     candidate_embeddings = {}
+
+        #     for doc, cand_embeds, cand_set in topic_res:
+
+        #         documents_embeddings[doc.id] = doc.doc_embed  # .reshape(1, -1)
+        #         # Size([1, 768])
+        #         for candidate, embedding in zip(cand_set, cand_embeds):
+        #             candidate_embeddings.setdefault(candidate, []).append(embedding)
+
+        #     candidate_embeddings = {
+        #         candidate: np.mean(embeddings, axis=0)
+        #         for candidate, embeddings in candidate_embeddings.items()
+        #     }
 
         (
             documents_embeddings,
@@ -392,7 +327,6 @@ class MDKPERank(BaseKPModel):
         corpus: KPEDataset,
         top_n: int = -1,
         min_len: int = 0,
-        stemming: bool = False,
         lemmatize: bool = False,
         **kwargs,
     ) -> List[List[KPEScore]]:
@@ -410,9 +344,7 @@ class MDKPERank(BaseKPModel):
             list of results with ((candidate, scores), candidate) items
         """
         res = [
-            self.extract_kp_from_topic(
-                sample, top_n, min_len, stemming, lemmatize, **kwargs
-            )
+            self.extract_kp_from_topic(sample, top_n, min_len, lemmatize, **kwargs)
             for _id, sample, _label in corpus
         ]
 

@@ -1,12 +1,10 @@
 import re
 from operator import itemgetter
 from time import time
-from typing import Callable, List, Optional, Set, Tuple
+from typing import List, Tuple
 
 import numpy as np
 from loguru import logger
-from nltk.stem import PorterStemmer
-from nltk.stem.api import StemmerI
 from sklearn.metrics.pairwise import cosine_similarity
 
 from geo_kpe_multidoc.document import Document
@@ -23,12 +21,16 @@ class MaskRank(BaseKPModel):
     """
 
     def __init__(
-        self, model, tagger, candidate_embedding_strategy: str = "MaskAll", **kwargs
+        self,
+        model,
+        candidade_selection_model,
+        candidate_embedding_strategy: str = "MaskAll",
+        **kwargs,
     ):
-        super().__init__(model, tagger, **kwargs)
+        super().__init__(model, candidade_selection_model, **kwargs)
         self.counter = 0
 
-    def embed_doc(self, doc: Document, stemmer: Callable = None) -> np.ndarray:
+    def embed_doc(self, doc: Document, **kwargs) -> np.ndarray:
         """
         Method that embeds the document.
         """
@@ -50,7 +52,6 @@ class MaskRank(BaseKPModel):
     def embed_candidates(
         self,
         doc: Document,
-        stemmer: Callable = None,
         cand_mode: str = "MaskAll",
         attention: str = "",
     ):
@@ -87,9 +88,7 @@ class MaskRank(BaseKPModel):
                 doc.candidate_set_embed.append(candidate_embeds)
 
         elif cand_mode == "MaskSubset":
-            doc.candidate_set = sorted(
-                doc.candidate_set, reverse=True, key=lambda x: len(x)
-            )
+            doc.candidate_set = sorted(doc.candidate_set, reverse=True, key=len)
             seen_candidates = {}
 
             for candidate in doc.candidate_set:
@@ -98,7 +97,6 @@ class MaskRank(BaseKPModel):
                 for prev_candidate in seen_candidates:
                     if len_candidate == len(prev_candidate):
                         break
-
                     elif candidate in prev_candidate:
                         prohibited_pos.extend(seen_candidates[prev_candidate])
 
@@ -126,7 +124,7 @@ class MaskRank(BaseKPModel):
             RuntimeError("cand_mode not set!")
 
     def embed_n_candidates(
-        self, doc: Document, min_len: int, stemmer: Optional[StemmerI] = None, **kwargs
+        self, doc: Document, **kwargs
     ) -> Tuple[np.ndarray, List[str]]:
         """
         Return
@@ -136,11 +134,11 @@ class MaskRank(BaseKPModel):
         """
         # TODO: why embed_doc in MaskRank is different, no post_processing or doc_mode
         t = time()
-        doc.doc_embed = self.embed_doc(doc, stemmer)
+        doc.doc_embed = self.embed_doc(doc)
         logger.info(f"Embed Doc in {time() -  t:.2f}s")
 
         t = time()
-        self.embed_candidates(doc, stemmer, cand_mode="MaskAll")
+        self.embed_candidates(doc, cand_mode="MaskAll")
         logger.info(f"Embed Candidates in {time() -  t:.2f}s")
 
         return doc.candidate_set_embed, doc.candidate_set
@@ -191,22 +189,17 @@ class MaskRank(BaseKPModel):
         return candidate_score[:top_n], [candidate[0] for candidate in candidate_score]
 
     def top_n_candidates(
-        self,
-        doc,
-        top_n: int = 5,
-        min_len: int = 5,
-        stemmer: Callable = None,
-        **kwargs,
+        self, doc, candidate_list, positions, top_n, **kwargs
     ) -> List[Tuple]:
         cand_mode = kwargs.get("cand_mode", "MaskAll")
         attention = kwargs.get("global_attention", "global_attention")
 
         t = time()
-        doc.doc_embed = self.embed_doc(doc, stemmer)
+        doc.doc_embed = self.embed_doc(doc)
         logger.info(f"Embed Doc in {time() -  t:.2f}s")
 
         t = time()
-        self.embed_candidates(doc, stemmer, cand_mode, attention)
+        self.embed_candidates(doc, cand_mode, attention)
         logger.info(f"Embed Candidates in {time() -  t:.2f}s")
 
         return self._rank_candidates(

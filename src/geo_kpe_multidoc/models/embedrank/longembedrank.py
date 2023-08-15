@@ -1,4 +1,4 @@
-from typing import Callable, List
+from typing import List
 
 import numpy as np
 import torch
@@ -12,16 +12,12 @@ from transformers import (
 )
 
 from geo_kpe_multidoc.document import Document
-from geo_kpe_multidoc.models.candidate_extract.candidate_extract_model import (
-    KPECandidateExtractionModel,
-)
 from geo_kpe_multidoc.models.embedrank.embedding_strategy import (
     STRATEGIES,
     CandidateEmbeddingStrategy,
     InContextEmbeddings,
 )
 from geo_kpe_multidoc.models.embedrank.embedrank_model import EmbedRank
-from geo_kpe_multidoc.models.pre_processing.pos_tagging import POS_tagger_spacy
 from geo_kpe_multidoc.models.sentence_embedder import (
     BigBirdSentenceEmbedder,
     LongformerSentenceEmbedder,
@@ -39,21 +35,19 @@ class LongEmbedRank(EmbedRank):
         self,
         model: PreTrainedModel,
         tokenizer: PreTrainedTokenizerBase,
-        tagger: POS_tagger_spacy,
+        candidate_selection_model,
         device=None,
         name="",
         candidate_embedding_strategy: str = "",
         **kwargs,
     ):
         # TODO: init super class
-        self.candidate_selection_model = KPECandidateExtractionModel(
-            tagger=tagger, **kwargs
-        )
+        self.candidate_selection_model = candidate_selection_model
         self.counter = 1
 
         if device is None:
             device = "cuda" if torch.cuda.is_available() else "cpu"
-            logger.info("LongEmbedRank use pytorch device: {}".format(device))
+            logger.info(f"LongEmbedRank use pytorch device: {device}")
             # if torch.cuda.device_count() > 1:
             #     device = "cuda" if torch.cuda.is_available() else "cpu"
             #     logger.info("LongEmbedRank use pytorch device: {}".format(device))
@@ -90,14 +84,13 @@ class LongEmbedRank(EmbedRank):
         )
         # TODO: Add support for e5 type models that require "query: " prefixed text.
         self.add_query_prefix = (
-            "query: " if kwargs.get("add_query_prefix", False) else ""
+            "query: " if kwargs.get("add_query_prefix") else ""
         )  # for intfloat/multilingual-e5-* models
         self.whitening = kwargs.get("whitening", False)
 
     def _embed_doc(
         self,
         doc: Document,
-        stemmer: Callable = None,
         doc_mode: str = "",
         post_processing: List[str] = None,
         output_attentions=False,
