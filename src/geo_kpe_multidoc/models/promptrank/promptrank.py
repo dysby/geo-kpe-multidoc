@@ -296,7 +296,7 @@ class PromptRank(BaseKPModel):
         """
 
         en_input = self.tokenizer(
-            doc.raw_text,
+            self.temp_en + doc.raw_text,
             max_length=self.max_len,
             padding="max_length",
             truncation=True,
