@@ -57,13 +57,19 @@ def MoranI(
     if n < 2:
         return np.nan
 
+    # # all values equal
+    # if np.allclose(scores, np.mean(scores)):
+    #     return 1
+
     std = scores.std()
     if std == 0:
         return 1
 
     z = (scores - scores.mean()) / (scores.std())
 
-    z = torch.Tensor(z.to_numpy()).to(device)
+    # change z to column vector because of pytorch warning
+    # of transpose unidimentional vectors...
+    z = torch.Tensor(z.to_numpy()).to(device).reshape(-1, 1)
     w = torch.Tensor(weight_matrix).to(device)
 
     moranI = z.T @ w @ z / (z.T @ z)
@@ -241,22 +247,23 @@ class MdGeoRank:
         return topic_doc_coordinates
 
     def geo_association(self):
+        """
+        topic_model_outputs: dict_keys(['dataset',
+                                        'topic',
+                                        'top_n_scores',
+                                        'candidate_document_matrix',
+                                        'gold_kp',
+                                        'documents_embeddings',
+                                        'candidate_embeddings',
+                                        'ranking_p_doc'])
+        """
+
         topic_doc_coordinates = self._load_md_coordinates()
         semantic_rank_model_outputs = self._load_semantic_rank_model_outputs()
 
         results = pd.DataFrame()
 
         for topic_id, topic_model_outputs in semantic_rank_model_outputs.items():
-            """
-            topic_model_outputs: dict_keys(['dataset',
-                                            'topic',
-                                            'top_n_scores',
-                                            'candidate_document_matrix',
-                                            'gold_kp',
-                                            'documents_embeddings',
-                                            'candidate_embeddings',
-                                            'ranking_p_doc'])
-            """
             candidate_scores_per_doc = pd.DataFrame(
                 [
                     {"doc": doc_id, "candidate": candidate, "score": score}
@@ -359,9 +366,7 @@ class MdGeoRank:
 
     def _rank(self, geo_association_results: pd.DataFrame):
         """
-        compose final score and transform results to evaluation format
-
-
+        Compose final score and transform results to evaluation format
 
         Parameters
         ----------
@@ -378,23 +383,20 @@ class MdGeoRank:
                     ...
                 }
         """
-        #
-
         final_score = pd.DataFrame().reindex_like(geo_association_results)
 
         final_score["score"] = (
-            geo_association_results["score"] + geo_association_results["moran_i"]
+            geo_association_results["semantic_score"]
+            + geo_association_results["moran_i"]
         )
 
         rankings = dict()
         for dataset in ["dataset"]:
-            for topic in final_score.index.get_level_values(0):
+            for topic in sorted(final_score.index.get_level_values(0).unique()):
                 top_n_scores = sorted(
-                    list(
-                        final_score.loc[topic]["score"].items(),
-                        key=itemgetter(1),
-                        reversed=True,
-                    )
+                    list(final_score.loc[topic]["score"].items()),
+                    key=itemgetter(1),
+                    reverse=True,
                 )
                 candidates = final_score.loc[topic].index.to_list()
                 rankings.setdefault(dataset, []).append((top_n_scores, candidates))
