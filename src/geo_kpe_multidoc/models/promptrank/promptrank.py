@@ -53,6 +53,9 @@ class PromptRank(BaseKPModel):
 
         # hack kwargs.max_seq_len is None...
         self.max_len = kwargs.get("max_seq_len") or 512
+        # TODO: HACK longmodel
+        if "long" in model_name.lower():
+            self.max_len = 4096
         self.temp_en = kwargs.get("encoder_prompt") or "Book: "
         self.temp_de = kwargs.get("decoder_prompt") or "This book mainly talks about "
         self.enable_filter = kwargs.get("enable_filter", False)
@@ -274,7 +277,9 @@ class PromptRank(BaseKPModel):
         en_input = self.tokenizer(
             self.temp_en + doc.raw_text,
             max_length=self.max_len,
-            padding="max_length",
+            # padding="max_length",
+            # In original PromptRank was used max lenght padding
+            # It is not usefull for LongT5
             truncation=True,
             return_tensors="pt",
         )
