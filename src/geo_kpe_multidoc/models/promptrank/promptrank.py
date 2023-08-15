@@ -254,7 +254,7 @@ class PromptRank(BaseKPModel):
         positions = doc.candidate_positions
 
         top_n, candidate_set = self.top_n_candidates(
-            doc, candidates, positions, **kwargs
+            doc, candidates, positions, top_n=top_n, **kwargs
         )
 
         logger.debug(f"Document #{self.counter} processed")
