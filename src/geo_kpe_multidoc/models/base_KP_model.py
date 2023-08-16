@@ -11,10 +11,7 @@ from geo_kpe_multidoc.datasets.datasets import KPEDataset
 from geo_kpe_multidoc.document import Document
 from geo_kpe_multidoc.models.backend.select_backend import select_backend
 from geo_kpe_multidoc.models.candidate_extract.candidate_extract_model import (
-    KPECandidateExtractionModel,
-)
-from geo_kpe_multidoc.models.candidate_extract.promptrank_extraction import (
-    PromptRankKPECandidateExtractionModel,
+    CandidateExtractionModel,
 )
 from geo_kpe_multidoc.models.pre_processing.pre_processing_utils import (
     filter_tokenizer_special_tokens,
@@ -93,7 +90,9 @@ class BaseKPModel:
     Simple abstract class to encapsulate all KP models
     """
 
-    def __init__(self, model, candidate_selection_model, **kwargs):
+    def __init__(
+        self, model, candidate_selection_model: CandidateExtractionModel, **kwargs
+    ):
         if model != "":
             self.model = select_backend(model)
         self.name = "{}_{}".format(
@@ -140,12 +139,18 @@ class BaseKPModel:
         """
         self.extract_candidates(doc, min_len, lemmer, **kwargs)
 
-        top_n, candidate_set = self.top_n_candidates(doc, top_n, min_len, **kwargs)
+        top_n_candidates_scores, candidate_set = self.top_n_candidates(
+            doc,
+            candidate_list=doc.candidate_set,
+            positions=doc.candidate_positions,
+            top_n=top_n,
+            **kwargs,
+        )
 
         logger.debug(f"Document #{self.counter} processed")
         self.counter += 1
 
-        return (top_n, candidate_set)
+        return (top_n_candidates_scores, candidate_set)
 
     def extract_kp_from_corpus(
         self,

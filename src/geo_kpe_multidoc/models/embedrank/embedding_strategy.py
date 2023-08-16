@@ -120,6 +120,55 @@ class InContextEmbeddings:
             doc.candidate_set_embed.append(np.mean(embds, 0))
 
 
+class InContextPlusClsEmbeddings:
+    """Compute each candidate mention embedding as the mean of each token in the mention,
+    and also the cls token and the last token of the document embedding
+    """
+
+    def __init__(self, add_query_prefix=False, **kwargs) -> None:
+        self.add_query_prefix = "query: " if add_query_prefix else ""
+
+    def candidate_embeddings(self, model, doc: Document):
+        for candidate in doc.candidate_set:
+            mentions_positions = _search_mentions(
+                model, doc.candidate_mentions[candidate], doc.token_ids
+            )
+
+            # backoff procedure, if mentions not found.
+            if len(mentions_positions) == 0:
+                for mention in doc.candidate_mentions[candidate]:
+                    embds = []
+                    q_mention = self.add_query_prefix + mention
+
+                    if isinstance(model, BaseEmbedder):
+                        embd = model.embed(q_mention)
+                    else:
+                        embd = (
+                            model.encode(q_mention, device=model.device)[
+                                "sentence_embedding"
+                            ]
+                            .detach()
+                            .cpu()
+                            .numpy()
+                        )
+                    embds.append(embd)
+
+                logger.debug(
+                    f"Candidate {candidate} - mentions not found: {doc.candidate_mentions[candidate]}"
+                )
+            else:
+                _, embed_dim = doc.token_embeddings.size()
+                embds = torch.empty(size=(len(mentions_positions), embed_dim))
+                for i, occurrence in enumerate(mentions_positions):
+                    embds[i] = torch.mean(
+                        doc.token_embeddings[(0, *occurrence, -1), :], dim=0
+                    )
+
+                embds = embds.numpy()
+
+            doc.candidate_set_embed.append(np.mean(embds, 0))
+
+
 class InAndOutContextEmbeddings:
     def __init__(self, add_query_prefix=False, **kwargs) -> None:
         self.add_query_prefix = "query: " if add_query_prefix else ""
@@ -244,6 +293,7 @@ STRATEGIES = {
     "no_context": OutContextEmbedding,
     "mentions_no_context": OutContextMentionsEmbedding,
     "in_context": InContextEmbeddings,
+    "in_context_plus_cls": InContextPlusClsEmbeddings,
     "in_n_out_context": InAndOutContextEmbeddings,
     "global_attention": InContextEmbeddings,
     "global_attention_dilated": InContextEmbeddings,

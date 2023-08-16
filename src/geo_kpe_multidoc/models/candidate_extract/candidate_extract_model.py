@@ -1,6 +1,6 @@
 from os import path
 from pathlib import Path
-from typing import Callable, List, Tuple
+from typing import Callable, List, Protocol, Tuple
 
 import joblib
 from loguru import logger
@@ -14,6 +14,24 @@ from geo_kpe_multidoc.models.pre_processing.pre_processing_utils import (
     remove_hyphens_and_dots,
     remove_whitespaces,
 )
+
+
+class CandidateExtractionModel(Protocol):
+    def __call__(
+        self,
+        doc: Document,
+        min_len: int = 5,
+        grammar: str = None,
+        lemmer_lang: str = None,
+        **kwargs,
+    ) -> Tuple[List[str], List[Tuple[int, int]]]:
+        """
+        Returns
+        -------
+        Tuple[List[str], List[Tuple[int, int]]]
+            List of candidate keyphrases and List of candidate positions (start, stop)
+        """
+        ...
 
 
 class KPECandidateExtractionModel:
