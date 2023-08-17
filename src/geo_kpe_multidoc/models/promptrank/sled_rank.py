@@ -81,7 +81,7 @@ class SLEDPromptRank(BaseKPModel):
         self.counter = 1
 
     def extract_candidates(
-        self, doc, min_len, lemmer, **kwargs
+        self, doc, min_len, lemmer: str, **kwargs
     ) -> Tuple[List[str], List]:
         return self.candidate_selection_model(
             doc=doc, min_len=min_len, lemmer_lang=lemmer, **kwargs
@@ -261,7 +261,7 @@ class SLEDPromptRank(BaseKPModel):
         attention_mask = torch.ones_like(en_input_ids)
         self.prefix_length = torch.LongTensor([[prefix_input_ids.size(1)]])
 
-        en_input_mask = en_input["attention_mask"]
+        en_input_mask = attention_mask
 
         doc_candidate_input_features = []
         for id, (candidate, position) in enumerate(
