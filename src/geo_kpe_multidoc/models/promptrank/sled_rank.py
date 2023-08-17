@@ -9,7 +9,7 @@ import torch
 import transformers
 from loguru import logger
 from torch.utils.data import DataLoader
-from transformers import AutoConfig, AutoTokenizer
+from transformers import AutoConfig, AutoModelForSeq2SeqLM, AutoTokenizer
 
 from geo_kpe_multidoc.datasets.promptrank_datasets import PromptRankDataset
 from geo_kpe_multidoc.document import Document
@@ -51,14 +51,17 @@ class SLEDPromptRank(BaseKPModel):
 
         self.device = "cuda" if torch.cuda.is_available() else "cpu"
 
-        self.model = SledModelForConditionalGeneration.from_pretrained(model_name)
-        self.tokenizer = SledTokenizer.from_pretrained(model_name)
+        self.model = AutoModelForSeq2SeqLM.from_pretrained(model_name)
+        self.tokenizer = AutoTokenizer.from_pretrained(model_name)
 
         self.model.to(self.device)
         self.model.eval()
 
         self.template_len = (
-            self.tokenizer(self.temp_de, return_tensors="pt")["input_ids"].shape[1] - 3
+            self.tokenizer(self.decoder_prompt, return_tensors="pt")["input_ids"].shape[
+                1
+            ]
+            - 3
         )
 
         # Dataset       \alpha  \gamma
