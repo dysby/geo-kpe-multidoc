@@ -42,6 +42,8 @@ class SLEDPromptRank(BaseKPModel):
         self.decoder_prompt = (
             kwargs.get("decoder_prompt") or "This book mainly talks about "
         )
+        self.prefix_length = 0
+
         self.enable_pos = not kwargs.get("no_position_feature", False)
         # \gamma in original paper
         # DUC 0.89
@@ -86,7 +88,7 @@ class SLEDPromptRank(BaseKPModel):
         )
 
     def top_n_candidates(
-        self, doc: Document, candidates, positions, **kwargs
+        self, doc: Document, candidates, positions, top_n, **kwargs
     ) -> List[Tuple]:
         # input
         # doc_list, labels_stemed, labels,  model, dataloader
@@ -123,6 +125,7 @@ class SLEDPromptRank(BaseKPModel):
                     input_ids=en_input_ids,
                     attention_mask=en_input_mask,
                     decoder_input_ids=de_input_ids,
+                    prefix_length, self.prefix_length
                 )[0]
                 # print(en_output.shape)
                 # x = empty_ids.repeat(en_input_ids.shape[0], 1, 1).to(device)
@@ -241,11 +244,22 @@ class SLEDPromptRank(BaseKPModel):
             A list with transformer for conditional input features and candidate
             positional features for each keyphrase candidate in the document.
         """
+
+        prefix_input_ids = self.tokenizer(
+            self.encoder_prompt, return_tensors="pt"
+        ).input_ids  # Batch size 1
+
         en_input = self.tokenizer(
-            self.encoder_prompt + doc.raw_text,
+            doc.raw_text,
             return_tensors="pt",
         )
         en_input_ids = en_input["input_ids"]
+
+        # we concatenate them together, but tell SLED where is the prefix by setting the prefix_length tensor
+        en_input_ids = torch.cat((prefix_input_ids, en_input_ids), dim=-1)
+        attention_mask = torch.ones_like(en_input_ids)
+        self.prefix_length = torch.LongTensor([[prefix_input_ids.size(1)]])
+
         en_input_mask = en_input["attention_mask"]
 
         doc_candidate_input_features = []
