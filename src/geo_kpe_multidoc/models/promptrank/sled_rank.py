@@ -76,7 +76,7 @@ class SLEDPromptRank(BaseKPModel):
 
         # Dataloader
         self.num_workers = 1  # Not used, because of Tokenizer paralelism warning
-        self.batch_size = 1
+        self.batch_size = 16
 
         self.counter = 1
 
@@ -88,11 +88,12 @@ class SLEDPromptRank(BaseKPModel):
         )
 
     def top_n_candidates(
-        self, doc: Document, candidates, positions, top_n, **kwargs
+        self, doc: Document, candidate_list, positions, top_n, **kwargs
     ) -> List[Tuple]:
         # input
         # doc_list, labels_stemed, labels,  model, dataloader
         cos_similarity_list = {}
+        # TODO: check candidate_list ignore from argument in function call
         candidate_list = []
         cos_score_list = []
         doc_id_list = []
@@ -125,7 +126,7 @@ class SLEDPromptRank(BaseKPModel):
                     input_ids=en_input_ids,
                     attention_mask=en_input_mask,
                     decoder_input_ids=de_input_ids,
-                    prefix_length, self.prefix_length
+                    prefix_length=self.prefix_length,
                 )[0]
                 # print(en_output.shape)
                 # x = empty_ids.repeat(en_input_ids.shape[0], 1, 1).to(device)
