@@ -29,6 +29,7 @@ from geo_kpe_multidoc.models.maskrank.maskrank_model import MaskRank
 from geo_kpe_multidoc.models.mdkperank.mdkperank_model import MDKPERank
 from geo_kpe_multidoc.models.mdkperank.mdpromptrank import MdPromptRank
 from geo_kpe_multidoc.models.promptrank.promptrank import PromptRank
+from geo_kpe_multidoc.models.promptrank.sled_rank import SLEDPromptRank
 
 
 def generateLongformerRanker(
@@ -224,11 +225,18 @@ def kpe_model_factory(BACKEND_MODEL_NAME, TAGGER_NAME, **kwargs) -> BaseKPModel:
                 **kwargs,
             )
     elif rank_class == "PromptRank":
-        kpe_model = PromptRank(
-            BACKEND_MODEL_NAME,
-            candidate_selection_model=candidate_selection_model,
-            **kwargs,
-        )
+        if "sled" in BACKEND_MODEL_NAME.lower():
+            kpe_model = SLEDPromptRank(
+                BACKEND_MODEL_NAME,
+                candidate_selection_model=candidate_selection_model,
+                **kwargs,
+            )
+        else:
+            kpe_model = PromptRank(
+                BACKEND_MODEL_NAME,
+                candidate_selection_model=candidate_selection_model,
+                **kwargs,
+            )
     elif rank_class == "MDKPERank":
         if "[longformer]" in BACKEND_MODEL_NAME:
             base_name = BACKEND_MODEL_NAME.replace("[longformer]", "")
