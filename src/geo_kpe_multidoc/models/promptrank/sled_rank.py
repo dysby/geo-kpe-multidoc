@@ -76,7 +76,7 @@ class SLEDPromptRank(BaseKPModel):
 
         # Dataloader
         self.num_workers = 1  # Not used, because of Tokenizer paralelism warning
-        self.batch_size = 1
+        self.batch_size = 16
 
         self.counter = 1
 
@@ -261,7 +261,7 @@ class SLEDPromptRank(BaseKPModel):
         attention_mask = torch.ones_like(en_input_ids)
         self.prefix_length = torch.LongTensor([[prefix_input_ids.size(1)]])
 
-        en_input_mask = attention_mask
+        en_input_mask = en_input["attention_mask"]
 
         doc_candidate_input_features = []
         for id, (candidate, position) in enumerate(
