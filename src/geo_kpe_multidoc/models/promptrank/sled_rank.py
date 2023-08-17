@@ -9,17 +9,17 @@ import torch
 import transformers
 from loguru import logger
 from torch.utils.data import DataLoader
-from transformers import AutoConfig, AutoModelForSeq2SeqLM, AutoTokenizer
+from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
 
 from geo_kpe_multidoc.datasets.promptrank_datasets import PromptRankDataset
 from geo_kpe_multidoc.document import Document
-from geo_kpe_multidoc.models.base_KP_model import BaseKPModel
 from geo_kpe_multidoc.models.candidate_extract.candidate_extract_model import (
     CandidateExtractionModel,
 )
+from geo_kpe_multidoc.models.promptrank.promptrank import PromptRank
 
 
-class SLEDPromptRank(BaseKPModel):
+class SLEDPromptRank(PromptRank):
     """
     Use SLED T5 for PromptRank
     """
@@ -79,13 +79,6 @@ class SLEDPromptRank(BaseKPModel):
         self.batch_size = 16
 
         self.counter = 1
-
-    def extract_candidates(
-        self, doc, min_len, lemmer: str, **kwargs
-    ) -> Tuple[List[str], List]:
-        return self.candidate_selection_model(
-            doc=doc, min_len=min_len, lemmer_lang=lemmer, **kwargs
-        )
 
     def top_n_candidates(
         self, doc: Document, candidate_list, positions, top_n, **kwargs
@@ -213,28 +206,6 @@ class SLEDPromptRank(BaseKPModel):
         )
 
         return top_k_can_score, top_k_can
-
-    def extract_kp_from_doc(
-        self,
-        doc: Document,
-        top_n,
-        min_len,
-        lemmer: Optional[Callable] = None,
-        **kwargs,
-    ) -> Tuple[List[Tuple[str, float]], List[str]]:
-        # Because base KPE extractor does not return positions (it returns mentions)
-        self.extract_candidates(doc, min_len, lemmer, **kwargs)
-        candidates = doc.candidate_set
-        positions = doc.candidate_positions
-
-        top_n, candidate_set = self.top_n_candidates(
-            doc, candidates, positions, top_n=top_n, **kwargs
-        )
-
-        logger.debug(f"Document #{self.counter} processed")
-        self.counter += 1
-
-        return (top_n, candidate_set)
 
     # def generate_doc_pairs(self, doc):
     def _input_features(self, doc: Document):
