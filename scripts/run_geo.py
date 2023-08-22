@@ -59,8 +59,7 @@ def parse_args():
     parser = argparse.ArgumentParser(
         formatter_class=argparse.RawDescriptionHelpFormatter,
         description="Multidocument Key-phrase extraction reranking with Geospacial association metrics",
-        ),
-    )
+        )
     parser.add_argument( "--experiment_name", default="run", type=str, help="Name/path to load experiment results",)
     parser.add_argument( "--dataset_name", type=str, default="MKDUC01", help="The dataset name MKDUC01",)
     parser.add_argument( "--geo.weight_function", type=str, default='inv_dist', help="Weitgh matrix distance function",)
