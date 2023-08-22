@@ -82,7 +82,7 @@ def parse_args():
     parser.add_argument( "--experiment_name", default="run", type=str, help="Name/path to load experiment results",)
     parser.add_argument( "--dataset_name", type=str, default="MKDUC01", help="The dataset name MKDUC01",)
     parser.add_argument( "--geo_weight_function", type=str, default='inv_dist', help="Weitgh matrix distance function",)
-    parser.add_argument( "--geo_weight_function_param", type=int, help="Weigth matrix distance function parameter",)
+    parser.add_argument( "--geo_weight_function_param", type=float, default=1000, help="Weigth matrix distance function parameter",)
     parser.add_argument( "--geo_association_index", type=str, default='moran_i', help="Geospacial association index used in rerank",)
     parser.add_argument( "--geo_alpha", type=float, default=-0.5, help="Geospacial association index power factor used in rerank",)
     parser.add_argument( "--preprocessing", action="store_true", help="Preprocess text documents by removing pontuation",)
