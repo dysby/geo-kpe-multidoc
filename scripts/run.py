@@ -7,36 +7,26 @@ from os import path
 from time import time
 
 import pandas as pd
-from geo_kpe_multidoc import GEO_KPE_MULTIDOC_OUTPUT_PATH
-from geo_kpe_multidoc.datasets.datasets import DATASETS, load_dataset
-from geo_kpe_multidoc.evaluation.evaluation_tools import (
-    evaluate_kp_extraction,
-    evaluate_kp_extraction_base,
-    extract_keyphrases_docs,
-    extract_keyphrases_topics,
-    model_scores_to_dataframe,
-    postprocess_model_outputs,
-)
-from geo_kpe_multidoc.evaluation.report import (
-    output_one_top_cands,
-    plot_score_distribuitions_with_gold,
-    table_latex,
-)
-from geo_kpe_multidoc.models import MDKPERank
-from geo_kpe_multidoc.models.factory import kpe_model_factory
-from geo_kpe_multidoc.models.maskrank.maskrank_model import MaskRank
-from geo_kpe_multidoc.models.mdkperank.mdpromptrank import MdPromptRank
-from geo_kpe_multidoc.models.pre_processing.pre_processing_utils import (
-    remove_new_lines_and_tabs,
-    remove_whitespaces,
-    select_stemmer,
-)
-from geo_kpe_multidoc.models.promptrank.promptrank import PromptRank
 from loguru import logger
 from matplotlib import pyplot as plt
 from tabulate import tabulate
 
 import wandb
+from geo_kpe_multidoc import GEO_KPE_MULTIDOC_OUTPUT_PATH
+from geo_kpe_multidoc.datasets.datasets import DATASETS, load_dataset
+from geo_kpe_multidoc.evaluation.evaluation_tools import (
+    evaluate_kp_extraction, evaluate_kp_extraction_base,
+    extract_keyphrases_docs, extract_keyphrases_topics,
+    model_scores_to_dataframe, postprocess_model_outputs)
+from geo_kpe_multidoc.evaluation.report import (
+    output_one_top_cands, plot_score_distribuitions_with_gold, table_latex)
+from geo_kpe_multidoc.models import MDKPERank
+from geo_kpe_multidoc.models.factory import kpe_model_factory
+from geo_kpe_multidoc.models.maskrank.maskrank_model import MaskRank
+from geo_kpe_multidoc.models.mdkperank.mdpromptrank import MdPromptRank
+from geo_kpe_multidoc.models.pre_processing.pre_processing_utils import (
+    remove_new_lines_and_tabs, remove_whitespaces, select_stemmer)
+from geo_kpe_multidoc.models.promptrank.promptrank import PromptRank
 
 
 # fmt: off
@@ -59,6 +49,7 @@ def parse_args():
     parser.add_argument( "--preprocessing", action="store_true", help="Preprocess text documents by removing pontuation",)
     parser.add_argument( "--extraction_variant", default="base", type=str, help="Set Extraction model variant [base, promptrank]",)
     parser.add_argument( "--min_len", type=int, default=0, help="Candidate keyphrase minimum length",)
+    parser.add_argument( "--kp_max_words", type=int, help="Candidate keyphrase maximum words",)
     parser.add_argument( "--lemmatization", action="store_true", help="boolean flag to use lemmatization")
     parser.add_argument( "--rank_model", default="EmbedRank", type=str, help="The Ranking Model", choices=[ "EmbedRank", "MaskRank", "PromptRank", "FusionRank", "MDKPERank", "MdPromptRank", "ExtractionEvaluator", ],)
     parser.add_argument( "--embed_model", type=str, help="Defines the embedding model to use", default="paraphrase-multilingual-mpnet-base-v2",)
@@ -71,7 +62,7 @@ def parse_args():
     parser.add_argument( "--no_position_feature", action="store_true", help="PromptRank: use candidate position as aditional feature (default: True)")
     parser.add_argument( "--add_query_prefix", action="store_true", help="Add support for e5 type models that require 'query: ' prefixed text",)
     parser.add_argument( "--candidate_mode", default="mentions_no_context", type=str, help="The method for candidate mode (no_context, mentions_no_context, global_attention, global_attention_dilated_nnn, attention_rank).",)
-    parser.add_argument( "--md_strategy", default="MEAN", type=str, help="Candidate ranking method for Multi-document extraction",)
+    parser.add_argument( "--md_strategy", default="MEAN", type=str, help="Candidate ranking method for Multi-document keyphrase extraction",)
     parser.add_argument( "--embedrank_mmr", action="store_true", help="boolean flag to use EmbedRank MMR")
     parser.add_argument( "--mmr_diversity", type=float, help="EmbedRank MMR diversity parameter value.",)
     parser.add_argument( "--whitening", action="store_true", help="Apply whitening to the embeddings")
@@ -107,7 +98,7 @@ def save(
         path.join(GEO_KPE_MULTIDOC_OUTPUT_PATH, filename), mode="w", encoding="utf8"
     ) as f:
         # f.write(args.__repr__())
-        json.dump(args.__dict__, f, indent=4)
+        json.dump(vars(args), f, indent=4)
 
     filename = filename[:-3] + "pdf"
     fig.savefig(path.join(GEO_KPE_MULTIDOC_OUTPUT_PATH, filename), dpi=100)
@@ -164,7 +155,7 @@ def write_resume_txt(performance_metrics, args):
 
 
 def _args_to_options(args):
-    options = dict()
+    options = {}
 
     options["experiment"] = args.experiment_name
 

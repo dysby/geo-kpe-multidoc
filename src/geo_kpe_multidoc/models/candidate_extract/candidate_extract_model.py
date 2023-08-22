@@ -87,6 +87,10 @@ class KPECandidateExtractionModel:
         self.join_hyphen_pos = False
         self.join_hyphen_pos_valid = False
 
+        self.min_len = kwargs.get("min_len", 0)
+        self.kp_max_words = kwargs.get("kp_max_words", 256)
+        # arbitrary high value
+
     def __call__(
         self,
         doc: Document,
@@ -206,7 +210,10 @@ class KPECandidateExtractionModel:
             for candidate, position in zip(temp_cand_set, temp_cand_positions):
                 # for candidate in temp_cand_set:
                 # TODO: Remove min_len and max words
-                if len(candidate) > min_len:  # and len(candidate.split(" ")) <= 5:
+                if (
+                    len(candidate) > min_len
+                    and len(candidate.split(" ")) <= self.kp_max_words
+                ):
                     # TODO: 'we insurer':{'US INSURERS'} but 'eastern us':{'eastern US'}
                     # TODO: normalize hyphens and dots in candidate
                     l_candidate = (

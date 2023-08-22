@@ -39,18 +39,18 @@ def postprocess_model_outputs(
     preprocessing: List[Callable] = None,
 ):
     """
-    Code snippet to correctly model results
+    Format results by applying preprocessing (and/or stemming) on extracted candidates
+    Sometimes candidates are already lemmatized by the ranking model.
 
-    {
-        dataset_name: [
-                ( top_n_cand_and_scores: List[Tuple[str, float]] , candidates: List[str]),
-                ...
-                ],
-        ...
-    }
-
-    Usually candidates are already lemmatized.
-
+    Returns
+    -------
+    dict: {
+            dataset_name: [
+                    ( top_n_cand_and_scores: List[Tuple[str, float]] , candidates: List[str]),
+                    ...
+                    ],
+            ...
+        }
     """
     res = {}
     for dataset in model_results:
@@ -104,8 +104,11 @@ def postprocess_dataset_labels(
     preprocessing: List[Callable] = None,
 ):
     """
-    Code snippet to correctly format dataset true labels
+    Format Gold Keyphrases by applying preprocessing (and/or stemming)
+    This is now done while loading the dataset
 
+    Returns
+    -------
     {
         dataset_name: [
                 doc_labels:List[str],
@@ -123,7 +126,6 @@ def postprocess_dataset_labels(
             for kp in corpus_true_labels[dataset][i]:
                 if preprocessing:
                     kp = postprocess(kp, preprocessing)
-
                 # if lemmer:
                 #     kp = lemmatize(kp, lemmer)
                 if stemmer:
@@ -137,8 +139,8 @@ def postprocess_dataset_labels(
 
 
 def evaluate_kp_extraction_base(
-    model_results: Dict[str, List] = {},
-    true_labels: Dict[str, Tuple[List]] = {},
+    model_results: Dict[str, List],
+    true_labels: Dict[str, Tuple[List]],
     model_name: str = "",
     save: bool = True,
     kp_eval: bool = True,
@@ -290,8 +292,8 @@ def evaluate_kp_extraction_base(
 
 
 def evaluate_kp_extraction(
-    model_results: Dict[str, List] = {},
-    true_labels: Dict[str, List[List]] = {},
+    model_results: Dict[str, List],
+    true_labels: Dict[str, List[List]],
     model_name: str = "",
     kp_eval: bool = True,
     k_set=[5, 10, 15],
@@ -350,10 +352,10 @@ def evaluate_kp_extraction(
                     results_kp[f"Recall_{k}"].append(r_k)
                     results_kp[f"F1_{k}"].append(f1_k)
 
-                map = MAP(top_kp, true_label)
+                map_ = MAP(top_kp, true_label)
                 ndcg = nDCG(top_kp, true_label)
 
-                results_kp["MAP"].append(map)
+                results_kp["MAP"].append(map_)
                 results_kp["nDCG"].append(ndcg)
 
         row = (
@@ -538,6 +540,12 @@ def extract_keyphrases_topics(
 
 
 def model_scores_to_dataframe(model_results, true_labels) -> pd.DataFrame:
+    """Format KPE scores to a Dataframe
+
+    Returns
+    -------
+    pd.DataFrame
+    """
     df = pd.DataFrame()
 
     for dataset, doc_candidade_values in model_results.items():

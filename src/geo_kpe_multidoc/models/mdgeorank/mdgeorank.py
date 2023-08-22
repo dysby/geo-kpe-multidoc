@@ -1,5 +1,6 @@
 import os
 import re
+from enum import Enum
 from functools import partial
 from operator import itemgetter
 from pathlib import Path
@@ -21,6 +22,12 @@ from geo_kpe_multidoc.models.pre_processing.pre_processing_utils import (
     remove_hyphens_and_dots,
     stemming,
 )
+
+
+class GeospacialAssociationIndex(Enum):
+    MORAN_I = "moran_i"
+    GETIS_ORD_G = "getisord_g"
+    GEARY_C = "geary_c"
 
 
 def _moran_i(serie, w):
@@ -151,8 +158,8 @@ def compute_weights_fully_connected(
     for i, j in zip(*inds):
         weight_matrix[i, j] = (
             # To exploit caching the function parameter order must be the same.
-            # Fortunatly, distance is simetric so we keep always the smallest value first,
-            # by comparison on the sum (lat+long vs lat+long).
+            # Fortunatly, distance is simetric so we keep always the smallest sum
+            # (lat+long vs lat+long) first.
             cached_vincenty(coordinates[i], coordinates[j])
             if sum(coordinates[i]) <= sum(coordinates[j])
             else cached_vincenty(coordinates[j], coordinates[i])
@@ -201,17 +208,31 @@ class MdGeoRank:
         self,
         experiment: str,
         stemmer: StemmerI,
-        d_threshold=1000,
+        d_threshold=100000,
         weight_function: Callable = inv_dist,
         weight_function_param=500,
-        **kwargs
+        geo_association_index: str = "moran_i",
+        **kwargs,
     ) -> None:
         self.experiment = experiment
         self.d_threshold = d_threshold
         self.weight_function = weight_function
         self.weight_function_param = weight_function_param
         self.stemmer = stemmer
+        # TODO: few values, maybe CUDA is not usefull because of
+        # many computation context changes
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        self._geo_association_index = GeospacialAssociationIndex(geo_association_index)
+
+    @property
+    def geo_association_index(self):
+        return self._geo_association_index
+
+    @geo_association_index.setter
+    def geo_association_index(self, new_geo_association_index: str):
+        self._geo_association_index = GeospacialAssociationIndex(
+            new_geo_association_index
+        )
 
     def _get_files(self, path: str):
         mdkpe_file_name_pattern = re.compile(r"d\d{2}-mdkpe-results\.pkl")
@@ -246,7 +267,7 @@ class MdGeoRank:
         topic_doc_coordinates.columns = ["_geometry"]
         return topic_doc_coordinates
 
-    def geo_association(self):
+    def geospacial_association(self):
         """
         topic_model_outputs: dict_keys(['dataset',
                                         'topic',
@@ -288,7 +309,8 @@ class MdGeoRank:
                 ):
                     candidate_scores.loc[kp, "in_gold"] = True
 
-            # number of documents where the candidate is present, within the current topic.
+            # number of documents where the candidate is present, within the current
+            # topic.
             # TEMP
             df = (
                 pd.DataFrame()
@@ -305,23 +327,27 @@ class MdGeoRank:
             candidate_scores["N"] = df.sum(axis=1)
             # END TEMP
 
-            # candidate_scores["N"] = topic_model_outputs["candidate_document_matrix"].sum(axis=1)
+            # candidate_scores["N"] = topic_model_outputs["candidate_document_matrix"]
+            #                               .sum(axis=1)
             candidate_scores.index.name = "candidate"
 
             topic_point_scores = gpd.GeoDataFrame(
                 candidate_scores_per_doc.join(topic_doc_coordinates.loc[topic_id])
             ).reset_index(drop=True)
-            # when the same location apears in multiple documents, the semantic score for that location is the mean of values for that location
+            # when the same location apears in multiple documents, the semantic score
+            # for that location is the mean of values for that location
             topic_point_scores = (
                 topic_point_scores.groupby("_geometry").mean().reset_index()
             )
             topic_point_scores = gpd.GeoDataFrame(topic_point_scores)
 
-            # print(f"{topic_id}: topic_point_scores: {len(topic_point_scores)} observations.")
+            # print(f"{topic_id}: topic_point_scores: {len(topic_point_scores)}
+            # observations.")
             topic_point_scores = topic_point_scores[
                 ~topic_point_scores["_geometry"].is_empty
             ]
-            # print(f"{topic_id}: topic_point_scores: {len(topic_point_scores)} without empty observations")
+            # print(f"{topic_id}: topic_point_scores: {len(topic_point_scores)} without
+            # empty observations")
 
             # If custom weight function
             # neighbors={'c': ['b'], 'b': ['c', 'a'], 'a': ['b']}
@@ -364,7 +390,11 @@ class MdGeoRank:
         results = results.set_index(["topic", results.index])
         return results
 
-    def _rank(self, geo_association_results: pd.DataFrame):
+    def rank(
+        self,
+        geo_association_results: pd.DataFrame,
+        alpha=-0.5,
+    ):
         """
         Compose final score and transform results to evaluation format
 
@@ -385,12 +415,11 @@ class MdGeoRank:
         """
         final_score = pd.DataFrame().reindex_like(geo_association_results)
 
-        final_score["score"] = (
-            geo_association_results["semantic_score"]
-            + geo_association_results["moran_i"]
-        )
+        final_score["score"] = geo_association_results[
+            "semantic_score"
+        ] * geo_association_results[self._geo_association_index.value] ** (alpha)
 
-        rankings = dict()
+        rankings = {}
         for dataset in ["dataset"]:
             for topic in sorted(final_score.index.get_level_values(0).unique()):
                 top_n_scores = sorted(
