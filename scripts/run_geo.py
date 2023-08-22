@@ -1,9 +1,11 @@
 import argparse
-import textwrap
 from datetime import datetime
 
-import geo_kpe_multidoc.geo.measures
 import pandas as pd
+from tabulate import tabulate
+
+import geo_kpe_multidoc.geo.measures
+import wandb
 from geo_kpe_multidoc.datasets.datasets import DATASETS, load_dataset
 from geo_kpe_multidoc.evaluation.evaluation_tools import (
     evaluate_kp_extraction,
@@ -24,9 +26,6 @@ from geo_kpe_multidoc.models.pre_processing.pre_processing_utils import (
     remove_whitespaces,
     select_stemmer,
 )
-from tabulate import tabulate
-
-import wandb
 
 
 def write_resume_txt(performance_metrics, args):
@@ -59,22 +58,15 @@ def write_resume_txt(performance_metrics, args):
 def parse_args():
     parser = argparse.ArgumentParser(
         formatter_class=argparse.RawDescriptionHelpFormatter,
-        description=textwrap.dedent(
-            """\
-            Key-phrase extraction
-            --------------------------------
-                Multi language
-                Multi document
-                Geospatial association measures
-            """
+        description="Multidocument Key-phrase extraction reranking with Geospacial association metrics",
         ),
     )
     parser.add_argument( "--experiment_name", default="run", type=str, help="Name/path to load experiment results",)
     parser.add_argument( "--dataset_name", type=str, default="MKDUC01", help="The dataset name MKDUC01",)
-    parser.add_argument( "--geo.weight_function", type=str, required=True, help="Weitgh matrix distance function",)
-    parser.add_argument( "--geo.weight_function_param", type=str, required=True, help="Weigth matrix distance function parameter",)
-    parser.add_argument( "--geo.geo_association_index", type=str, required=True, help="Geospacial association index used in rerank",)
-    parser.add_argument( "--geo.alpha", type=str, required=True, help="Geospacial association index power factor used in rerank",)
+    parser.add_argument( "--geo.weight_function", type=str, default='inv_dist', help="Weitgh matrix distance function",)
+    parser.add_argument( "--geo.weight_function_param", type=int, help="Weigth matrix distance function parameter",)
+    parser.add_argument( "--geo.geo_association_index", type=str, default='moran_i', help="Geospacial association index used in rerank",)
+    parser.add_argument( "--geo.alpha", type=float, default=-0.5, help="Geospacial association index power factor used in rerank",)
     parser.add_argument( "--preprocessing", action="store_true", help="Preprocess text documents by removing pontuation",)
     return parser.parse_args()
 # fmt: on
