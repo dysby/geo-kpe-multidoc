@@ -16,11 +16,9 @@ from geo_kpe_multidoc.evaluation.evaluation_tools import (
 from geo_kpe_multidoc.evaluation.report import (
     output_one_top_cands,
     plot_score_distribuitions_with_gold,
+    table_latex,
 )
-from geo_kpe_multidoc.models.mdgeorank.mdgeorank import (
-    GeospacialAssociationIndex,
-    MdGeoRank,
-)
+from geo_kpe_multidoc.models.mdgeorank.mdgeorank import MdGeoRank
 from geo_kpe_multidoc.models.pre_processing.pre_processing_utils import (
     remove_new_lines_and_tabs,
     remove_whitespaces,
@@ -29,7 +27,7 @@ from geo_kpe_multidoc.models.pre_processing.pre_processing_utils import (
 
 
 def write_resume_txt(performance_metrics, args):
-    with open("runs.resume.txt", "a") as f:
+    with open("runs.resume.txt", "a", encoding="utf-8") as f:
         stamp = datetime.now().strftime(r"%Y%m%d-%H%M")
         print(f"Date: {stamp}", file=f)
         print(f"Args: {args}", file=f)
@@ -52,6 +50,27 @@ def write_resume_txt(performance_metrics, args):
             ),
             file=f,
         )
+    with open("runs.resume.latex.txt", "a", encoding="utf-8") as f:
+        stamp = datetime.now().strftime(r"%Y%m%d-%H%M")
+        print(f"Date: {stamp}", file=f)
+        print(f"Args: {args}", file=f)
+        print(
+            table_latex(
+                performance_metrics[
+                    [
+                        "Recall",
+                        "nDCG",
+                        "F1_5",
+                        "F1_10",
+                        "F1_15",
+                    ]
+                ],
+                caption=str(args),
+                label=f"{args.experiment_name}-{stamp}".replace("_", " "),
+                percentage=True,
+            ),
+            file=f,
+        )
 
 
 # fmt: off
@@ -62,10 +81,10 @@ def parse_args():
         )
     parser.add_argument( "--experiment_name", default="run", type=str, help="Name/path to load experiment results",)
     parser.add_argument( "--dataset_name", type=str, default="MKDUC01", help="The dataset name MKDUC01",)
-    parser.add_argument( "--geo.weight_function", type=str, default='inv_dist', help="Weitgh matrix distance function",)
-    parser.add_argument( "--geo.weight_function_param", type=int, help="Weigth matrix distance function parameter",)
-    parser.add_argument( "--geo.geo_association_index", type=str, default='moran_i', help="Geospacial association index used in rerank",)
-    parser.add_argument( "--geo.alpha", type=float, default=-0.5, help="Geospacial association index power factor used in rerank",)
+    parser.add_argument( "--geo_weight_function", type=str, default='inv_dist', help="Weitgh matrix distance function",)
+    parser.add_argument( "--geo_weight_function_param", type=int, help="Weigth matrix distance function parameter",)
+    parser.add_argument( "--geo_association_index", type=str, default='moran_i', help="Geospacial association index used in rerank",)
+    parser.add_argument( "--geo_alpha", type=float, default=-0.5, help="Geospacial association index power factor used in rerank",)
     parser.add_argument( "--preprocessing", action="store_true", help="Preprocess text documents by removing pontuation",)
     return parser.parse_args()
 # fmt: on
@@ -92,10 +111,10 @@ def main():
         args.experiment_name,
         stemmer,
         weight_function=getattr(
-            geo_kpe_multidoc.geo.measures, args.geo.weight_function
+            geo_kpe_multidoc.geo.measures, args.geo_weight_function
         ),
-        weight_function_param=args.geo.weight_function_param,
-        geo_association_index=args.geo.geo_association_index,
+        weight_function_param=args.geo_weight_function_param,
+        geo_association_index=args.geo_geo_association_index,
     )
 
     # Re-Rank with Geo Associations

@@ -15,17 +15,27 @@ import wandb
 from geo_kpe_multidoc import GEO_KPE_MULTIDOC_OUTPUT_PATH
 from geo_kpe_multidoc.datasets.datasets import DATASETS, load_dataset
 from geo_kpe_multidoc.evaluation.evaluation_tools import (
-    evaluate_kp_extraction, evaluate_kp_extraction_base,
-    extract_keyphrases_docs, extract_keyphrases_topics,
-    model_scores_to_dataframe, postprocess_model_outputs)
+    evaluate_kp_extraction,
+    evaluate_kp_extraction_base,
+    extract_keyphrases_docs,
+    extract_keyphrases_topics,
+    model_scores_to_dataframe,
+    postprocess_model_outputs,
+)
 from geo_kpe_multidoc.evaluation.report import (
-    output_one_top_cands, plot_score_distribuitions_with_gold, table_latex)
+    output_one_top_cands,
+    plot_score_distribuitions_with_gold,
+    table_latex,
+)
 from geo_kpe_multidoc.models import MDKPERank
 from geo_kpe_multidoc.models.factory import kpe_model_factory
 from geo_kpe_multidoc.models.maskrank.maskrank_model import MaskRank
 from geo_kpe_multidoc.models.mdkperank.mdpromptrank import MdPromptRank
 from geo_kpe_multidoc.models.pre_processing.pre_processing_utils import (
-    remove_new_lines_and_tabs, remove_whitespaces, select_stemmer)
+    remove_new_lines_and_tabs,
+    remove_whitespaces,
+    select_stemmer,
+)
 from geo_kpe_multidoc.models.promptrank.promptrank import PromptRank
 
 
@@ -107,7 +117,7 @@ def save(
 
 
 def write_resume_txt(performance_metrics, args):
-    with open("runs.resume.txt", "a") as f:
+    with open("runs.resume.txt", "a", encoding="uft-8") as f:
         stamp = datetime.now().strftime(r"%Y%m%d-%H%M")
         print(f"Date: {stamp}", file=f)
         print(f"Args: {args}", file=f)
@@ -131,7 +141,7 @@ def write_resume_txt(performance_metrics, args):
             file=f,
         )
 
-    with open("runs.resume.latex.txt", "a") as f:
+    with open("runs.resume.latex.txt", "a", encoding="utf-8") as f:
         stamp = datetime.now().strftime(r"%Y%m%d-%H%M")
         print(f"Date: {stamp}", file=f)
         print(f"Args: {args}", file=f)
