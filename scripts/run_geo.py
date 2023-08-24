@@ -1,11 +1,8 @@
 import argparse
 from datetime import datetime
 
-import pandas as pd
-from tabulate import tabulate
-
 import geo_kpe_multidoc.geo.measures
-import wandb
+import pandas as pd
 from geo_kpe_multidoc.datasets.datasets import DATASETS, load_dataset
 from geo_kpe_multidoc.evaluation.evaluation_tools import (
     evaluate_kp_extraction,
@@ -24,6 +21,9 @@ from geo_kpe_multidoc.models.pre_processing.pre_processing_utils import (
     remove_whitespaces,
     select_stemmer,
 )
+from tabulate import tabulate
+
+import wandb
 
 
 def write_resume_txt(performance_metrics, args):
@@ -114,7 +114,7 @@ def main():
             geo_kpe_multidoc.geo.measures, args.geo_weight_function
         ),
         weight_function_param=args.geo_weight_function_param,
-        geo_association_index=args.geo_geo_association_index,
+        geo_association_index=args.geo_association_index,
     )
 
     # Re-Rank with Geo Associations

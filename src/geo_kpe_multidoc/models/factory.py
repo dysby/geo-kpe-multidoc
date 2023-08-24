@@ -240,13 +240,11 @@ def kpe_model_factory(BACKEND_MODEL_NAME, TAGGER_NAME, **kwargs) -> BaseKPModel:
     elif rank_class == "MDKPERank":
         if "[longformer]" in BACKEND_MODEL_NAME:
             base_name = BACKEND_MODEL_NAME.replace("[longformer]", "")
-            single_doc_ranker = (
-                generateLongformerRanker(
-                    LongEmbedRank,
-                    base_name,
-                    candidate_selection_model=candidate_selection_model,
-                    **kwargs,
-                ),
+            single_doc_ranker = generateLongformerRanker(
+                LongEmbedRank,
+                base_name,
+                candidate_selection_model=candidate_selection_model,
+                **kwargs,
             )
         else:
             single_doc_ranker = EmbedRank(
