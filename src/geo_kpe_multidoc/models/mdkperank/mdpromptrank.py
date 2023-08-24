@@ -24,7 +24,7 @@ class MdPromptRank(BaseKPModel):
         self,
         topic_docs: List[Document],
         top_n: int = -1,
-        min_len: int = 5,
+        kp_min_len: int = 5,
         lemmer: Optional[Callable] = None,
         **kwargs,
     ) -> MdKPEOutput:
@@ -50,7 +50,7 @@ class MdPromptRank(BaseKPModel):
         for doc in topic_docs:
             doc_ids.add(doc.id)
             doc_candidates, _ = self.base_model.extract_candidates(
-                doc, min_len, lemmer=lemmer, **kwargs
+                doc, kp_min_len, lemmer=lemmer, **kwargs
             )
             topic_candidates.update(doc_candidates)
             for candidate in doc_candidates:

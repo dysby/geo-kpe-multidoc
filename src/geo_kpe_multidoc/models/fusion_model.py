@@ -46,7 +46,7 @@ class FusionModel:
         corpus,
         dataset,
         top_n=5,
-        min_len=0,
+        kp_min_len=0,
         stemming=False,
         lemmatize=False,
         **kwargs,
@@ -61,7 +61,7 @@ class FusionModel:
         # res_by_model[model_idx]
         res_by_model = [
             model.extract_kp_from_corpus(
-                corpus, dataset, -1, min_len, stemming, **kwargs
+                corpus, dataset, -1, kp_min_len, stemming, **kwargs
             )
             for model in self.models
         ]

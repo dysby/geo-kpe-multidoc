@@ -239,7 +239,7 @@ def evaluate_kp_extraction_base(
                     for i in range(1, len(top_kp) + 1)
                     if top_kp[i - 1] in true_label
                 ]
-                map = np.sum(ap) / float(len(true_label))
+                map_ = np.sum(ap) / float(len(true_label))
                 ndcg = np.sum(
                     [
                         1.0 / np.log2(i + 1)
@@ -251,7 +251,7 @@ def evaluate_kp_extraction_base(
                     [1.0 / np.log2(i + 1) for i in range(1, len(true_label) + 1)]
                 )
 
-                results_kp["MAP"].append(map)
+                results_kp["MAP"].append(map_)
                 results_kp["nDCG"].append(ndcg)
 
         res += f"\nResults for Dataset {dataset}\n --- \n"
@@ -378,7 +378,7 @@ def extract_keyphrases_docs(
     dataset: KPEDataset,
     model: Union[EmbedRank, MaskRank, LongEmbedRank],
     top_n=20,
-    min_len=0,
+    kp_min_len=0,
     lemmer=None,
     n_docs_limit=-1,
     **kwargs,
@@ -411,7 +411,7 @@ def extract_keyphrases_docs(
                 pre_processing_pipeline=preprocessing,
             ),
             top_n=top_n,
-            min_len=min_len,
+            kp_min_len=kp_min_len,
             lemmer=lemmer,
             **kwargs,
         )
@@ -450,7 +450,7 @@ def extract_keyphrases_topics(
     dataset: KPEDataset,
     model: Union[MDKPERank, MdPromptRank],
     top_n=-1,
-    min_len=0,
+    kp_min_len=0,
     lemmer=None,
     n_docs_limit=-1,
     **kwargs,
@@ -488,7 +488,7 @@ def extract_keyphrases_topics(
                 for doc_name, txt in docs
             ],  # kpe_model.pre_process(doc),
             top_n=top_n,
-            min_len=min_len,
+            kp_min_len=kp_min_len,
             lemmer=lemmer,
             **kwargs,
         )

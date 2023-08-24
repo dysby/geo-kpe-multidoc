@@ -1,12 +1,10 @@
 from dataclasses import dataclass
 from itertools import chain
 from operator import itemgetter
-from statistics import mean
 from typing import Callable, Dict, Iterable, List, Tuple
 
 import numpy as np
 import pandas as pd
-from nltk.stem.api import StemmerI
 
 from geo_kpe_multidoc.datasets.datasets import KPEDataset
 from geo_kpe_multidoc.document import Document
@@ -42,11 +40,11 @@ class MDKPERank(BaseKPModel):
         self,
         doc,
         top_n: int = -1,
-        min_len: int = 0,
+        kp_min_len: int = 0,
         lemmer=None,
         **kwargs,
     ):
-        self.base_model_embed.extract_candidates(doc, min_len, lemmer, **kwargs)
+        self.base_model_embed.extract_candidates(doc, kp_min_len, lemmer, **kwargs)
 
         _, cand_embeds, candidate_set = self.base_model_embed.embed_candidates(
             doc,
@@ -56,14 +54,14 @@ class MDKPERank(BaseKPModel):
         return (doc, cand_embeds, candidate_set)
 
     def extract_kp_from_doc(
-        self, doc, top_n, min_len, lemmer=None, **kwargs
+        self, doc, top_n, kp_min_len, lemmer=None, **kwargs
     ) -> Tuple[Document, List[np.ndarray], List[str]]:  # Tuple[List[Tuple], List[str]]:
         """
         Extracts key-phrases from a given document, with optional arguments
         relevant to its specific functionality
         """
 
-        self.base_model_embed.extract_candidates(doc, min_len, lemmer, **kwargs)
+        self.base_model_embed.extract_candidates(doc, kp_min_len, lemmer, **kwargs)
 
         _, cand_embeds, candidate_set = self.base_model_embed.embed_candidates(
             doc,
@@ -86,7 +84,7 @@ class MDKPERank(BaseKPModel):
         self,
         topic_docs: List[Document],
         top_n: int = -1,
-        min_len: int = 0,
+        kp_min_len: int = 0,
         stemming: bool = False,
         lemmatize: bool = False,
         **kwargs,
@@ -115,7 +113,7 @@ class MDKPERank(BaseKPModel):
             self.extract_kp_from_doc(
                 doc,
                 top_n=top_n,
-                min_len=min_len,
+                kp_min_len=kp_min_len,
                 stemming=stemming,
                 lemmatize=lemmatize,
                 **kwargs,
@@ -202,7 +200,7 @@ class MDKPERank(BaseKPModel):
         self,
         topic_docs: List[Document],
         top_n: int = -1,
-        min_len: int = 0,
+        kp_min_len: int = 0,
         lemmatize: bool = False,
         **kwargs,
     ) -> MdKPEOutput:
@@ -221,7 +219,7 @@ class MDKPERank(BaseKPModel):
             self.extract_kp_from_doc(
                 doc,
                 top_n=top_n,
-                min_len=min_len,
+                kp_min_len=kp_min_len,
                 lemmatize=lemmatize,
                 **kwargs,
             )
@@ -313,39 +311,11 @@ class MDKPERank(BaseKPModel):
             key=itemgetter(1),  # sort by score
         )
 
-    def _score_w_geo_association_I(S, N, I, lambda_=0.5, gamma=0.5):
-        return S * lambda_ * (N - (N * gamma * I))
+    # def _score_w_geo_association_I(S, N, I, lambda_=0.5, gamma=0.5):
+    #     return S * lambda_ * (N - (N * gamma * I))
 
-    def _score_w_geo_association_C(S, N, C, lambda_=0.5, gamma=0.5):
-        return S * lambda_ * N / (gamma * C)
+    # def _score_w_geo_association_C(S, N, C, lambda_=0.5, gamma=0.5):
+    #     return S * lambda_ * N / (gamma * C)
 
-    def _score_w_geo_association_G(S, N, G, lambda_=0.5, gamma=0.5):
-        return S * lambda_ * (N * gamma) * G
-
-    def extract_kp_from_corpus(
-        self,
-        corpus: KPEDataset,
-        top_n: int = -1,
-        min_len: int = 0,
-        lemmatize: bool = False,
-        **kwargs,
-    ) -> List[List[KPEScore]]:
-        """
-        Extracts key-phrases from a list of given documents, with optional arguments
-        relevant to its specific functionality
-
-        Parameters:
-        ------
-            corpus: TextDataset
-                Iterable container with tuple (doc/docs, keyphrases} items.
-
-        Returns:
-        ------
-            list of results with ((candidate, scores), candidate) items
-        """
-        res = [
-            self.extract_kp_from_topic(sample, top_n, min_len, lemmatize, **kwargs)
-            for _id, sample, _label in corpus
-        ]
-
-        return res
+    # def _score_w_geo_association_G(S, N, G, lambda_=0.5, gamma=0.5):
+    #     return S * lambda_ * (N * gamma) * G

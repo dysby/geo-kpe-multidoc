@@ -20,7 +20,7 @@ class CandidateExtractionModel(Protocol):
     def __call__(
         self,
         doc: Document,
-        min_len: int = 5,
+        kp_min_len: int = 5,
         grammar: str = None,
         lemmer_lang: str = None,
         **kwargs,
@@ -87,14 +87,14 @@ class KPECandidateExtractionModel:
         self.join_hyphen_pos = False
         self.join_hyphen_pos_valid = False
 
-        self.min_len = kwargs.get("min_len", 0)
+        self.kp_min_len = kwargs.get("kp_min_len", 0)
         self.kp_max_words = kwargs.get("kp_max_words", 256)
         # arbitrary high value
 
     def __call__(
         self,
         doc: Document,
-        min_len: int = 5,
+        kp_min_len: int = 5,
         grammar: str = None,
         lemmer_lang: str = None,
         **kwargs,
@@ -106,7 +106,7 @@ class KPECandidateExtractionModel:
             List of candidate keyphrases and List of candidate positions (start, stop)
         """
         return self._extract_candidates_simple(
-            doc, min_len, grammar, lemmer_lang, **kwargs
+            doc, kp_min_len, grammar, lemmer_lang, **kwargs
         )
 
     def _pos_tag_doc(self, doc: Document, stemming, use_cache, **kwargs) -> None:
@@ -143,7 +143,7 @@ class KPECandidateExtractionModel:
     def _extract_candidates_simple(
         self,
         doc: Document,
-        min_len: int = 0,
+        kp_min_len: int = 0,
         grammar: str = None,
         lemmer_lang: str = None,
         **kwargs,
@@ -211,7 +211,7 @@ class KPECandidateExtractionModel:
                 # for candidate in temp_cand_set:
                 # TODO: Remove min_len and max words
                 if (
-                    len(candidate) > min_len
+                    len(candidate) > self.kp_min_len
                     and len(candidate.split(" ")) <= self.kp_max_words
                 ):
                     # TODO: 'we insurer':{'US INSURERS'} but 'eastern us':{'eastern US'}
@@ -264,7 +264,7 @@ class KPECandidateExtractionModel:
     def _extract_candidates(
         self,
         doc: Document,
-        min_len: int = 5,
+        kp_min_len: int = 5,
         grammar: str = None,
         lemmer_lang: str = None,
         **kwargs,
@@ -328,7 +328,10 @@ class KPECandidateExtractionModel:
                 #     pass
 
                 # TODO: Remove min_len and max words
-                if len(candidate) > min_len and len(candidate.split(" ")) <= 5:
+                if (
+                    len(candidate) > self.kp_min_len
+                    and len(candidate.split(" ")) <= self.kp_max_words
+                ):
                     l_candidate = (
                         lemmatize(candidate, lemmer_lang) if lemmer_lang else candidate
                     )
@@ -369,7 +372,7 @@ class KPECandidateExtractionModel:
     def _mask_rank_extract_candidates(
         self,
         doc: Document,
-        min_len: int = 5,
+        kp_min_len: int = 5,
         grammar: str = "",
         lemmer: Callable = None,
         **kwargs,
@@ -393,7 +396,7 @@ class KPECandidateExtractionModel:
                 temp_cand_set.append(" ".join(word for word, tag in subtree.leaves()))
 
             for candidate in temp_cand_set:
-                if len(candidate) > min_len:
+                if len(candidate) > self.kp_min_len:
                     candidate_set.add(candidate)
 
         doc.candidate_set = list(candidate_set)

@@ -7,11 +7,6 @@ from os import path
 from time import time
 
 import pandas as pd
-from loguru import logger
-from matplotlib import pyplot as plt
-from tabulate import tabulate
-
-import wandb
 from geo_kpe_multidoc import GEO_KPE_MULTIDOC_OUTPUT_PATH
 from geo_kpe_multidoc.datasets.datasets import DATASETS, load_dataset
 from geo_kpe_multidoc.evaluation.evaluation_tools import (
@@ -37,6 +32,11 @@ from geo_kpe_multidoc.models.pre_processing.pre_processing_utils import (
     select_stemmer,
 )
 from geo_kpe_multidoc.models.promptrank.promptrank import PromptRank
+from loguru import logger
+from matplotlib import pyplot as plt
+from tabulate import tabulate
+
+import wandb
 
 
 # fmt: off
@@ -53,41 +53,41 @@ def parse_args():
         """
         ),
     )
-    parser.add_argument( "--experiment_name", default="run", type=str, help="Name to save experiment results.",)
-    parser.add_argument( "--dataset_name", type=str, required=True, help="The input dataset name",)
-    parser.add_argument( "--dataset_source", type=str, default="base", help="Dataset sources [base, preloaded, promptrank]",)
-    parser.add_argument( "--preprocessing", action="store_true", help="Preprocess text documents by removing pontuation",)
-    parser.add_argument( "--extraction_variant", default="base", type=str, help="Set Extraction model variant [base, promptrank]",)
-    parser.add_argument( "--min_len", type=int, default=0, help="Candidate keyphrase minimum length",)
-    parser.add_argument( "--kp_max_words", type=int, help="Candidate keyphrase maximum words",)
-    parser.add_argument( "--lemmatization", action="store_true", help="boolean flag to use lemmatization")
-    parser.add_argument( "--rank_model", default="EmbedRank", type=str, help="The Ranking Model", choices=[ "EmbedRank", "MaskRank", "PromptRank", "FusionRank", "MDKPERank", "MdPromptRank", "ExtractionEvaluator", ],)
-    parser.add_argument( "--embed_model", type=str, help="Defines the embedding model to use", default="paraphrase-multilingual-mpnet-base-v2",)
-    parser.add_argument( "--longformer_max_length", type=int, default=4096, help="longformer: max length of the new model",)
-    parser.add_argument( "--longformer_attention_window", type=int, default=512, help="Longformer: sliding chunk Attention Window size",)
-    parser.add_argument( "--longformer_only_copy_to_max_position", type=int, help="Longformer: only copy first positions of Pretrained Model position embedding weights",)
-    parser.add_argument( "--max_seq_len", type=int, help="PromptRank: max input sequence length because each model have a differenter config key especification")
-    parser.add_argument( "--encoder_prompt", type=str, help="PromptRank: encoder prompt default 'Book: ' ")
-    parser.add_argument( "--decoder_prompt", type=str, help="PromptRank: decoder prompt default 'This book mainly talks about ' ")
-    parser.add_argument( "--no_position_feature", action="store_true", help="PromptRank: use candidate position as aditional feature (default: True)")
-    parser.add_argument( "--add_query_prefix", action="store_true", help="Add support for e5 type models that require 'query: ' prefixed text",)
-    parser.add_argument( "--candidate_mode", default="mentions_no_context", type=str, help="The method for candidate mode (no_context, mentions_no_context, global_attention, global_attention_dilated_nnn, attention_rank).",)
-    parser.add_argument( "--md_strategy", default="MEAN", type=str, help="Candidate ranking method for Multi-document keyphrase extraction",)
-    parser.add_argument( "--embedrank_mmr", action="store_true", help="boolean flag to use EmbedRank MMR")
-    parser.add_argument( "--mmr_diversity", type=float, help="EmbedRank MMR diversity parameter value.",)
-    parser.add_argument( "--whitening", action="store_true", help="Apply whitening to the embeddings")
-    parser.add_argument( "--tagger_name", type=str, help="Explicit use this Spacy tagger",)
-    parser.add_argument( "--no_stemming", action="store_true", help="bool flag to use stemming")
-    parser.add_argument( "--ensemble_mode", type=str, default="weighted", help="Fusion model ensembling mode", choices=["weighted", "harmonic"],)
-    parser.add_argument( "--weights", nargs="+", help="Weight list for Fusion Rank, in .2f", default="0.50 0.50",)
-    parser.add_argument( "--top_n", default=-1, type=int, help="Keep only Top N candidates",)
+    parser.add_argument("--experiment_name", default="run", type=str, help="Name to save experiment results.",)
+    parser.add_argument("--dataset_name", type=str, required=True, help="The input dataset name",)
+    parser.add_argument("--dataset_source", type=str, default="base", help="Dataset sources [base, preloaded, promptrank]",)
+    parser.add_argument("--preprocessing", action="store_true", help="Preprocess text documents by removing pontuation",)
+    parser.add_argument("--extraction_variant", default="base", type=str, help="Set Extraction model variant [base, promptrank]",)
+    parser.add_argument("--kp_min_len", type=int, default=0, help="Candidate keyphrase minimum length",)
+    parser.add_argument("--kp_max_words", type=int, help="Candidate keyphrase maximum words",)
+    parser.add_argument("--lemmatization", action="store_true", help="boolean flag to use lemmatization")
+    parser.add_argument("--rank_model", default="EmbedRank", type=str, help="The Ranking Model", choices=[ "EmbedRank", "MaskRank", "PromptRank", "FusionRank", "MDKPERank", "MdPromptRank", "ExtractionEvaluator", ],)
+    parser.add_argument("--embed_model", type=str, help="Defines the embedding model to use", default="paraphrase-multilingual-mpnet-base-v2",)
+    parser.add_argument("--longformer_max_length", type=int, default=4096, help="longformer: max length of the new model",)
+    parser.add_argument("--longformer_attention_window", type=int, default=512, help="Longformer: sliding chunk Attention Window size",)
+    parser.add_argument("--longformer_only_copy_to_max_position", type=int, help="Longformer: only copy first positions of Pretrained Model position embedding weights",)
+    parser.add_argument("--max_seq_len", type=int, help="PromptRank: max input sequence length because each model have a differenter config key especification")
+    parser.add_argument("--encoder_prompt", type=str, help="PromptRank: encoder prompt default 'Book: ' ")
+    parser.add_argument("--decoder_prompt", type=str, help="PromptRank: decoder prompt default 'This book mainly talks about ' ")
+    parser.add_argument("--no_position_feature", action="store_true", help="PromptRank: use candidate position as aditional feature (default: True)")
+    parser.add_argument("--add_query_prefix", action="store_true", help="Add support for e5 type models that require 'query: ' prefixed instruction",)
+    parser.add_argument("--candidate_mode", default="mentions_no_context", type=str, help="The method for candidate mode (no_context, mentions_no_context, global_attention, global_attention_dilated_nnn, attention_rank).",)
+    parser.add_argument("--md_strategy", default="MEAN", type=str, help="Candidate ranking method for Multi-document keyphrase extraction",)
+    parser.add_argument("--mmr", action="store_true", help="boolean flag to use EmbedRank MMR")
+    parser.add_argument("--mmr_diversity", type=float, help="EmbedRank MMR diversity parameter value.",)
+    parser.add_argument("--whitening", action="store_true", help="Apply whitening to the embeddings")
+    parser.add_argument("--tagger_name", type=str, help="Explicit use this Spacy tagger",)
+    parser.add_argument("--no_stemming", action="store_true", help="bool flag to use stemming")
+    parser.add_argument("--ensemble_mode", type=str, default="weighted", help="Fusion model ensembling mode", choices=["weighted", "harmonic"],)
+    parser.add_argument("--weights", nargs="+", help="Weight list for Fusion Rank, in .2f", default="0.50 0.50",)
+    parser.add_argument("--top_n", default=-1, type=int, help="Keep only Top N candidates",)
     # parser.add_argument( "--pooling", type=str, default="mean", help="[NOT USED] Embedding Pooling strategy [mean, max]",)
-    parser.add_argument( "--doc_limit", default=-1, type=int, help="Max number of documents to process from Dataset",)
-    parser.add_argument( "--doc_name", type=str, help="Doc ID to test from Dataset.",)
-    parser.add_argument( "--cache_pos_tags", action="store_true", help="Save/Load doc POS Tagging in cache directory.",)
-    parser.add_argument( "--cache_candidate_selection", action="store_true", help="Save/Load doc Candidat in cache directoryy.",)
-    parser.add_argument( "--cache_embeddings", action="store_true", help="Save/Load doc and candidates embeddings in cache directory.",)
-    parser.add_argument( "--cache_results", action="store_true", help="Save KPE Model outputs (top N per doc) to cache directory.",
+    parser.add_argument("--doc_limit", default=-1, type=int, help="Max number of documents to process from Dataset",)
+    parser.add_argument("--doc_name", type=str, help="Doc ID to test from Dataset.",)
+    parser.add_argument("--cache_pos_tags", action="store_true", help="Save/Load doc POS Tagging in cache directory.",)
+    parser.add_argument("--cache_candidate_selection", action="store_true", help="Save/Load doc Candidat in cache directoryy.",)
+    parser.add_argument("--cache_embeddings", action="store_true", help="Save/Load doc and candidates embeddings in cache directory.",)
+    parser.add_argument("--cache_results", action="store_true", help="Save KPE Model outputs (top N per doc) to cache directory.",
     )
     return parser.parse_args()
 # fmt: on
@@ -117,7 +117,7 @@ def save(
 
 
 def write_resume_txt(performance_metrics, args):
-    with open("runs.resume.txt", "a", encoding="uft-8") as f:
+    with open("runs.resume.txt", "a", encoding="utf-8") as f:
         stamp = datetime.now().strftime(r"%Y%m%d-%H%M")
         print(f"Date: {stamp}", file=f)
         print(f"Args: {args}", file=f)
@@ -169,7 +169,7 @@ def _args_to_options(args):
 
     options["experiment"] = args.experiment_name
 
-    if args.embedrank_mmr:
+    if args.mmr:
         options["mmr"] = True
         logger.warning("MMR is only used with EmbedRank type models.")
         if args.mmr_diversity:
@@ -199,8 +199,8 @@ def _args_to_options(args):
     if args.candidate_mode:
         options["cand_mode"] = args.candidate_mode
 
-    if args.min_len:
-        options["min_len"] = args.min_len
+    if args.kp_min_len:
+        options["kp_min_len"] = args.kp_min_len
 
     return options
 

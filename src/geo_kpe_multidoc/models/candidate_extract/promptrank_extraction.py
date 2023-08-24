@@ -44,8 +44,9 @@ class PromptRankKPECandidateExtractionModel:
                 {<NN.*|JJ>*<NN.*>}  # Adjective(s)(optional) + Noun(s)"""
         )
 
-        self.max_len = kwargs.get("max_len", 512)
-        self.min_len = kwargs.get("min_len", 0)
+        self.max_len = kwargs.get("max_seq_len", 512)
+        self.kp_min_len = kwargs.get("kp_min_len", 0)
+        self.kp_max_words = kwargs.get("kp_max_words", 256)
         self.parser = RegexpParser(self.grammar)
         self.language = ISO_to_language[language]
         # Limit candidate size
@@ -55,12 +56,12 @@ class PromptRankKPECandidateExtractionModel:
     def __call__(
         self,
         doc: Document,
-        min_len: int = 5,
+        kp_min_len: int = 5,
         grammar: str = None,
         lemmer_lang: str = None,
         **kwargs,
     ) -> Tuple[List, List]:
-        return self._extract_candidates(doc, min_len, grammar, lemmer_lang, **kwargs)
+        return self._extract_candidates(doc, kp_min_len, grammar, lemmer_lang, **kwargs)
 
     def _pos_tag_doc(self, doc: Document, **kwargs) -> None:
         # considered_tags = {"NN", "NNS", "NNP", "NNPS", "JJ"}
@@ -88,7 +89,7 @@ class PromptRankKPECandidateExtractionModel:
     def _extract_candidates(
         self,
         doc: Document,
-        min_len: int = 5,
+        kp_min_len: int = 5,
         grammar: str = None,
         lemmer_lang: str = None,
         **kwargs,
@@ -145,7 +146,7 @@ class PromptRankKPECandidateExtractionModel:
                 #    count += 1
                 continue
 
-            if len(can) < self.min_len:
+            if len(can) < self.kp_min_len:
                 continue
 
             # Adictional processing if lemmatization is enabled

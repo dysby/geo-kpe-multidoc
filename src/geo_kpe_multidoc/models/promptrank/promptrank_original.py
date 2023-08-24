@@ -93,13 +93,13 @@ class PromptRank(BaseKPModel):
         self.stemmer = select_stemmer(kwargs.get("lang", "en"))
         self.counter = 1
 
-    def extract_candidates(self, doc, min_len, lemmer, **kwargs) -> List[str]:
+    def extract_candidates(self, doc, kp_min_len, lemmer, **kwargs) -> List[str]:
         return self.candidate_selection_model(
-            doc=doc, min_len=min_len, lemmer_lang=lemmer, **kwargs
+            doc=doc, kp_min_len=kp_min_len, lemmer_lang=lemmer, **kwargs
         )
 
     def top_n_candidates(
-        self, doc, candidate_list, top_n, min_len, **kwargs
+        self, doc, candidate_list, top_n, kp_min_len, **kwargs
     ) -> List[Tuple]:
         # input
         # doc_list, labels_stemed, labels,  model, dataloader
@@ -332,7 +332,7 @@ class PromptRank(BaseKPModel):
         self,
         doc: Document,
         top_n,
-        min_len,
+        kp_min_len,
         stemmer: Optional[StemmerI] = None,
         lemmer: Optional[Callable] = None,
         **kwargs,
@@ -342,10 +342,10 @@ class PromptRank(BaseKPModel):
         relevant to its specific functionality
         """
 
-        self.extract_candidates(doc, min_len, lemmer, **kwargs)
+        self.extract_candidates(doc, kp_min_len, lemmer, **kwargs)
 
         top_n, candidate_set = self.top_n_candidates(
-            doc, top_n, min_len, stemmer, **kwargs
+            doc, top_n, kp_min_len, stemmer, **kwargs
         )
 
         logger.debug(f"Document #{self.counter} processed")

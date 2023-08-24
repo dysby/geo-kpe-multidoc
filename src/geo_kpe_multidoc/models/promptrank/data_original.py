@@ -142,7 +142,7 @@ class PromptRankExtractor:
         return doc_pairs, count
 
     def __call__(
-        self, doc: Document, min_len=0, lemmer_lang="en", **kwargs
+        self, doc: Document, kp_min_len=0, lemmer_lang="en", **kwargs
     ) -> List[str]:
         text = " ".join(doc.raw_text.split()[: self.max_len])
         text_obj = InputTextObj(self.en_model, text)

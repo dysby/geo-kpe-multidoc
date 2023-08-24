@@ -110,10 +110,10 @@ class BaseKPModel:
         return remove_whitespaces(txt)[1:]
 
     def extract_candidates(
-        self, doc, min_len, lemmer, **kwargs
+        self, doc, kp_min_len, lemmer, **kwargs
     ) -> Tuple[List[str], List[Tuple[int, int]]]:
         return self.candidate_selection_model(
-            doc=doc, min_len=min_len, lemmer_lang=lemmer, **kwargs
+            doc=doc, kp_min_len=kp_min_len, lemmer_lang=lemmer, **kwargs
         )
 
     def top_n_candidates(
@@ -128,7 +128,7 @@ class BaseKPModel:
         self,
         doc: Document,
         top_n,
-        min_len,
+        kp_min_len,
         # stemmer: Optional[StemmerI] = None,
         lemmer: Optional[Callable] = None,
         **kwargs,
@@ -137,7 +137,7 @@ class BaseKPModel:
         Concrete method that extracts key-phrases from a given document, with optional
         arguments relevant to its specific functionality
         """
-        self.extract_candidates(doc, min_len, lemmer, **kwargs)
+        self.extract_candidates(doc, kp_min_len, lemmer, **kwargs)
 
         top_n_candidates_scores, candidate_set = self.top_n_candidates(
             doc,
@@ -157,7 +157,7 @@ class BaseKPModel:
         corpus: KPEDataset,
         dataset,
         top_n=5,
-        min_len=0,
+        kp_min_len=0,
         lemmatize=False,
         **kwargs,
     ) -> List[List[Tuple]]:
@@ -183,7 +183,7 @@ class ExtractionEvaluator(BaseKPModel):
         self,
         doc: Document,
         top_n,
-        min_len,
+        kp_min_len,
         stemmer: Optional[StemmerI] = None,
         lemmer: Optional[Callable] = None,
         **kwargs,
@@ -191,7 +191,7 @@ class ExtractionEvaluator(BaseKPModel):
         """
         Shallow model for candidate extraction evalutation
         """
-        self.extract_candidates(doc, min_len, lemmer, **kwargs)
+        self.extract_candidates(doc, kp_min_len, lemmer, **kwargs)
 
         top_n = len(doc.candidate_set) if top_n == -1 else top_n
 

@@ -111,10 +111,10 @@ class PromptRank(BaseKPModel):
         self.counter = 1
 
     def extract_candidates(
-        self, doc, min_len, lemmer, **kwargs
+        self, doc, kp_min_len, lemmer, **kwargs
     ) -> Tuple[List[str], List]:
         return self.candidate_selection_model(
-            doc=doc, min_len=min_len, lemmer_lang=lemmer, **kwargs
+            doc=doc, kp_min_len=kp_min_len, lemmer_lang=lemmer, **kwargs
         )
 
     def top_n_candidates(
@@ -246,13 +246,13 @@ class PromptRank(BaseKPModel):
         self,
         doc: Document,
         top_n,
-        min_len,
+        kp_min_len,
         stemmer: Optional[StemmerI] = None,
         lemmer: Optional[Callable] = None,
         **kwargs,
     ) -> Tuple[List[Tuple[str, float]], List[str]]:
         # Because base KPE extractor does not return positions (it returns mentions)
-        self.extract_candidates(doc, min_len, lemmer, **kwargs)
+        self.extract_candidates(doc, kp_min_len, lemmer, **kwargs)
         candidates = doc.candidate_set
         positions = doc.candidate_positions
 

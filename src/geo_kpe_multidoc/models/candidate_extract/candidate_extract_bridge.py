@@ -71,13 +71,13 @@ class BridgeKPECandidateExtractionModel:
     def __call__(
         self,
         doc: Document,
-        min_len: int = 5,
+        kp_min_len: int = 5,
         grammar: str = None,
         lemmer_lang: str = None,
         **kwargs,
     ):
         return self._extract_candidates_positions(
-            doc, min_len, grammar, lemmer_lang, **kwargs
+            doc, kp_min_len, grammar, lemmer_lang, **kwargs
         )
 
     def _pos_tag_doc(self, doc: Document, stemming, use_cache, **kwargs) -> None:
@@ -97,7 +97,7 @@ class BridgeKPECandidateExtractionModel:
     def _extract_candidates_positions(
         self,
         doc: Document,
-        min_len: int = 0,
+        kp_min_len: int = 0,
         grammar: str = None,
         lemmer_lang: str = None,
         **kwargs,
