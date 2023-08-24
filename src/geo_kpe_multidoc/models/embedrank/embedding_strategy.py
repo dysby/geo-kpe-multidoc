@@ -18,6 +18,9 @@ class CandidateEmbeddingStrategy(Protocol):
     def candidate_embeddings(self, model, doc: Document):
         ...
 
+    def set_global_attention(self, model, doc: Document):
+        ...
+
 
 class OutContextMentionsEmbedding:
     def __init__(self, add_query_prefix=False, **kwargs) -> None:
@@ -43,6 +46,9 @@ class OutContextMentionsEmbedding:
                 embds.append(embd)
 
             doc.candidate_set_embed.append(np.mean(embds, 0))
+
+    def set_global_attention(self, model, doc: Document):
+        pass
 
 
 class OutContextEmbedding:
@@ -119,6 +125,9 @@ class InContextEmbeddings:
 
             doc.candidate_set_embed.append(np.mean(embds, 0))
 
+    def set_global_attention(self, model, doc: Document):
+        pass
+
 
 class InContextPlusClsEmbeddings:
     """Compute each candidate mention embedding as the mean of each token in the mention,
@@ -127,6 +136,9 @@ class InContextPlusClsEmbeddings:
 
     def __init__(self, add_query_prefix=False, **kwargs) -> None:
         self.add_query_prefix = "query: " if add_query_prefix else ""
+
+    def set_global_attention(self, model, doc: Document):
+        pass
 
     def candidate_embeddings(self, model, doc: Document):
         for candidate in doc.candidate_set:
@@ -172,6 +184,9 @@ class InContextPlusClsEmbeddings:
 class InAndOutContextEmbeddings:
     def __init__(self, add_query_prefix=False, **kwargs) -> None:
         self.add_query_prefix = "query: " if add_query_prefix else ""
+
+    def set_global_attention(self, model, doc: Document):
+        pass
 
     def candidate_embeddings(self, model, doc: Document):
         # TODO: temp to comparison of out context embeddings vs in context embeddings
@@ -253,7 +268,7 @@ class GlobalAttentionCandidateStrategy(InContextEmbeddings):
     def __init__(self, add_query_prefix=False, **kwargs) -> None:
         super().__init__(add_query_prefix, **kwargs)
 
-    def _set_global_attention_on_candidates(self, model, doc: Document):
+    def set_global_attention(self, model, doc: Document):
         mentions = []
         for candidate in doc.candidate_set:
             # mentions_positions, _ = self._search_mentions(doc, candidate)
@@ -267,26 +282,16 @@ class GlobalAttentionCandidateStrategy(InContextEmbeddings):
         logger.debug(f"Global Attention in {len(mentions)} tokens")
         doc.global_attention_mask[:, mentions] = 1
 
-    def candidate_embeddings(self, model, doc: Document):
-        # TODO: maybe move document embedding into these strategy classes
-        # don't need to reset global attention on candidate positions
-        # because it is needed before when embedding the document
-        # self._set_global_attention_on_candidates(doc)
-
-        super().candidate_embeddings(model, doc)
-
 
 class GlobalAttentionDilatedStrategy(InContextEmbeddings):
     def __init__(self, dilation: int = 128, **kwargs) -> None:
         self.dilation = dilation
         super().__init__(**kwargs)
 
-    def candidate_embeddings(self, model, doc: Document):
+    def set_global_attention(self, model, doc: Document):
         input_size = doc.global_attention_mask.size(1)
         indices = torch.arange(0, input_size, self.dilation)
         doc.global_attention_mask.index_fill_(1, indices, 1)
-
-        super().candidate_embeddings(model, doc)
 
 
 STRATEGIES = {

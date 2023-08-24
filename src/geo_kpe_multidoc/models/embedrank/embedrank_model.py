@@ -203,25 +203,11 @@ class EmbedRank(BaseKPModel):
         doc.global_attention_mask[:, 0] = 1  # CLS token
 
         # TODO: Global Attention alternatives
+        self.candidate_embedding_strategy.set_global_attention(self.model, doc)
         # Global attention on the first 100 tokens
         # global_attention_mask[:, :100] = 1
         # # Global attention on periods
         # global_attention_mask[(input_ids == self.tokenizer.convert_tokens_to_ids('.'))] = 1
-
-        if isinstance(
-            self.candidate_embedding_strategy, GlobalAttentionCandidateStrategy
-        ):
-            # # if "global_attention" in cand_mode:
-            # if "dilated" in cand_mode:
-            #     dilation = int("".join(filter(str.isdigit, cand_mode)))
-            #     input_size = doc.global_attention_mask.size(1)
-            #     indices = torch.arange(0, input_size, dilation)
-            #     doc.global_attention_mask.index_fill_(1, indices, 1)
-            #     # cand_mode = cand_mode[: cand_mode.index("dilated") + 7]  # remove digits
-            # else:
-            self.candidate_embedding_strategy._set_global_attention_on_candidates(
-                self.model, doc
-            )
 
         output_attentions = "attention_rank" in cand_mode
 
