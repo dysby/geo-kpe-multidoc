@@ -219,7 +219,9 @@ class EmbedRank(BaseKPModel):
             #     doc.global_attention_mask.index_fill_(1, indices, 1)
             #     # cand_mode = cand_mode[: cand_mode.index("dilated") + 7]  # remove digits
             # else:
-            self.candidate_embedding_strategy._set_global_attention_on_candidates(doc)
+            self.candidate_embedding_strategy._set_global_attention_on_candidates(
+                self.model, doc
+            )
 
         output_attentions = "attention_rank" in cand_mode
 
