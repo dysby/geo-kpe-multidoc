@@ -67,8 +67,12 @@ class Document:
         id: str,
         dataset: str = "",
         topic: str = "",
-        pre_processing_pipeline: List[Callable] = [],
+        pre_processing_pipeline: List[Callable] = None,
     ):
+        pre_processing_pipeline = (
+            pre_processing_pipeline if pre_processing_pipeline else []
+        )
+
         for f in pre_processing_pipeline:
             raw_text = f(raw_text)
         self.raw_text = raw_text
