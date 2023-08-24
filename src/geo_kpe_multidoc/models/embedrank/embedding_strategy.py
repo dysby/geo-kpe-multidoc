@@ -295,8 +295,6 @@ STRATEGIES = {
     "in_context": InContextEmbeddings,
     "in_context_plus_cls": InContextPlusClsEmbeddings,
     "in_n_out_context": InAndOutContextEmbeddings,
-    "global_attention": InContextEmbeddings,
-    "global_attention_dilated": InContextEmbeddings,
-    # "global_attention": GlobalAttentionCandidateStrategy,
-    # "dilated": GlobalAttentionDilatedStrategy,
+    "global_attention": GlobalAttentionCandidateStrategy,
+    "global_attention_dilated": GlobalAttentionDilatedStrategy,
 }

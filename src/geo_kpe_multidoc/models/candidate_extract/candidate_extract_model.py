@@ -87,8 +87,10 @@ class KPECandidateExtractionModel:
         self.join_hyphen_pos = False
         self.join_hyphen_pos_valid = False
 
-        self.kp_min_len = kwargs.get("kp_min_len", 0)
-        self.kp_max_words = kwargs.get("kp_max_words", 256)
+        self.kp_min_len = kwargs.get("kp_min_len") if kwargs.get("kp_min_len") else 0
+        self.kp_max_words = (
+            kwargs.get("kp_max_words") if kwargs.get("kp_max_words") else 256
+        )
         # arbitrary high value
 
     def __call__(

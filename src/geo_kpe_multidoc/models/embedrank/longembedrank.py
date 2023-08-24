@@ -70,22 +70,26 @@ class LongEmbedRank(EmbedRank):
         self.model: SentenceEmbedder = embedder_cls(model, tokenizer)
         self.name = f"LongEmbedRank_{name}"
 
-        # strategies = {
-        #     "no_context": OutContextEmbedding,
-        #     "mentions_no_context": OutContextMentionsEmbedding,
-        #     "in_context": InContextEmbeddings,
-        #     "in_n_out_context": InAndOutContextEmbeddings,
-        # }
-        # TODO: deal with global_attention and global_attention_dilated
-        strategy = STRATEGIES.get(candidate_embedding_strategy, InContextEmbeddings)
-        self.candidate_embedding_strategy: CandidateEmbeddingStrategy = strategy()
+        self.add_query_prefix = (
+            "query: " if kwargs.get("add_query_prefix") else ""
+        )  # for intfloat/multilingual-e5-* models
+
+        dilation = 128
+        if "dilated" in candidate_embedding_strategy:
+            dilation = int("".join(filter(str.isdigit, candidate_embedding_strategy)))
+            candidate_embedding_strategy = candidate_embedding_strategy[
+                : candidate_embedding_strategy.index("dilated") + len("dilated")
+            ]
+        strategy = STRATEGIES.get(candidate_embedding_strategy)
+
+        self.candidate_embedding_strategy: CandidateEmbeddingStrategy = strategy(
+            add_query_prefix=self.add_query_prefix, dilation=dilation
+        )
         logger.info(
             f"Initialize EmbedRank w/ {self.candidate_embedding_strategy.__class__.__name__}"
         )
         # TODO: Add support for e5 type models that require "query: " prefixed text.
-        self.add_query_prefix = (
-            "query: " if kwargs.get("add_query_prefix") else ""
-        )  # for intfloat/multilingual-e5-* models
+
         self.whitening = kwargs.get("whitening", False)
 
     def _embed_doc(
