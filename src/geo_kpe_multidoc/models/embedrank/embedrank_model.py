@@ -2,7 +2,7 @@ import os
 from operator import itemgetter
 from pathlib import Path
 from time import time
-from typing import List, Tuple
+from typing import List, Optional, Tuple
 
 import joblib
 import numpy as np
@@ -51,6 +51,7 @@ class EmbedRank(BaseKPModel):
         candidate_selection_model,
         pooling_strategy: str = "mean",
         candidate_embedding_strategy: str = "mentions_no_context",
+        max_seq_len: Optional[int] = None,
         **kwargs,
     ):
         super().__init__(model, candidate_selection_model, **kwargs)
@@ -72,6 +73,10 @@ class EmbedRank(BaseKPModel):
         self.add_query_prefix = (
             "query: " if kwargs.get("add_query_prefix", False) else ""
         )  # for intfloat/multilingual-e5-* models
+
+        if max_seq_len:
+            self.model.model_max_lenght = max_seq_len
+        # force max sequence length, for sentence-t5* models
 
         self.candidate_embedding_strategy: CandidateEmbeddingStrategy = strategy(
             add_query_prefix=self.add_query_prefix, dilation=dilation
