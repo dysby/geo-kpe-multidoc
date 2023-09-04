@@ -38,7 +38,7 @@ def generateLongformerRanker(
     candidate_selection_model,
     longformer_max_length,
     longformer_attention_window,
-    generate_position_embeddings=False,
+    # generate_position_embeddings=False,
     **kwargs,
 ):
     # Load AllenAi Longformer
@@ -82,14 +82,14 @@ def generateLongformerRanker(
     #     del model.embeddings.token_type_ids
 
     sbert = SentenceTransformer(backend_model_name)
-
+    # TODO: generate_new_positions now a s
     longformer_model, longformer_tokenizer = convert_roberta_to_longformer(
         sbert._modules["0"].auto_model,
         sbert.tokenizer,
         new_max_pos,
         attention_window,
         copy_from_position,
-        generate_new=generate_position_embeddings,
+        # generate_new_positions=generate_position_embeddings,
     )
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 

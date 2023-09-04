@@ -18,7 +18,6 @@ from geo_kpe_multidoc.models.base_KP_model import BaseKPModel
 from geo_kpe_multidoc.models.embedrank.embedding_strategy import (
     STRATEGIES,
     CandidateEmbeddingStrategy,
-    GlobalAttentionCandidateStrategy,
 )
 from geo_kpe_multidoc.models.pre_processing.post_processing_utils import (
     whitening_np,
@@ -119,10 +118,6 @@ class EmbedRank(BaseKPModel):
         doc.token_embeddings = doc_embeddings["token_embeddings"].detach().cpu()
         doc.attention_mask = doc_embeddings["attention_mask"].detach().cpu()
 
-        # TODO: longformer attention window 256 with inputs only 128
-        # limit_128 = True
-        # if limit_128:
-        #     doc.token_ids = doc.token_ids[:128]
         return doc_embeddings["sentence_embedding"].detach().cpu().numpy()
 
     def _aggregate_candidate_mention_embeddings(
