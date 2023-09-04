@@ -1,5 +1,6 @@
 import itertools
 from operator import itemgetter
+from typing import Dict, List, Tuple
 
 import numpy as np
 import pandas as pd
@@ -104,6 +105,21 @@ class Ranker:
             candidate_embeddings, documents_embeddings, candidate_document_matrix
         )
 
+    def _score_to_ranking_p_doc(
+        self, score_per_document: pd.DataFrame
+    ) -> Dict[str, Tuple[List[Tuple[str, float]], List[str]]]:
+        # ranking_p_doc: Dict[str, Tuple[List[Tuple[str, float]], List[str]]]
+        ranking_p_doc = {
+            doc_id: [
+                [(candidate, score) for candidate, score in candidate_scores.items()],
+                list(candidate_scores.keys()),
+            ]
+            for doc_id, candidate_scores in score_per_document.to_dict(
+                orient="index"
+            ).items()
+        }
+        return ranking_p_doc
+
 
 class MeanRank(Ranker):
     """Compute the mean of keyphrase to documents similarity"""
@@ -126,11 +142,14 @@ class MeanRank(Ranker):
             score_per_document.mean(axis=1).sort_values(ascending=False).items()
         )
 
+        ranking_p_doc = self._score_to_ranking_p_doc(score_per_document)
+
         return (
             documents_embeddings,
             candidates_embeddings,
             candidate_document_matrix,
             top_n_scores,
+            ranking_p_doc,
         )
 
 
@@ -155,11 +174,13 @@ class MaxRank(Ranker):
             score_per_document.max(axis=1).sort_values(ascending=False).items()
         )
 
+        ranking_p_doc = self._score_to_ranking_p_doc(score_per_document)
         return (
             documents_embeddings,
             candidates_embeddings,
             candidate_document_matrix,
             top_n_scores,
+            ranking_p_doc,
         )
 
 
@@ -225,11 +246,13 @@ class MaxMaxRank(Ranker):
             score_per_document.max(axis=1).sort_values(ascending=False).items()
         )
 
+        ranking_p_doc = self._score_to_ranking_p_doc(score_per_document)
         return (
             documents_embeddings,
             candidates_embeddings,
             candidate_document_matrix,
             top_n_scores,
+            ranking_p_doc,
         )
 
 
@@ -245,11 +268,13 @@ class ITCSRank(Ranker):
         **kwargs,
     ):
         top_n_scores = None
+        ranking_p_doc = None
         return (
             documents_embeddings,
             candidates_embeddings,
             candidate_document_matrix,
             top_n_scores,
+            ranking_p_doc,
         )
 
 
@@ -279,11 +304,13 @@ class MrrRank(Ranker):
             .items()
         )
 
+        ranking_p_doc = self._score_to_ranking_p_doc(score_per_document)
         return (
             documents_embeddings,
             candidates_embeddings,
             candidate_document_matrix,
             top_n_scores,
+            ranking_p_doc,
         )
 
 
@@ -313,15 +340,20 @@ class MmrRank(Ranker):
             top_n=len(candidates_embeddings),
             diversity=self.diversity,
         )
-        # candidate to document similarity
-        # candidate to candidate similarity
-        # maximal relevance
 
+        # keep score per document for geo association metrics
+        score_per_document = pd.DataFrame(
+            cosine_similarity(candidates_embeddings, documents_embeddings)
+        )
+        score_per_document.index = candidates_embeddings.index
+        score_per_document.columns = documents_embeddings.index
+        ranking_p_doc = self._score_to_ranking_p_doc(score_per_document)
         return (
             documents_embeddings,
             candidates_embeddings,
             candidate_document_matrix,
             top_n_scores,
+            ranking_p_doc,
         )
 
 
@@ -393,11 +425,13 @@ class MaxSumRank(Ranker):
             for idx in candidate
         ]
 
+        ranking_p_doc = self._score_to_ranking_p_doc(score_per_document)
         return (
             documents_embeddings,
             candidates_embeddings,
             candidate_document_matrix,
             top_n_scores,
+            ranking_p_doc,
         )
 
 
@@ -411,11 +445,13 @@ class DDPRank(Ranker):
         **kwargs,
     ):
         top_n_scores = None
+        ranking_p_doc = None
         return (
             documents_embeddings,
             candidates_embeddings,
             candidate_document_matrix,
             top_n_scores,
+            ranking_p_doc,
         )
 
 
@@ -479,6 +515,9 @@ class DPSCRank(Ranker):
         **kwargs,
     ):
         sim_matrix = cosine_similarity(candidates_embeddings, candidates_embeddings)
+        score_per_document = pd.DataFrame(sim_matrix)
+        score_per_document.index = candidates_embeddings.index
+        score_per_document.columns = documents_embeddings.index
         sim_matrix[np.diag_indices_from(sim_matrix)] = 0
         # effective_lens = [effective_length(s) for s in split_into_sentences(text)]
         # real_lens = [real_length(s) for s in split_into_sentences(text)]
@@ -496,11 +535,13 @@ class DPSCRank(Ranker):
             reverse=True,
         )
 
+        ranking_p_doc = self._score_to_ranking_p_doc(score_per_document)
         return (
             documents_embeddings,
             candidates_embeddings,
             candidate_document_matrix,
             top_n_scores,
+            ranking_p_doc,
         )
 
 
@@ -561,11 +602,14 @@ class UmapClustersRank(Ranker):
             reverse=True,
         )
 
+        ranking_p_doc = None
+
         return (
             documents_embeddings,
             candidates_embeddings,
             candidate_document_matrix,
             top_n_scores,
+            ranking_p_doc,
         )
 
 
@@ -611,11 +655,13 @@ class ClusterCentroidsRank(Ranker):
 
         top_n_scores = [(candidates_embeddings.index[closest[i]], i) for i in ordering]
 
+        ranking_p_doc = None
         return (
             documents_embeddings,
             candidates_embeddings,
             candidate_document_matrix,
             top_n_scores,
+            ranking_p_doc,
         )
 
 
@@ -631,11 +677,13 @@ class ComunityRank(Ranker):
         # 1: Get network graph based?
         # 2: Comunities and assign a keyphrase from largest comunities
         top_n_scores = None
+        ranking_p_doc = None
         return (
             documents_embeddings,
             candidates_embeddings,
             candidate_document_matrix,
             top_n_scores,
+            ranking_p_doc,
         )
 
 
@@ -651,11 +699,13 @@ class EigenRank(Ranker):
         # 1: Network graph
         # 2: EigenVector Centrality for the network and get
         top_n_scores = None
+        ranking_p_doc = None
         return (
             documents_embeddings,
             candidates_embeddings,
             candidate_document_matrix,
             top_n_scores,
+            ranking_p_doc,
         )
 
 
@@ -690,7 +740,8 @@ class AffinityRank(Ranker):
             M_tilda = M_tilda + self.gamma ** (t - 1) * np.linalg.matrix_power(M, t)
         M_tilda = M_tilda / np.linalg.norm(M_tilda, axis=1, keepdims=True)
 
-        sentence_score_t_1 = np.random.rand(len(score_per_document.index))
+        # TODO: check size
+        sentence_score_t_1 = np.random.rand(len(score_per_document.columns))
 
         first_term = np.multiply(self.damping, M_tilda)
         B_transpose = np.transpose(M_tilda)
@@ -715,12 +766,13 @@ class AffinityRank(Ranker):
             key=itemgetter(1),
             reversed=True,
         )
-
+        ranking_p_doc = self._score_to_ranking_p_doc(score_per_document)
         return (
             documents_embeddings,
             candidates_embeddings,
             candidate_document_matrix,
             top_n_scores,
+            ranking_p_doc,
         )
 
 
@@ -766,7 +818,8 @@ class PageRank(Ranker):
             candidate_document_matrix, axis=1, keepdims=True
         )
 
-        sentence_score_t_1 = np.random.rand(len(score_per_document.index))
+        # TODO: Check size
+        sentence_score_t_1 = np.random.rand(len(score_per_document.columns))
         # sentence_score_t_1 = np.zeros(np.asarray(corpus).shape, dtype=float, order='C')
         first_term = np.multiply(self.alpha, adjacency_matrix)
         B_transpose = np.transpose(matrix_B)
@@ -792,11 +845,13 @@ class PageRank(Ranker):
             reverse=True,
         )
 
+        ranking_p_doc = self._score_to_ranking_p_doc(score_per_document)
         return (
             documents_embeddings,
             candidates_embeddings,
             candidate_document_matrix,
             top_n_scores,
+            ranking_p_doc,
         )
 
 
