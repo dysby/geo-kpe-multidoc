@@ -309,26 +309,28 @@ class MdGeoRank:
                 ):
                     candidate_scores.loc[kp, "in_gold"] = True
 
-            # number of documents where the candidate is present, within the current
-            # topic.
-            # TEMP
-            df = (
-                pd.DataFrame()
-                .reindex_like(candidate_scores_per_doc)
-                .fillna(0)
-                .astype(int)
-                .transpose()
-            )
+            # # number of documents where the candidate is present, within the current
+            # # topic.
+            # # TEMP
+            # df = (
+            #     pd.DataFrame()
+            #     .reindex_like(candidate_scores_per_doc)
+            #     .fillna(0)
+            #     .astype(int)
+            #     .transpose()
+            # )
 
-            for cand, docs in topic_model_outputs["candidate_document_matrix"].items():
-                for doc in docs:
-                    df.loc[cand, doc] += 1
+            # # TODO: does not count mentions
+            # for cand, docs in topic_model_outputs["candidate_document_matrix"].items():
+            #     for doc in docs:
+            #         df.loc[cand, doc] += 1
 
-            candidate_scores["N"] = df.sum(axis=1)
-            # END TEMP
+            # candidate_scores["N"] = df.sum(axis=1)
+            # # END TEMP
 
-            # candidate_scores["N"] = topic_model_outputs["candidate_document_matrix"]
-            #                               .sum(axis=1)
+            candidate_scores["N"] = topic_model_outputs[
+                "candidate_document_matrix"
+            ].sum(axis=1)
             candidate_scores.index.name = "candidate"
 
             topic_point_scores = gpd.GeoDataFrame(

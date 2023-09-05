@@ -47,7 +47,18 @@ class Ranker:
     def __init__(self, **kwargs) -> None:
         ...
 
-    def _extract_features(self, topic_extraction_features):
+    def _extract_features(
+        self, topic_extraction_features
+    ) -> Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
+        """
+        Params
+        ------
+        topic_extraction_features: List[(doc, candidate_embedings, candidate_list), ...]
+        Returns
+        -------
+        Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]
+            documents_embeddings, candidate_embeddings, candidate_document_matrix_df
+        """
         documents_embeddings = {}
         candidate_embeddings = {}
 

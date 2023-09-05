@@ -64,6 +64,7 @@ class MdPromptRank(BaseKPModel):
             .astype(int)
         )
         for cand, docs in candidate_document_matrix.items():
+            # TODO: use index slice assignment without looping on docs.
             for doc in docs:
                 df.loc[cand, doc] += 1
 
