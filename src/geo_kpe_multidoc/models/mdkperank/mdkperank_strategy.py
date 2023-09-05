@@ -125,9 +125,9 @@ class Ranker:
                 [(candidate, score) for candidate, score in candidate_scores.items()],
                 list(candidate_scores.keys()),
             ]
-            for doc_id, candidate_scores in score_per_document.to_dict(
-                orient="index"
-            ).items()
+            for doc_id, candidate_scores in score_per_document.transpose()
+            .to_dict(orient="index")
+            .items()
         }
         return ranking_p_doc
 
