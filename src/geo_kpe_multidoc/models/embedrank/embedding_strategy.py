@@ -29,10 +29,9 @@ class OutContextMentionsEmbedding:
     def candidate_embeddings(self, model, doc: Document):
         for candidate in doc.candidate_set:
             # TODO: refactor to batch encode
+            embds = []
             for mention in doc.candidate_mentions[candidate]:
                 mention = self.add_query_prefix + mention
-
-                embds = []
                 # TODO: deal with subclassing LongEmbedRank
                 if isinstance(model, BaseEmbedder):
                     embd = model.embed(mention)
@@ -94,8 +93,8 @@ class InContextEmbeddings:
             # candidate is beyond max position for emdedding
             # return a non-contextualized embedding.
             if len(mentions_positions) == 0:
+                embds = []
                 for mention in doc.candidate_mentions[candidate]:
-                    embds = []
                     q_mention = self.add_query_prefix + mention
 
                     if isinstance(model, BaseEmbedder):
@@ -148,8 +147,8 @@ class InContextPlusClsEmbeddings:
 
             # backoff procedure, if mentions not found.
             if len(mentions_positions) == 0:
+                embds = []
                 for mention in doc.candidate_mentions[candidate]:
-                    embds = []
                     q_mention = self.add_query_prefix + mention
 
                     if isinstance(model, BaseEmbedder):

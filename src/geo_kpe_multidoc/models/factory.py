@@ -257,11 +257,18 @@ def kpe_model_factory(BACKEND_MODEL_NAME, TAGGER_NAME, **kwargs) -> BaseKPModel:
             single_doc_ranker, rank_strategy=kwargs["md_strategy"], **kwargs
         )
     elif rank_class == "MdPromptRank":
-        single_doc_ranker = PromptRank(
-            BACKEND_MODEL_NAME,
-            candidate_selection_model=candidate_selection_model,
-            **kwargs,
-        )
+        if "sled" in BACKEND_MODEL_NAME.lower():
+            single_doc_ranker = SLEDPromptRank(
+                BACKEND_MODEL_NAME,
+                candidate_selection_model=candidate_selection_model,
+                **kwargs,
+            )
+        else:
+            single_doc_ranker = PromptRank(
+                BACKEND_MODEL_NAME,
+                candidate_selection_model=candidate_selection_model,
+                **kwargs,
+            )
         kpe_model = MdPromptRank(single_doc_ranker)
     elif rank_class == "ExtractionEvaluator":
         kpe_model = ExtractionEvaluator(
