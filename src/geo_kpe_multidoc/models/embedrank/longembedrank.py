@@ -38,7 +38,7 @@ class LongEmbedRank(EmbedRank):
         candidate_selection_model,
         device=None,
         name="",
-        candidate_embedding_strategy: str = "",
+        candidate_embedding_strategy: str = "mentions_no_context",
         **kwargs,
     ):
         # TODO: init super class

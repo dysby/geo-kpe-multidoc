@@ -208,6 +208,7 @@ def kpe_model_factory(BACKEND_MODEL_NAME, TAGGER_NAME, **kwargs) -> BaseKPModel:
             kpe_model = EmbedRank(
                 BACKEND_MODEL_NAME,
                 candidate_selection_model=candidate_selection_model,
+                candidate_embedding_strategy=kwargs.get("candidate_mode"),
                 **kwargs,
             )
     elif rank_class == "MaskRank":
@@ -222,6 +223,7 @@ def kpe_model_factory(BACKEND_MODEL_NAME, TAGGER_NAME, **kwargs) -> BaseKPModel:
             kpe_model = MaskRank(
                 BACKEND_MODEL_NAME,
                 candidate_selection_model=candidate_selection_model,
+                candidate_embedding_strategy=kwargs.get("candidate_mode"),
                 **kwargs,
             )
     elif rank_class == "PromptRank":
