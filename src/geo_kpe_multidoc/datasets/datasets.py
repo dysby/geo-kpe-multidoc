@@ -121,7 +121,9 @@ def load_dataset(
         """Remove topic key and document id and keep only a list of items each corresponding to
         a topic, and each item composed by a list of docs and a list of keyphrases."""
         dataset = {}
-        with open(f"{dataset_dir}/MKDUC01/MKDUC01.json", "r") as source_f:
+        with open(
+            f"{dataset_dir}/MKDUC01/MKDUC01.json", "r", encoding="utf8"
+        ) as source_f:
             dataset = json.load(source_f)
         logger.info(f"Load json with {len(dataset)} topics")
 
@@ -178,8 +180,8 @@ def load_dataset(
                     except KeyError:
                         # Error: There is no item named 'PubMed/docs_docsutf8/12915528.txt' in the archive
                         continue
-                    id = file.split("/")[-1][:-4]
-                    ids.append(id)
+                    _id = file.split("/")[-1][:-4]
+                    ids.append(_id)
         return ids, documents, labels
 
     if datasource == "preloaded":

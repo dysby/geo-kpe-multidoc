@@ -6,7 +6,7 @@ from nltk.stem import StemmerI
 def clean_keywords(strings, stemmer: StemmerI):
     """from https://github.com/asahi417/kex/"""
 
-    def cleaner(_string):
+    def cleaner(_string: str):
         _string = _string.lower()
         _string = re.sub(r"\A\s*", "", _string)
         _string = re.sub(r"\s*\Z", "", _string)
@@ -17,7 +17,10 @@ def clean_keywords(strings, stemmer: StemmerI):
             .replace(".", "")
         )
         _string = re.sub(r"\s{2,}", " ", _string)
-        _string = " ".join(list(map(lambda x: stemmer.stem(x), _string.split(" "))))
+        # _string = " ".join(list(map(lambda x: stemmer.stem(x), _string.split(" "))))
+        _string = " ".join(list(map(stemmer.stem, _string.split(" "))))
+        # TODO: remove ' from keyphrases
+        _string = _string.replace("'", "")
         return _string
 
     keys = list(

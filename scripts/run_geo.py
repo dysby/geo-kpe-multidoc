@@ -85,16 +85,13 @@ def parse_args():
     parser.add_argument( "--geo_weight_function_param", type=float, default=1000, help="Weigth matrix distance function parameter",)
     parser.add_argument( "--geo_association_index", type=str, default='moran_i', help="Geospacial association index used in rerank",)
     parser.add_argument( "--geo_alpha", type=float, default=-0.5, help="Geospacial association index power factor used in rerank",)
-    parser.add_argument( "--preprocessing", action="store_true", help="Preprocess text documents by removing pontuation",)
     return parser.parse_args()
 # fmt: on
 
 
 def main():
     args = parse_args()
-    args.preprocessing = (
-        [remove_new_lines_and_tabs, remove_whitespaces] if args.preprocessing else []
-    )
+
     stemmer = select_stemmer(DATASETS[args.dataset_name].get("language"))
     lemmer = DATASETS[args.dataset_name].get("language")
 
@@ -124,13 +121,14 @@ def main():
     )
 
     # True labels are preprocessed while loading Dataset.
+    preprocessing_pipeline = [remove_new_lines_and_tabs, remove_whitespaces]
     model_results = postprocess_model_outputs(
-        model_output_ranking, stemmer, lemmer, args.preprocessing
+        model_output_ranking, stemmer, lemmer, preprocessing_pipeline
     )
 
     with wandb.init(
         project="geo-kpe-multidoc",
-        name=f"geo-{args.experiment_name}",
+        name=f"{args.experiment_name}-geo",
         config=vars(args),
     ):
         # Print and Save Results
