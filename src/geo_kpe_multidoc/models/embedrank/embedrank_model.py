@@ -1,3 +1,4 @@
+import math
 import os
 from operator import itemgetter
 from pathlib import Path
@@ -83,6 +84,11 @@ class EmbedRank(BaseKPModel):
         logger.info(
             f"Initialize EmbedRank w/ {self.candidate_embedding_strategy.__class__.__name__}"
         )
+
+        # TODO: add score position factor bias like in PromptRank
+        self.enable_pos = not kwargs.get("no_position_feature", False)
+        self.position_factor = kwargs.get("position_factor", 1.2e8)
+        # self.length_factor = kwargs.get("length_factor", 0.6)
 
         self.whitening = kwargs.get("whitening", False)
 
@@ -268,6 +274,7 @@ class EmbedRank(BaseKPModel):
 
     def _rank_candidates(
         self,
+        doc: Document,
         doc_embed: np.ndarray,
         candidate_set_embed: List[np.ndarray],
         candidate_set: List[str],
@@ -297,7 +304,6 @@ class EmbedRank(BaseKPModel):
             doc_embed = whiten[-1, :]
             candidate_set_embed = whiten[:-1, :]
 
-        doc_sim = []
         if mmr_mode:
             assert mmr_diversity >= 0
             assert mmr_diversity <= 1
@@ -328,6 +334,29 @@ class EmbedRank(BaseKPModel):
                 key=itemgetter(1),
             )
 
+        if self.enable_pos:
+            # doc_len = doc.len(doc.raw_text.split()[: self.max_len])
+            # doc_results.loc[:,"pos"] = torch.Tensor(doc_results["pos"].values.astype(float)) / doc_len + position_factor / (doc_len ** 3)
+            doc_len = len(doc.token_ids)
+
+            candidate_score = [
+                (
+                    candidate,
+                    (
+                        min(doc.candidate_positions[doc.candidate_set.index(candidate)])
+                        / doc_len
+                        + self.position_factor / (doc_len**3)
+                    )
+                    * math.log(abs(score)),
+                )
+                for candidate, score in candidate_score
+            ]
+            candidate_score = sorted(
+                candidate_score,
+                reverse=True,
+                key=itemgetter(1),
+            )
+
         return candidate_score[:top_n], candidate_set
 
     def top_n_candidates(
@@ -345,7 +374,12 @@ class EmbedRank(BaseKPModel):
 
         # candidate_score[:top_n], candidate_set
         ranking = self._rank_candidates(
-            doc.doc_embed, doc.candidate_set_embed, doc.candidate_set, top_n, **kwargs
+            doc,
+            doc.doc_embed,
+            doc.candidate_set_embed,
+            doc.candidate_set,
+            top_n,
+            **kwargs,
         )
 
         # DEBUG: check score distribution of found vs not found mentions

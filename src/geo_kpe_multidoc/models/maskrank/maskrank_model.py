@@ -144,7 +144,13 @@ class MaskRank(BaseKPModel):
         return doc.candidate_set_embed, doc.candidate_set
 
     def _rank_candidates(
-        self, doc_embed, candidate_set_embed, candidate_set, top_n: int = -1, **kwargs
+        self,
+        doc: Document,
+        doc_embed,
+        candidate_set_embed,
+        candidate_set,
+        top_n: int = -1,
+        **kwargs,
     ):
         """
         This method is key for each ranking model.
@@ -203,7 +209,12 @@ class MaskRank(BaseKPModel):
         logger.info(f"Embed Candidates in {time() -  t:.2f}s")
 
         return self._rank_candidates(
-            doc.doc_embed, doc.candidate_set_embed, doc.candidate_set, top_n, **kwargs
+            doc,
+            doc.doc_embed,
+            doc.candidate_set_embed,
+            doc.candidate_set,
+            top_n,
+            **kwargs,
         )
 
         # doc_sim = []
