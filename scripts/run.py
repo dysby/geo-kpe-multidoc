@@ -7,6 +7,11 @@ from os import path
 from time import time
 
 import pandas as pd
+from loguru import logger
+from matplotlib import pyplot as plt
+from tabulate import tabulate
+
+import wandb
 from geo_kpe_multidoc import GEO_KPE_MULTIDOC_OUTPUT_PATH
 from geo_kpe_multidoc.datasets.datasets import DATASETS, load_dataset
 from geo_kpe_multidoc.evaluation.evaluation_tools import (
@@ -32,11 +37,6 @@ from geo_kpe_multidoc.models.pre_processing.pre_processing_utils import (
     select_stemmer,
 )
 from geo_kpe_multidoc.models.promptrank.promptrank import PromptRank
-from loguru import logger
-from matplotlib import pyplot as plt
-from tabulate import tabulate
-
-import wandb
 
 
 # fmt: off
@@ -67,8 +67,9 @@ def parse_args():
     parser.add_argument("--longformer_attention_window", type=int, default=512, help="Longformer: sliding chunk Attention Window size",)
     parser.add_argument("--longformer_only_copy_to_max_position", type=int, help="Longformer: only copy first positions of Pretrained Model position embedding weights",)
     parser.add_argument("--max_seq_len", type=int, help="PromptRank: max input sequence length because each model have a differenter config key especification")
-    parser.add_argument("--encoder_prompt", type=str, help="PromptRank: encoder prompt default 'Book: ' ")
-    parser.add_argument("--decoder_prompt", type=str, help="PromptRank: decoder prompt default 'This book mainly talks about ' ")
+    parser.add_argument("--batch_size", type=int, help="PromptRank: decoding batch size")
+    parser.add_argument("--encoder_prompt", type=str, help="PromptRank: encoder prompt, default 'Book: ' ")
+    parser.add_argument("--decoder_prompt", type=str, help="PromptRank: decoder prompt, default 'This book mainly talks about ' ")
     parser.add_argument("--no_position_feature", action="store_true", help="PromptRank: use candidate position as aditional feature (default: True)")
     parser.add_argument("--add_query_prefix", action="store_true", help="Add support for e5 type models that require 'query: ' prefixed instruction",)
     parser.add_argument("--candidate_mode", default="mentions_no_context", type=str, help="The method for candidate mode (no_context, mentions_no_context, global_attention, global_attention_dilated_nnn, attention_rank).",)
@@ -302,7 +303,7 @@ def main():
 
         xlim = (
             (dataset_kpe["score"].min(), dataset_kpe["score"].max())
-            if isinstance(kpe_model, (PromptRank, MaskRank))
+            if isinstance(kpe_model, (PromptRank, MaskRank)) or args.no_position_feature
             else (0, 1)
         )
         fig = plot_score_distribuitions_with_gold(

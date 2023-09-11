@@ -76,7 +76,7 @@ class SLEDPromptRank(PromptRank):
 
         # Dataloader
         self.num_workers = 1  # Not used, because of Tokenizer paralelism warning
-        self.batch_size = 16
+        self.batch_size = kwargs.get("batch_size") or 16
 
         self.counter = 1
 
