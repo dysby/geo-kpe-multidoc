@@ -1,4 +1,5 @@
 import itertools
+from functools import partial
 from operator import itemgetter
 from typing import Dict, List, Tuple
 
@@ -184,6 +185,53 @@ class MaxRank(Ranker):
         top_n_scores = list(
             score_per_document.max(axis=1).sort_values(ascending=False).items()
         )
+
+        ranking_p_doc = self._score_to_ranking_p_doc(score_per_document)
+        return (
+            documents_embeddings,
+            candidates_embeddings,
+            candidate_document_matrix,
+            top_n_scores,
+            ranking_p_doc,
+        )
+
+
+class MeanTopMaxRank(Ranker):
+    """Each Candidate score is the mean of top 50% similarity scores in the 
+    multidocument set. This strategy is a mix of MaxRank and MeanRank.
+    """
+
+    def _rank(
+        self,
+        candidates_embeddings: pd.DataFrame,
+        documents_embeddings: pd.DataFrame,
+        candidate_document_matrix: pd.DataFrame,
+        *args,
+        **kwargs,
+    ):
+        # Function to compute the mean of top 50% values for a row
+        def _mean_top_50_percent(row, top_50_percent_threshold):
+            threshold = top_50_percent_threshold.loc[row.name]
+            top_50_percent_values = row[row >= threshold]
+            return top_50_percent_values.mean()
+
+        score_per_document = pd.DataFrame(
+            cosine_similarity(candidates_embeddings, documents_embeddings)
+        )
+        score_per_document.index = candidates_embeddings.index
+        score_per_document.columns = documents_embeddings.index
+
+        # Calculate the top 50% threshold value for each row
+        top_50_percent_threshold = score_per_document.apply(
+            lambda row: row.quantile(0.5), axis=1
+        )
+        aggregation = partial(
+            _mean_top_50_percent, top_50_percent_threshold=top_50_percent_threshold
+        )
+        # Apply the function to each row
+        mean_top_50p = score_per_document.apply(aggregation, axis=1)
+
+        top_n_scores = list(mean_top_50p.sort_values(ascending=False).items())
 
         ranking_p_doc = self._score_to_ranking_p_doc(score_per_document)
         return (
@@ -869,6 +917,7 @@ class PageRank(Ranker):
 STRATEGIES = {
     "MEAN": MeanRank,
     "MAX": MaxRank,
+    "MEANTOPMAX": MeanTopMaxRank,
     "MAXMAX": MaxMaxRank,
     "MMR": MmrRank,
     "MRR": MrrRank,
