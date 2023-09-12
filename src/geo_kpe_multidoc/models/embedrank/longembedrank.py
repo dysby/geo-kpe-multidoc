@@ -70,6 +70,7 @@ class LongEmbedRank(EmbedRank):
         self.model: SentenceEmbedder = embedder_cls(model, tokenizer)
         self.name = f"LongEmbedRank_{name}"
 
+        # TODO: Add support for e5 type models that require "query: " prefixed text.
         self.add_query_prefix = (
             "query: " if kwargs.get("add_query_prefix") else ""
         )  # for intfloat/multilingual-e5-* models
@@ -88,7 +89,10 @@ class LongEmbedRank(EmbedRank):
         logger.info(
             f"Initialize EmbedRank w/ {self.candidate_embedding_strategy.__class__.__name__}"
         )
-        # TODO: Add support for e5 type models that require "query: " prefixed text.
+
+        # TODO: add score position factor bias like in PromptRank
+        self.enable_pos = not kwargs.get("no_position_feature", False)
+        self.position_factor = kwargs.get("position_factor", 1.2e8)
 
         self.whitening = kwargs.get("whitening", False)
 

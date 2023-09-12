@@ -2,6 +2,9 @@ import torch
 from loguru import logger
 from sentence_transformers import SentenceTransformer
 
+from geo_kpe_multidoc.models.backend.roberta2longformer.bert2longformer import (
+    convert_bert_to_longformer,
+)
 from geo_kpe_multidoc.models.backend.roberta2longformer.roberta2bigbird import (
     convert_roberta_to_bigbird,
 )
@@ -42,6 +45,7 @@ def generateLongformerRanker(
     **kwargs,
 ):
     # Load AllenAi Longformer
+    # TODO: Load allenai/longformer
     if backend_model_name == "allenai/longformer-base-4096":
         from transformers import AutoTokenizer, LongformerModel
 
@@ -82,13 +86,19 @@ def generateLongformerRanker(
     #     del model.embeddings.token_type_ids
 
     sbert = SentenceTransformer(backend_model_name)
-    # TODO: generate_new_positions now a s
-    longformer_model, longformer_tokenizer = convert_roberta_to_longformer(
+
+    if sbert._modules["0"].auto_model.config.model_type == "bert":
+        convert_to_longformer = convert_bert_to_longformer
+    else:
+        convert_to_longformer = convert_roberta_to_longformer
+
+    # TODO: generate_new_positions now a string
+    longformer_model, longformer_tokenizer = convert_to_longformer(
         sbert._modules["0"].auto_model,
         sbert.tokenizer,
-        new_max_pos,
-        attention_window,
-        copy_from_position,
+        longformer_max_length=new_max_pos,
+        attention_window=attention_window,
+        max_copy_from_index=copy_from_position,
         # generate_new_positions=generate_position_embeddings,
     )
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
