@@ -1,9 +1,10 @@
 import math
 import os
+from functools import partial
 from operator import itemgetter
 from pathlib import Path
 from time import time
-from typing import List, Optional, Tuple
+from typing import Dict, List, Optional, Tuple
 
 import joblib
 import numpy as np
@@ -26,6 +27,20 @@ from geo_kpe_multidoc.models.pre_processing.post_processing_utils import (
 )
 from geo_kpe_multidoc.models.pre_processing.pre_processing_utils import tokenize_hf
 from geo_kpe_multidoc.models.sentence_embedder import LongformerSentenceEmbedder
+
+
+def min_candidate_position(
+    candidate: str,
+    candidates: List[str],
+    positions: Dict[str, List[int]],  # noqa: F821
+    not_found_position: int,
+):
+    """Handle candidate positions if not found, returns default `not_found_position`"""
+    try:
+        idx = min(positions[candidates.index(candidate)])
+    except ValueError:
+        idx = not_found_position
+    return idx
 
 
 class EmbedRank(BaseKPModel):
@@ -339,10 +354,19 @@ class EmbedRank(BaseKPModel):
             # doc_results.loc[:,"pos"] = torch.Tensor(doc_results["pos"].values.astype(float)) / doc_len + position_factor / (doc_len ** 3)
             doc_len = len(doc.token_ids)
 
+            # TODO: In Multidoc KPE the candidade can be from another doc.
+            # safe_candidate_position = partial(
+            #     min_candidate_position, not_found_position=doc_len
+            # )
             candidate_score = [
                 (
                     candidate,
                     (
+                        # safe_candidate_position(
+                        #     candidate=candidate,
+                        #     candidates=doc.candidate_set,
+                        #     positions=doc.candidate_positions,
+                        # )
                         min(doc.candidate_positions[doc.candidate_set.index(candidate)])
                         / doc_len
                         + self.position_factor / (doc_len**3)
