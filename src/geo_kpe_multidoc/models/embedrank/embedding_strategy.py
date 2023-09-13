@@ -191,12 +191,12 @@ class InAndOutContextEmbeddings:
         # TODO: temp to comparison of out context embeddings vs in context embeddings
         save_embeddings = False
         if save_embeddings:
-            candidate_embeddings = dict()
+            candidate_embeddings = {}
 
         for candidate in doc.candidate_set:
             candidate_mentions_embeddings = []
             for mention in doc.candidate_mentions[candidate]:
-                q_mention = self.adds_query_prefix + mention
+                q_mention = self.add_query_prefix + mention
                 if isinstance(model, BaseEmbedder):
                     mention_out_of_context_embedding = model.embed(q_mention)
                 else:

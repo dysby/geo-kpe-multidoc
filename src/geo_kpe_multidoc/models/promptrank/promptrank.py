@@ -119,7 +119,7 @@ class PromptRank(BaseKPModel):
 
     def top_n_candidates(
         self, doc, candidate_list, positions, top_n, **kwargs
-    ) -> List[Tuple]:
+    ) -> Tuple[List[Tuple[str, float]], List[str]]:
         # input
         # doc_list, labels_stemed, labels,  model, dataloader
         cos_similarity_list = {}

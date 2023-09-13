@@ -1,5 +1,6 @@
 import re
 from enum import Enum, auto
+from functools import partial
 from typing import Callable, List, Optional, Tuple
 
 import torch
@@ -35,24 +36,30 @@ def _search_mentions(model, candidate_mentions, token_ids):
     mentions = []
     # TODO: mention counts for mean_in_n_out_context
     # mentions_counts = []
-    for mention in candidate_mentions:
-        if isinstance(model, BaseEmbedder):
-            # original tokenization by KeyBert/SentenceTransformer
-            tokenized_candidate = tokenize_hf(mention, model)
-            model_special_ids = model.embedding_model.tokenizer.all_special_ids
-        else:
-            # tokenize via local SentenceEmbedder Class
-            tokenized_candidate = model.tokenize(mention)
-            model_special_ids = model.tokenizer.all_special_ids
-        # filt_ids = filter_special_tokens(tokenized_candidate["input_ids"])
-        filt_ids = filter_tokenizer_special_tokens(
-            tokenized_candidate["input_ids"],
-            model_special_ids,
-        )
+    # TODO: simplifys tokenization selection due to non-uniform model classes
+    if isinstance(model, BaseEmbedder):
+        # original tokenization by KeyBert/SentenceTransformer
+        tokenize = partial(tokenize_hf, model=model)
+        model_special_ids = model.embedding_model.tokenizer.all_special_ids
+    else:
+        # tokenize via local SentenceEmbedder Class
+        tokenize = model.tokenize
+        model_special_ids = model.tokenizer.all_special_ids
 
-        # Should not be Empty after filter
-        if filt_ids:
-            mentions += find_occurrences(filt_ids, token_ids)
+    for original_mention in candidate_mentions:
+        # TODO: account for special tokenization schemes ' word' vs 'word'"
+        # for mention in (original_mention, " " + original_mention):
+        for mention in (original_mention,):
+            tokenized_candidate = tokenize(mention)
+            # filt_ids = filter_special_tokens(tokenized_candidate["input_ids"])
+            filt_ids = filter_tokenizer_special_tokens(
+                tokenized_candidate["input_ids"],
+                model_special_ids,
+            )
+
+            # Should not be Empty after filter
+            if filt_ids:
+                mentions += find_occurrences(filt_ids, token_ids)
     return mentions  # , mentions_counts
 
 
