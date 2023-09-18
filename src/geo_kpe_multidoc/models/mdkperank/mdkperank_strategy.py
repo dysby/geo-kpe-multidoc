@@ -69,6 +69,7 @@ class Ranker:
             single_mode_ranking_per_doc[doc.id] = ranking_in_doc  # .reshape(1, -1)
             # Size([1, 768])
             # Not all Single Document Methods compute a candidate_embedding (e.g. PromptRank)
+            cand_embeds = cand_embeds if cand_embeds else []
             for candidate, embedding in itertools.zip_longest(cand_set, cand_embeds):
                 candidate_embeddings.setdefault(candidate, []).append(embedding)
 
@@ -318,6 +319,7 @@ class MaxMaxRank(Ranker):
         ) in topic_extraction_features:
             documents_embeddings[doc.id] = doc.doc_embed  # .reshape(1, -1)
             single_mode_ranking_per_doc[doc.id] = single_mode_ranking_per_doc
+            # cand_embeds = cand_embeds if cand_embeds else []
             for candidate, embedding in zip(cand_set, cand_embeds):
                 candidate_embeddings.setdefault(candidate, []).append(embedding)
 
