@@ -7,6 +7,7 @@ import pandas as pd
 from geo_kpe_multidoc.document import Document
 from geo_kpe_multidoc.models import BaseKPModel
 from geo_kpe_multidoc.models.mdkperank.mdkperank_model import MdKPEOutput
+from geo_kpe_multidoc.models.mdkperank.mdkperank_strategy import MD_RANK_STRATEGIES
 from geo_kpe_multidoc.models.promptrank.promptrank import PromptRank
 
 
@@ -18,6 +19,10 @@ class MdPromptRank(BaseKPModel):
         self.name = (
             ".".join([self.__class__.__name__, base_model.name.split("_")[0]])
             + base_model.name[base_model.name.index("_") :]
+        )
+
+        self.ranking_strategy = MD_RANK_STRATEGIES[rank_strategy](
+            in_single_mode=True, **kwargs
         )
 
     def extract_kp_from_topic(
@@ -70,8 +75,9 @@ class MdPromptRank(BaseKPModel):
 
         candidate_document_matrix = df
 
-        ranking_p_doc = {}
+        single_mode_ranking_per_doc = {}
         scores_for_candidate = {}
+        topic_res = []  # # List[(doc, cand_embeds, candidate_set, ranking_in_doc), ...]
         for doc in topic_docs:
             # append  missing candidates to check with doc
             missing = list(topic_candidates - set(doc.candidate_set))
@@ -83,22 +89,31 @@ class MdPromptRank(BaseKPModel):
             doc.candidate_set.extend(missing)
             doc.candidate_positions.extend(missing_position)
 
-            ranking_p_doc[doc.id] = self.base_model.top_n_candidates(
+            ranking_in_doc, _candidades = self.base_model.top_n_candidates(
                 doc, doc.candidate_set, doc.candidate_positions, top_n=top_n, **kwargs
             )
+            topic_res.append((doc, None, None, ranking_in_doc))
 
-            for candidate, score in ranking_p_doc[doc.id][0]:
-                scores_for_candidate.setdefault(candidate, []).append(score)
+        (
+            documents_embeddings,
+            candidate_embeddings,
+            _wrong_candidate_document_matrix,
+            top_n_scores,
+            ranking_p_doc,
+        ) = self.ranking_strategy(topic_res)
 
-        top_n_scores = sorted(
-            [
-                (candidate, np.mean(scores))
-                for candidate, scores in scores_for_candidate.items()
-            ],
-            key=itemgetter(1),
-            reverse=True,
-        )
-        candidates, _ = list(zip(*top_n_scores))
+        # for candidate, score in single_mode_ranking_per_doc[doc.id][0]:
+        #     scores_for_candidate.setdefault(candidate, []).append(score)
+
+        # top_n_scores = sorted(
+        #     [
+        #         (candidate, np.mean(scores))
+        #         for candidate, scores in scores_for_candidate.items()
+        #     ],
+        #     key=itemgetter(1),
+        #     reverse=True,
+        # )
+        candidates = candidate_document_matrix.index.to_list()
 
         return MdKPEOutput(
             top_n_scores=top_n_scores,

@@ -138,10 +138,12 @@ def plot_score_distribuitions_with_gold(
 ) -> plt.Figure:
     plt.rcParams["figure.figsize"] = (6.4, 4.8)
 
+    results = results[np.isfinite(results["score"])]
+
     fig, ax = plt.subplots()
     ax = results[~results["in_gold"]]["score"].plot.hist(density=True)
     ax = results[results["in_gold"]]["score"].plot.hist(density=True, alpha=0.5)
-    if xlim is not None:
+    if xlim is not None and np.all(np.isfinite(xlim)):
         ax.set_xlim(xlim)
     ax.set_title(title, fontsize=12)
     plt.legend(["non-gold", "gold"])

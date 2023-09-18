@@ -50,11 +50,11 @@ class Ranker:
 
     def _extract_features(
         self, topic_extraction_features
-    ) -> Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
+    ) -> Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, Dict]:
         """
         Params
         ------
-        topic_extraction_features: List[(doc, candidate_embedings, candidate_list), ...]
+        topic_extraction_features: List[(doc, candidate_embedings, candidate_list, ranking_in_doc), ...]
         Returns
         -------
         Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]
@@ -62,22 +62,26 @@ class Ranker:
         """
         documents_embeddings = {}
         candidate_embeddings = {}
+        single_mode_ranking_per_doc = {}
 
-        for doc, cand_embeds, cand_set in topic_extraction_features:
+        for doc, cand_embeds, cand_set, ranking_in_doc in topic_extraction_features:
             documents_embeddings[doc.id] = doc.doc_embed  # .reshape(1, -1)
+            single_mode_ranking_per_doc[doc.id] = ranking_in_doc  # .reshape(1, -1)
             # Size([1, 768])
-            for candidate, embedding in zip(cand_set, cand_embeds):
+            # Not all Single Document Methods compute a candidate_embedding (e.g. PromptRank)
+            for candidate, embedding in itertools.zip_longest(cand_set, cand_embeds):
                 candidate_embeddings.setdefault(candidate, []).append(embedding)
 
         #    candidate_document_embeddings[doc.id] = candidate_embeddings
 
         # The candidate embedding is the average of each embedding
         # of the candidate in the document.
+        # For PromptRank candidate_embedding is None
         candidate_embeddings = {
-            candidate: np.mean(embeddings, axis=0)
+            candidate: np.mean(embeddings, axis=0) if embeddings[0] else None
             for candidate, embeddings in candidate_embeddings.items()
         }
-
+        # For PromptRank document_embedding is also None
         documents_embeddings = pd.DataFrame.from_dict(
             documents_embeddings, orient="index"
         )
@@ -91,17 +95,23 @@ class Ranker:
             index=candidate_embeddings.index,
             columns=documents_embeddings.index,
         )
-        for doc, _, cand_set in topic_extraction_features:
+        for doc, _, cand_set, _ in topic_extraction_features:
             # Each mention is an observation in the document
             candidate_document_matrix.loc[cand_set, doc.id] += 1
 
-        return documents_embeddings, candidate_embeddings, candidate_document_matrix
+        return (
+            documents_embeddings,
+            candidate_embeddings,
+            candidate_document_matrix,
+            single_mode_ranking_per_doc,
+        )
 
     def _rank(
         self,
         candidates_embeddings: pd.DataFrame,
         documents_embeddings: pd.DataFrame,
         candidate_document_matrix: pd.DataFrame,
+        single_mode_ranking_per_doc: dict,
         *args,
         **kwargs,
     ):
@@ -112,9 +122,13 @@ class Ranker:
             documents_embeddings,
             candidate_embeddings,
             candidate_document_matrix,
+            single_mode_ranking_per_doc,
         ) = self._extract_features(topic_extraction_features)
         return self._rank(
-            candidate_embeddings, documents_embeddings, candidate_document_matrix
+            candidate_embeddings,
+            documents_embeddings,
+            candidate_document_matrix,
+            single_mode_ranking_per_doc,
         )
 
     def _score_to_ranking_p_doc(
@@ -136,19 +150,33 @@ class Ranker:
 class MeanRank(Ranker):
     """Compute the mean of keyphrase to documents similarity"""
 
+    def __init__(self, **kwargs) -> None:
+        self.in_single_mode = kwargs.get("in_single_mode")
+
     def _rank(
         self,
         candidates_embeddings: pd.DataFrame,
         documents_embeddings: pd.DataFrame,
         candidate_document_matrix: pd.DataFrame,
+        single_mode_ranking_per_doc: dict,
         *args,
         **kwargs,
     ):
-        score_per_document = pd.DataFrame(
-            cosine_similarity(candidates_embeddings, documents_embeddings)
-        )
-        score_per_document.index = candidates_embeddings.index
-        score_per_document.columns = documents_embeddings.index
+        if self.in_single_mode:
+            pd.DataFrame.from_records(
+                [
+                    (doc, cand, score)
+                    for doc, scores in single_mode_ranking_per_doc.items()
+                    for cand, score in scores
+                ],
+                columns=["doc", "candidate", "score"],
+            ).set_index("candidate").pivot(columns="doc", values="score").mean(axis=1)
+        else:
+            score_per_document = pd.DataFrame(
+                cosine_similarity(candidates_embeddings, documents_embeddings)
+            )
+            score_per_document.index = candidates_embeddings.index
+            score_per_document.columns = documents_embeddings.index
 
         top_n_scores = list(
             score_per_document.mean(axis=1).sort_values(ascending=False).items()
@@ -168,19 +196,33 @@ class MeanRank(Ranker):
 class MaxRank(Ranker):
     """Each Candidate score is the maximum similarity to a single document in the multidocument set."""
 
+    def __init__(self, **kwargs) -> None:
+        self.in_single_mode = kwargs.get("in_single_mode")
+
     def _rank(
         self,
         candidates_embeddings: pd.DataFrame,
         documents_embeddings: pd.DataFrame,
         candidate_document_matrix: pd.DataFrame,
+        single_mode_ranking_per_doc: dict,
         *args,
         **kwargs,
     ):
-        score_per_document = pd.DataFrame(
-            cosine_similarity(candidates_embeddings, documents_embeddings)
-        )
-        score_per_document.index = candidates_embeddings.index
-        score_per_document.columns = documents_embeddings.index
+        if self.in_single_mode:
+            pd.DataFrame.from_records(
+                [
+                    (doc, cand, score)
+                    for doc, scores in single_mode_ranking_per_doc.items()
+                    for cand, score in scores
+                ],
+                columns=["doc", "candidate", "score"],
+            ).set_index("candidate").pivot(columns="doc", values="score").mean(axis=1)
+        else:
+            score_per_document = pd.DataFrame(
+                cosine_similarity(candidates_embeddings, documents_embeddings)
+            )
+            score_per_document.index = candidates_embeddings.index
+            score_per_document.columns = documents_embeddings.index
 
         top_n_scores = list(
             score_per_document.max(axis=1).sort_values(ascending=False).items()
@@ -197,15 +239,19 @@ class MaxRank(Ranker):
 
 
 class MeanTopMaxRank(Ranker):
-    """Each Candidate score is the mean of top 50% similarity scores in the 
+    """Each Candidate score is the mean of top 50% similarity scores in the
     multidocument set. This strategy is a mix of MaxRank and MeanRank.
     """
+
+    def __init__(self, **kwargs) -> None:
+        self.in_single_mode = kwargs.get("in_single_mode")
 
     def _rank(
         self,
         candidates_embeddings: pd.DataFrame,
         documents_embeddings: pd.DataFrame,
         candidate_document_matrix: pd.DataFrame,
+        single_mode_ranking_per_doc: dict,
         *args,
         **kwargs,
     ):
@@ -215,11 +261,21 @@ class MeanTopMaxRank(Ranker):
             top_50_percent_values = row[row >= threshold]
             return top_50_percent_values.mean()
 
-        score_per_document = pd.DataFrame(
-            cosine_similarity(candidates_embeddings, documents_embeddings)
-        )
-        score_per_document.index = candidates_embeddings.index
-        score_per_document.columns = documents_embeddings.index
+        if self.in_single_mode:
+            pd.DataFrame.from_records(
+                [
+                    (doc, cand, score)
+                    for doc, scores in single_mode_ranking_per_doc.items()
+                    for cand, score in scores
+                ],
+                columns=["doc", "candidate", "score"],
+            ).set_index("candidate").pivot(columns="doc", values="score").mean(axis=1)
+        else:
+            score_per_document = pd.DataFrame(
+                cosine_similarity(candidates_embeddings, documents_embeddings)
+            )
+            score_per_document.index = candidates_embeddings.index
+            score_per_document.columns = documents_embeddings.index
 
         # Calculate the top 50% threshold value for each row
         top_50_percent_threshold = score_per_document.apply(
@@ -247,19 +303,23 @@ class MaxMaxRank(Ranker):
     """Compute an alternative candidate embedding representation by Max pooling the
     candidate contextualized embedding from each document. Set the candidate socre as
     the maximum similarity to the  mean of keyphrase to documents similarity.
+    # TODO: Not compatible with PromptRank, need change extract_features
     """
 
     def _extract_features(self, topic_extraction_features):
         documents_embeddings = {}
         candidate_embeddings = {}
-
-        for doc, cand_embeds, cand_set in topic_extraction_features:
+        single_mode_ranking_per_doc = {}
+        for (
+            doc,
+            cand_embeds,
+            cand_set,
+            single_mode_ranking_per_doc,
+        ) in topic_extraction_features:
             documents_embeddings[doc.id] = doc.doc_embed  # .reshape(1, -1)
-            # Size([1, 768])
+            single_mode_ranking_per_doc[doc.id] = single_mode_ranking_per_doc
             for candidate, embedding in zip(cand_set, cand_embeds):
                 candidate_embeddings.setdefault(candidate, []).append(embedding)
-
-        #    candidate_document_embeddings[doc.id] = candidate_embeddings
 
         # The candidate embedding is the average of each embedding
         # of the candidate in the document.
@@ -275,23 +335,28 @@ class MaxMaxRank(Ranker):
             candidate_embeddings, orient="index"
         )
 
-        # new dataframe with 0
         candidate_document_matrix = pd.DataFrame(
             np.zeros((len(candidate_embeddings), len(documents_embeddings)), dtype=int),
             index=candidate_embeddings.index,
             columns=documents_embeddings.index,
         )
-        for doc, _, cand_set in topic_extraction_features:
+        for doc, _, cand_set, _ in topic_extraction_features:
             # Each mention is an observation in the document
             candidate_document_matrix.loc[cand_set, doc.id] += 1
 
-        return documents_embeddings, candidate_embeddings, candidate_document_matrix
+        return (
+            documents_embeddings,
+            candidate_embeddings,
+            candidate_document_matrix,
+            single_mode_ranking_per_doc,
+        )
 
     def _rank(
         self,
         candidates_embeddings: pd.DataFrame,
         documents_embeddings: pd.DataFrame,
         candidate_document_matrix: pd.DataFrame,
+        single_mode_ranking_per_doc: dict,
         *args,
         **kwargs,
     ):
@@ -323,6 +388,7 @@ class ITCSRank(Ranker):
         candidates_embeddings: pd.DataFrame,
         documents_embeddings: pd.DataFrame,
         candidate_document_matrix,
+        single_mode_ranking_per_doc: dict,
         *args,
         **kwargs,
     ):
@@ -337,24 +403,37 @@ class ITCSRank(Ranker):
         )
 
 
-class MrrRank(Ranker):
-    """Mean Reciprocal Rank"""
+class RRFRank(Ranker):
+    """Reciprocal Rank Fusion"""
+
+    def __init__(self, **kwargs) -> None:
+        self.in_single_mode = kwargs.get("in_single_mode")
 
     def _rank(
         self,
         candidates_embeddings: pd.DataFrame,
         documents_embeddings: pd.DataFrame,
         candidate_document_matrix: pd.DataFrame,
+        single_mode_ranking_per_doc: dict,
         *args,
         **kwargs,
     ):
+        if self.in_single_mode:
+            pd.DataFrame.from_records(
+                [
+                    (doc, cand, score)
+                    for doc, scores in single_mode_ranking_per_doc.items()
+                    for cand, score in scores
+                ],
+                columns=["doc", "candidate", "score"],
+            ).set_index("candidate").pivot(columns="doc", values="score").mean(axis=1)
+        else:
+            score_per_document = pd.DataFrame(
+                cosine_similarity(candidates_embeddings, documents_embeddings)
+            )
+            score_per_document.index = candidates_embeddings.index
+            score_per_document.columns = documents_embeddings.index
         # TODO: add k parameter from original paper default k=60
-        score_per_document = pd.DataFrame(
-            cosine_similarity(candidates_embeddings, documents_embeddings)
-        )
-
-        score_per_document.index = candidates_embeddings.index
-        score_per_document.columns = documents_embeddings.index
 
         top_n_scores = list(
             (1 / score_per_document.rank())
@@ -386,6 +465,7 @@ class MmrRank(Ranker):
         candidates_embeddings: pd.DataFrame,
         documents_embeddings: pd.DataFrame,
         candidate_document_matrix: pd.DataFrame,
+        single_mode_ranking_per_doc: dict,
         *args,
         **kwargs,
     ):
@@ -436,6 +516,7 @@ class MaxSumRank(Ranker):
         candidates_embeddings: pd.DataFrame,
         documents_embeddings: pd.DataFrame,
         candidate_document_matrix: pd.DataFrame,
+        single_mode_ranking_per_doc: dict,
         *args,
         **kwargs,
     ):
@@ -500,6 +581,7 @@ class DDPRank(Ranker):
         candidates_embeddings: pd.DataFrame,
         documents_embeddings: pd.DataFrame,
         candidate_document_matrix: pd.DataFrame,
+        single_mode_ranking_per_doc: dict,
         *args,
         **kwargs,
     ):
@@ -570,6 +652,7 @@ class DPSCRank(Ranker):
         candidates_embeddings: pd.DataFrame,
         documents_embeddings: pd.DataFrame,
         candidate_document_matrix: pd.DataFrame,
+        single_mode_ranking_per_doc: dict,
         *args,
         **kwargs,
     ):
@@ -613,6 +696,7 @@ class UmapClustersRank(Ranker):
         candidates_embeddings: pd.DataFrame,
         documents_embeddings: pd.DataFrame,
         candidate_document_matrix: pd.DataFrame,
+        single_mode_ranking_per_doc: dict,
         *args,
         **kwargs,
     ):
@@ -687,6 +771,7 @@ class ClusterCentroidsRank(Ranker):
         candidates_embeddings: pd.DataFrame,
         documents_embeddings: pd.DataFrame,
         candidate_document_matrix: pd.DataFrame,
+        single_mode_ranking_per_doc: dict,
         *args,
         **kwargs,
     ):
@@ -730,6 +815,7 @@ class ComunityRank(Ranker):
         candidates_embeddings: pd.DataFrame,
         documents_embeddings: pd.DataFrame,
         candidate_document_matrix: pd.DataFrame,
+        single_mode_ranking_per_doc: dict,
         *args,
         **kwargs,
     ):
@@ -752,6 +838,7 @@ class EigenRank(Ranker):
         candidates_embeddings: pd.DataFrame,
         documents_embeddings: pd.DataFrame,
         candidate_document_matrix: pd.DataFrame,
+        single_mode_ranking_per_doc: dict,
         *args,
         **kwargs,
     ):
@@ -781,6 +868,7 @@ class AffinityRank(Ranker):
         candidates_embeddings: pd.DataFrame,
         documents_embeddings: pd.DataFrame,
         candidate_document_matrix: pd.DataFrame,
+        single_mode_ranking_per_doc: dict,
         *args,
         **kwargs,
     ):
@@ -846,6 +934,7 @@ class PageRank(Ranker):
         candidates_embeddings: pd.DataFrame,
         documents_embeddings: pd.DataFrame,
         candidate_document_matrix: pd.DataFrame,
+        single_mode_ranking_per_doc: dict,
         *args,
         **kwargs,
     ):
@@ -914,13 +1003,13 @@ class PageRank(Ranker):
         )
 
 
-STRATEGIES = {
+MD_RANK_STRATEGIES = {
     "MEAN": MeanRank,
     "MAX": MaxRank,
     "MEANTOPMAX": MeanTopMaxRank,
     "MAXMAX": MaxMaxRank,
     "MMR": MmrRank,
-    "MRR": MrrRank,
+    "RRF": RRFRank,
     "ITCS": ITCSRank,
     "MAXSUM": MaxSumRank,
     "CLUSTERCENTROIDS": ClusterCentroidsRank,

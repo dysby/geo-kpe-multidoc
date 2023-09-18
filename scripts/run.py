@@ -7,11 +7,6 @@ from os import path
 from time import time
 
 import pandas as pd
-from loguru import logger
-from matplotlib import pyplot as plt
-from tabulate import tabulate
-
-import wandb
 from geo_kpe_multidoc import GEO_KPE_MULTIDOC_OUTPUT_PATH
 from geo_kpe_multidoc.datasets.datasets import DATASETS, load_dataset
 from geo_kpe_multidoc.evaluation.evaluation_tools import (
@@ -37,6 +32,11 @@ from geo_kpe_multidoc.models.pre_processing.pre_processing_utils import (
     select_stemmer,
 )
 from geo_kpe_multidoc.models.promptrank.promptrank import PromptRank
+from loguru import logger
+from matplotlib import pyplot as plt
+from tabulate import tabulate
+
+import wandb
 
 
 # fmt: off
@@ -303,7 +303,8 @@ def main():
 
         xlim = (
             (dataset_kpe["score"].min(), dataset_kpe["score"].max())
-            if isinstance(kpe_model, (PromptRank, MaskRank)) or args.no_position_feature
+            if isinstance(kpe_model, (PromptRank, MaskRank))
+            or not args.no_position_feature
             else (0, 1)
         )
         fig = plot_score_distribuitions_with_gold(
