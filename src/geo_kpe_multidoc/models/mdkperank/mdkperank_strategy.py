@@ -163,14 +163,19 @@ class MeanRank(Ranker):
         **kwargs,
     ):
         if self.in_single_mode:
-            pd.DataFrame.from_records(
-                [
-                    (doc, cand, score)
-                    for doc, scores in single_mode_ranking_per_doc.items()
-                    for cand, score in scores
-                ],
-                columns=["doc", "candidate", "score"],
-            ).set_index("candidate").pivot(columns="doc", values="score").mean(axis=1)
+            score_per_document = (
+                pd.DataFrame.from_records(
+                    [
+                        (doc, cand, score)
+                        for doc, scores in single_mode_ranking_per_doc.items()
+                        for cand, score in scores
+                    ],
+                    columns=["doc", "candidate", "score"],
+                )
+                .set_index("candidate")
+                .pivot(columns="doc", values="score")
+                .mean(axis=1)
+            )
         else:
             score_per_document = pd.DataFrame(
                 cosine_similarity(candidates_embeddings, documents_embeddings)
@@ -209,14 +214,19 @@ class MaxRank(Ranker):
         **kwargs,
     ):
         if self.in_single_mode:
-            pd.DataFrame.from_records(
-                [
-                    (doc, cand, score)
-                    for doc, scores in single_mode_ranking_per_doc.items()
-                    for cand, score in scores
-                ],
-                columns=["doc", "candidate", "score"],
-            ).set_index("candidate").pivot(columns="doc", values="score").mean(axis=1)
+            score_per_document = (
+                pd.DataFrame.from_records(
+                    [
+                        (doc, cand, score)
+                        for doc, scores in single_mode_ranking_per_doc.items()
+                        for cand, score in scores
+                    ],
+                    columns=["doc", "candidate", "score"],
+                )
+                .set_index("candidate")
+                .pivot(columns="doc", values="score")
+                .mean(axis=1)
+            )
         else:
             score_per_document = pd.DataFrame(
                 cosine_similarity(candidates_embeddings, documents_embeddings)
@@ -262,14 +272,19 @@ class MeanTopMaxRank(Ranker):
             return top_50_percent_values.mean()
 
         if self.in_single_mode:
-            pd.DataFrame.from_records(
-                [
-                    (doc, cand, score)
-                    for doc, scores in single_mode_ranking_per_doc.items()
-                    for cand, score in scores
-                ],
-                columns=["doc", "candidate", "score"],
-            ).set_index("candidate").pivot(columns="doc", values="score").mean(axis=1)
+            score_per_document = (
+                pd.DataFrame.from_records(
+                    [
+                        (doc, cand, score)
+                        for doc, scores in single_mode_ranking_per_doc.items()
+                        for cand, score in scores
+                    ],
+                    columns=["doc", "candidate", "score"],
+                )
+                .set_index("candidate")
+                .pivot(columns="doc", values="score")
+                .mean(axis=1)
+            )
         else:
             score_per_document = pd.DataFrame(
                 cosine_similarity(candidates_embeddings, documents_embeddings)
@@ -420,14 +435,19 @@ class RRFRank(Ranker):
         **kwargs,
     ):
         if self.in_single_mode:
-            pd.DataFrame.from_records(
-                [
-                    (doc, cand, score)
-                    for doc, scores in single_mode_ranking_per_doc.items()
-                    for cand, score in scores
-                ],
-                columns=["doc", "candidate", "score"],
-            ).set_index("candidate").pivot(columns="doc", values="score").mean(axis=1)
+            score_per_document = (
+                pd.DataFrame.from_records(
+                    [
+                        (doc, cand, score)
+                        for doc, scores in single_mode_ranking_per_doc.items()
+                        for cand, score in scores
+                    ],
+                    columns=["doc", "candidate", "score"],
+                )
+                .set_index("candidate")
+                .pivot(columns="doc", values="score")
+                .mean(axis=1)
+            )
         else:
             score_per_document = pd.DataFrame(
                 cosine_similarity(candidates_embeddings, documents_embeddings)
