@@ -139,8 +139,10 @@ class MdPromptRank(BaseKPModel):
             ranking_p_doc=ranking_p_doc,
         )
 
-    def _save_md_embeddings_in_cache(self, topic_res: List, topic_id: str):
+    def _save_md_embeddings_in_cache(self, object_to_cache: List, topic_id: str):
+        # store a tuple(topic_res, candidate_document_matrix) in cache file
         # topic_res: List[(doc, cand_embeds, candidate_set, ranking_in_doc), ...]
+        # candidate_document_matrix
         logger.info(f"Saving {topic_id} embeddings in cache dir.")
 
         cache_file_path = os.path.join(
@@ -151,12 +153,12 @@ class MdPromptRank(BaseKPModel):
 
         Path(cache_file_path).parent.mkdir(exist_ok=True, parents=True)
         joblib.dump(
-            topic_res,
+            object_to_cache,
             cache_file_path,
         )
 
     def _read_md_embeddings_from_cache(self, topic_id):
-        # TODO: implement caching? is usefull only in future analysis
+        # TODO: caching for mdpromptrank need topic_res object and candidate_document_matrix
         cache_file_path = os.path.join(
             GEO_KPE_MULTIDOC_CACHE_PATH,
             self.name,
@@ -167,4 +169,4 @@ class MdPromptRank(BaseKPModel):
             topic_res = joblib.load(cache_file_path)
             logger.debug(f"Load embeddings from cache {cache_file_path}")
             return topic_res
-        return None
+        return None, None
