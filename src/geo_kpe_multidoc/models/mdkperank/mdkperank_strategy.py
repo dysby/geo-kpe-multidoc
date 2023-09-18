@@ -174,7 +174,6 @@ class MeanRank(Ranker):
                 )
                 .set_index("candidate")
                 .pivot(columns="doc", values="score")
-                .mean(axis=1)
             )
         else:
             score_per_document = pd.DataFrame(
@@ -225,7 +224,6 @@ class MaxRank(Ranker):
                 )
                 .set_index("candidate")
                 .pivot(columns="doc", values="score")
-                .mean(axis=1)
             )
         else:
             score_per_document = pd.DataFrame(
@@ -283,7 +281,6 @@ class MeanTopMaxRank(Ranker):
                 )
                 .set_index("candidate")
                 .pivot(columns="doc", values="score")
-                .mean(axis=1)
             )
         else:
             score_per_document = pd.DataFrame(
@@ -446,7 +443,6 @@ class RRFRank(Ranker):
                 )
                 .set_index("candidate")
                 .pivot(columns="doc", values="score")
-                .mean(axis=1)
             )
         else:
             score_per_document = pd.DataFrame(
