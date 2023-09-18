@@ -153,7 +153,7 @@ class MDKPERank(BaseKPModel):
     #     return S * lambda_ * (N * gamma) * G
 
     def _save_md_embeddings_in_cache(self, topic_res: List, topic_id: str):
-        topic_res = []  # # List[(doc, cand_embeds, candidate_set, ranking_in_doc), ...]
+        # topic_res: List[(doc, cand_embeds, candidate_set, ranking_in_doc), ...]
         logger.info(f"Saving {topic_id} embeddings in cache dir.")
 
         cache_file_path = os.path.join(
