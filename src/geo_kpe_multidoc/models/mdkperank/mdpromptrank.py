@@ -140,7 +140,7 @@ class MdPromptRank(BaseKPModel):
 
         cache_file_path = os.path.join(
             GEO_KPE_MULTIDOC_CACHE_PATH,
-            self.name[self.name.index("_") + 1 :],
+            self.name,
             f"{topic_id}-md-embeddings.gz",
         )
 
@@ -154,7 +154,7 @@ class MdPromptRank(BaseKPModel):
         # TODO: implement caching? is usefull only in future analysis
         cache_file_path = os.path.join(
             GEO_KPE_MULTIDOC_CACHE_PATH,
-            self.name[self.name.index("_") + 1 :],
+            self.name,
             f"{topic_id}-md-embeddings.gz",
         )
 

@@ -77,16 +77,6 @@ class MDKPERank(BaseKPModel):
 
         return (doc, cand_embeds, candidate_set, ranking_in_doc)
 
-    # def _get_locations(
-    #     self, docs_geo_coords, docs_of_candidate: List[str]
-    # ) -> List[Tuple[float, float]]:
-    #     """
-    #     Get all coordenates of documents tha mention the candidate keyphrase
-    #     TODO: what about repeated locations?
-    #     """
-    #     locations = [docs_geo_coords[doc_id] for doc_id in docs_of_candidate]
-    #     return list(chain(*locations))
-
     def extract_kp_from_topic(
         self,
         topic_docs: List[Document],
@@ -143,22 +133,13 @@ class MDKPERank(BaseKPModel):
             ranking_p_doc=ranking_p_doc,
         )
 
-    # def _score_w_geo_association_I(S, N, I, lambda_=0.5, gamma=0.5):
-    #     return S * lambda_ * (N - (N * gamma * I))
-
-    # def _score_w_geo_association_C(S, N, C, lambda_=0.5, gamma=0.5):
-    #     return S * lambda_ * N / (gamma * C)
-
-    # def _score_w_geo_association_G(S, N, G, lambda_=0.5, gamma=0.5):
-    #     return S * lambda_ * (N * gamma) * G
-
     def _save_md_embeddings_in_cache(self, topic_res: List, topic_id: str):
         # topic_res: List[(doc, cand_embeds, candidate_set, ranking_in_doc), ...]
         logger.info(f"Saving {topic_id} embeddings in cache dir.")
 
         cache_file_path = os.path.join(
             GEO_KPE_MULTIDOC_CACHE_PATH,
-            self.name[self.name.index("_") + 1 :],
+            self.name,
             f"{topic_id}-md-embeddings.gz",
         )
 
@@ -172,7 +153,7 @@ class MDKPERank(BaseKPModel):
         # TODO: implement caching? is usefull only in future analysis
         cache_file_path = os.path.join(
             GEO_KPE_MULTIDOC_CACHE_PATH,
-            self.name[self.name.index("_") + 1 :],
+            self.name,
             f"{topic_id}-md-embeddings.gz",
         )
 
@@ -181,3 +162,12 @@ class MDKPERank(BaseKPModel):
             logger.debug(f"Load embeddings from cache {cache_file_path}")
             return topic_res
         return None
+
+    # def _score_w_geo_association_I(S, N, I, lambda_=0.5, gamma=0.5):
+    #     return S * lambda_ * (N - (N * gamma * I))
+
+    # def _score_w_geo_association_C(S, N, C, lambda_=0.5, gamma=0.5):
+    #     return S * lambda_ * N / (gamma * C)
+
+    # def _score_w_geo_association_G(S, N, G, lambda_=0.5, gamma=0.5):
+    #     return S * lambda_ * (N * gamma) * G
