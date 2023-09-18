@@ -92,7 +92,8 @@ class MdPromptRank(BaseKPModel):
             ranking_in_doc, _candidades = self.base_model.top_n_candidates(
                 doc, doc.candidate_set, doc.candidate_positions, top_n=top_n, **kwargs
             )
-            topic_res.append((doc, None, None, ranking_in_doc))
+            # doc, cand_embeddings (empty list), candidates (same for all doc in topic), ranking
+            topic_res.append((doc, [], doc.candidate_set, ranking_in_doc))
 
         (
             documents_embeddings,

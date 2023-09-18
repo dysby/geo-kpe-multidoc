@@ -69,7 +69,6 @@ class Ranker:
             single_mode_ranking_per_doc[doc.id] = ranking_in_doc  # .reshape(1, -1)
             # Size([1, 768])
             # Not all Single Document Methods compute a candidate_embedding (e.g. PromptRank)
-            cand_embeds = cand_embeds if cand_embeds else []
             for candidate, embedding in itertools.zip_longest(cand_set, cand_embeds):
                 candidate_embeddings.setdefault(candidate, []).append(embedding)
 
