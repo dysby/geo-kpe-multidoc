@@ -57,8 +57,11 @@ class MdPromptRank(BaseKPModel):
         use_cache = kwargs.get("cache_md_embeddings", False)
 
         topic_res = None
+        candidate_document_matrix = None
         if use_cache:
-            topic_res = self._read_md_embeddings_from_cache(topic_docs[0].topic)
+            topic_res, candidate_document_matrix = self._read_md_embeddings_from_cache(
+                topic_docs[0].topic
+            )
 
         if not topic_res:
             topic_candidates = set()
@@ -114,7 +117,9 @@ class MdPromptRank(BaseKPModel):
                 topic_res.append((doc, [], doc.candidate_set, ranking_in_doc))
 
             if use_cache:
-                self._save_md_embeddings_in_cache(topic_res, topic_docs[0].topic)
+                self._save_md_embeddings_in_cache(
+                    (topic_res, candidate_document_matrix), topic_docs[0].topic
+                )
         # Rank Candidates
         (
             documents_embeddings,
