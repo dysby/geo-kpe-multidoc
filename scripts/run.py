@@ -193,7 +193,8 @@ def _args_to_options(args):
 
     if args.cache_embeddings:
         options["cache_embeddings"] = True
-
+    if args.cache_md_embeddings:
+        options["cache_md_embeddings"] = True
     if args.preprocessing:
         # options["preprocess"] = [remove_special_chars, remove_whitespaces]
         options["preprocessing"] = [remove_new_lines_and_tabs, remove_whitespaces]
