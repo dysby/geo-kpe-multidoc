@@ -88,7 +88,8 @@ def parse_args():
     parser.add_argument("--cache_pos_tags", action="store_true", help="Save/Load doc POS Tagging in cache directory.",)
     parser.add_argument("--cache_candidate_selection", action="store_true", help="Save/Load doc Candidat in cache directoryy.",)
     parser.add_argument("--cache_embeddings", action="store_true", help="Save/Load doc and candidates embeddings in cache directory.",)
-    parser.add_argument("--cache_results", action="store_true", help="Save KPE Model outputs (top N per doc) to cache directory.",
+    parser.add_argument("--cache_md_embeddings", action="store_true", help="Save/Load topic embeddings in cache directory.",)
+    parser.add_argument("--cache_results", action="store_true", help="Save KPE Model outputs (top N per doc/topic) to cache directory.",
     )
     return parser.parse_args()
 # fmt: on

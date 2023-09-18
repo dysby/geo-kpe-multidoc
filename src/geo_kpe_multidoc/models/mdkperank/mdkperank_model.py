@@ -1,11 +1,16 @@
+import os
 from dataclasses import dataclass
 from itertools import chain
 from operator import itemgetter
+from pathlib import Path
 from typing import Callable, Dict, Iterable, List, Tuple
 
+import joblib
 import numpy as np
 import pandas as pd
+from loguru import logger
 
+from geo_kpe_multidoc import GEO_KPE_MULTIDOC_CACHE_PATH
 from geo_kpe_multidoc.datasets.datasets import KPEDataset
 from geo_kpe_multidoc.document import Document
 from geo_kpe_multidoc.models.mdkperank.mdkperank_strategy import MD_RANK_STRATEGIES
@@ -101,16 +106,26 @@ class MDKPERank(BaseKPModel):
         -------
             List KPE extracted from the agregation of documents set, with their score(/embedding?)
         """
-        topic_res = [
-            self.extract_kp_from_doc(
-                doc,
-                top_n=top_n,
-                kp_min_len=kp_min_len,
-                lemmatize=lemmatize,
-                **kwargs,
-            )
-            for doc in topic_docs
-        ]
+
+        use_cache = kwargs.get("cache_md_embeddings", False)
+
+        topic_res = None
+        if use_cache:
+            topic_res = self._read_md_embeddings_from_cache(topic_docs[0].topic)
+
+        if not topic_res:
+            topic_res = [
+                self.extract_kp_from_doc(
+                    doc,
+                    top_n=top_n,
+                    kp_min_len=kp_min_len,
+                    lemmatize=lemmatize,
+                    **kwargs,
+                )
+                for doc in topic_docs
+            ]
+            if use_cache:
+                self._save_md_embeddings_in_cache(topic_res, topic_docs[0].topic)
 
         (
             documents_embeddings,
@@ -136,3 +151,33 @@ class MDKPERank(BaseKPModel):
 
     # def _score_w_geo_association_G(S, N, G, lambda_=0.5, gamma=0.5):
     #     return S * lambda_ * (N * gamma) * G
+
+    def _save_md_embeddings_in_cache(self, topic_res: List, topic_id: str):
+        topic_res = []  # # List[(doc, cand_embeds, candidate_set, ranking_in_doc), ...]
+        logger.info(f"Saving {topic_id} embeddings in cache dir.")
+
+        cache_file_path = os.path.join(
+            GEO_KPE_MULTIDOC_CACHE_PATH,
+            self.name[self.name.index("_") + 1 :],
+            f"{topic_id}-md-embeddings.gz",
+        )
+
+        Path(cache_file_path).parent.mkdir(exist_ok=True, parents=True)
+        joblib.dump(
+            topic_res,
+            cache_file_path,
+        )
+
+    def _read_md_embeddings_from_cache(self, topic_id):
+        # TODO: implement caching? is usefull only in future analysis
+        cache_file_path = os.path.join(
+            GEO_KPE_MULTIDOC_CACHE_PATH,
+            self.name[self.name.index("_") + 1 :],
+            f"{topic_id}-md-embeddings.gz",
+        )
+
+        if os.path.exists(cache_file_path):
+            topic_res = joblib.load(cache_file_path)
+            logger.debug(f"Load embeddings from cache {cache_file_path}")
+            return topic_res
+        return None
