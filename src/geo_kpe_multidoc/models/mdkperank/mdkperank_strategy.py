@@ -553,7 +553,13 @@ class MMRPos(Ranker):
 
         words = candidates_embeddings.index
         top_n = len(words)
-        word_doc_similarity = np.exp(score_per_document).max(axis=1)
+        word_doc_similarity = (
+            np.exp(score_per_document)
+            .max(axis=1)
+            .loc[candidates_embeddings.index]
+            .to_numpy()
+            .reshape(-1, 1)
+        )
 
         # Extract similarity within words, and between words and the document
         # word_doc_similarity = cosine_similarity(word_embeddings, doc_embedding)
