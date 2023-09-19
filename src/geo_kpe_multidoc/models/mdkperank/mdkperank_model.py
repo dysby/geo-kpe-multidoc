@@ -3,7 +3,7 @@ from dataclasses import dataclass
 from itertools import chain
 from operator import itemgetter
 from pathlib import Path
-from typing import Callable, Dict, Iterable, List, Tuple
+from typing import Callable, Dict, Iterable, List, Optional, Tuple
 
 import joblib
 import numpy as np
@@ -66,14 +66,21 @@ class MDKPERank(BaseKPModel):
         return (doc, cand_embeds, candidate_set)
 
     def extract_kp_from_doc(
-        self, doc, top_n, kp_min_len, lemmer=None, **kwargs
-    ) -> Tuple[Document, List[np.ndarray], List[str]]:  # Tuple[List[Tuple], List[str]]:
+        self,
+        doc: Document,
+        top_n=-1,
+        kp_min_len=0,
+        lemmer: Optional[Callable] = None,
+        **kwargs,
+    ) -> Tuple[
+        Document, List[np.ndarray], List[str], List
+    ]:  # Tuple[List[Tuple], List[str]]:
         """
         Extracts key-phrases from a given document, with optional arguments
         relevant to its specific functionality
         """
         ranking_in_doc, _doc_candidates = self.base_model_embed.extract_kp_from_doc(
-            doc, kp_min_len, lemmer, **kwargs
+            doc, top_n, kp_min_len, lemmer, **kwargs
         )
         cand_embeds, candidate_set = doc.candidate_set_embed, doc.candidate_set
         # self.base_model_embed.extract_candidates(doc, kp_min_len, lemmer, **kwargs)

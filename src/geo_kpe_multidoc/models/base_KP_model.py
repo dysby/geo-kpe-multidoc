@@ -134,8 +134,8 @@ class BaseKPModel:
     def extract_kp_from_doc(
         self,
         doc: Document,
-        top_n,
-        kp_min_len,
+        top_n: int = -1,
+        kp_min_len: int = 0,
         # stemmer: Optional[StemmerI] = None,
         lemmer: Optional[Callable] = None,
         **kwargs,
