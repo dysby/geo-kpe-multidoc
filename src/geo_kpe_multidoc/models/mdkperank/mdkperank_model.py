@@ -39,7 +39,14 @@ class MDKPERank(BaseKPModel):
             + model.name[model.name.index("_") :]
         )
 
-        self.ranking_strategy = MD_RANK_STRATEGIES[rank_strategy](**kwargs)
+        # no_positional_feature  = candidate score is only computed base on sementic
+        #                           similarity of embeddings, does not take into account
+        #                           the candidate position
+        in_single_mode = not kwargs.get("no_positional_feature")
+
+        self.ranking_strategy = MD_RANK_STRATEGIES[rank_strategy](
+            in_single_mode=in_single_mode, **kwargs
+        )
 
     def _extract_doc_candidate_embeddings(
         self,
