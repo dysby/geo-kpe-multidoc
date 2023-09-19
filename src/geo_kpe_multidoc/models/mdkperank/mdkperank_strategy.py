@@ -78,7 +78,9 @@ class Ranker:
         # of the candidate in the document.
         # For PromptRank candidate_embedding is None
         candidate_embeddings = {
-            candidate: np.mean(embeddings, axis=0) if embeddings[0] else None
+            candidate: np.mean(embeddings, axis=0)
+            if isinstance(embeddings[0], np.ndarray)
+            else None
             for candidate, embeddings in candidate_embeddings.items()
         }
         # For PromptRank document_embedding is also None
