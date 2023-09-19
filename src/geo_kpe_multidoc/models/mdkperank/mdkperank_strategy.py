@@ -475,7 +475,10 @@ class MmrRank(Ranker):
 
     def __init__(self, **kwargs) -> None:
         # TODO: Not compatible with 0 diversity
-        self.diversity = kwargs.get("mmr_diversity") or 0.5
+        if kwargs.get("mmr_diversity") == 0:
+            self.diversity = 0
+        else:
+            self.diversity = kwargs.get("mmr_diversity") or 0.5
 
     def _rank(
         self,
@@ -503,6 +506,90 @@ class MmrRank(Ranker):
         )
         score_per_document.index = candidates_embeddings.index
         score_per_document.columns = documents_embeddings.index
+        ranking_p_doc = self._score_to_ranking_p_doc(score_per_document)
+        return (
+            documents_embeddings,
+            candidates_embeddings,
+            candidate_document_matrix,
+            top_n_scores,
+            ranking_p_doc,
+        )
+
+
+class MMRPos(Ranker):
+    # TODO: Semantice Score + candidate diversity, based on "Unsupervised extractive
+    #   multi-document summarization method based on transfer learning from BERT
+    #   multi-task fine-tuning"
+
+    def __init__(self, **kwargs) -> None:
+        if kwargs.get("mmr_diversity") == 0:
+            self.diversity = 0
+        else:
+            self.diversity = kwargs.get("mmr_diversity") or 0.5
+
+    def _rank(
+        self,
+        candidates_embeddings: pd.DataFrame,
+        documents_embeddings: pd.DataFrame,
+        candidate_document_matrix: pd.DataFrame,
+        single_mode_ranking_per_doc: dict,
+        *args,
+        **kwargs,
+    ):
+        score_per_document = (
+            pd.DataFrame.from_records(
+                [
+                    (doc, cand, score)
+                    for doc, scores in single_mode_ranking_per_doc.items()
+                    for cand, score in scores
+                ],
+                columns=["doc", "candidate", "score"],
+            )
+            .set_index("candidate")
+            .pivot(columns="doc", values="score")
+        )
+
+        words = candidates_embeddings.index
+        top_n = len(words)
+        word_doc_similarity = np.exp(score_per_document).max(axis=1)
+
+        # Extract similarity within words, and between words and the document
+        # word_doc_similarity = cosine_similarity(word_embeddings, doc_embedding)
+        word_similarity = cosine_similarity(candidates_embeddings)
+
+        # Initialize candidates and already choose best keyword/keyphras
+        keywords_idx = [np.argmax(word_doc_similarity)]
+        candidates_idx = [i for i in range(len(words)) if i != keywords_idx[0]]
+
+        for _ in range(min(top_n - 1, len(words) - 1)):
+            # Extract similarities within candidates and
+            # between candidates and selected keywords/phrases
+            candidate_similarities = word_doc_similarity[candidates_idx, :]
+            target_similarities = np.max(
+                word_similarity[candidates_idx][:, keywords_idx], axis=1
+            )
+
+            # Calculate MMR
+            mmr_ = (
+                1 - self.diversity
+            ) * candidate_similarities - self.diversity * target_similarities.reshape(
+                -1, 1
+            )
+            mmr_idx = candidates_idx[np.argmax(mmr_)]
+
+            # Update keywords & candidates
+            keywords_idx.append(mmr_idx)
+            candidates_idx.remove(mmr_idx)
+
+        # Extract and sort keywords in descending similarity
+        keywords = [
+            (words[idx], round(float(word_doc_similarity.reshape(1, -1)[0][idx]), 4))
+            for idx in keywords_idx
+        ]
+        top_n_scores = sorted(keywords, key=itemgetter(1), reverse=True)
+
+        # keep score per document for geo association metrics
+
         ranking_p_doc = self._score_to_ranking_p_doc(score_per_document)
         return (
             documents_embeddings,
@@ -1026,6 +1113,7 @@ MD_RANK_STRATEGIES = {
     "MEANTOPMAX": MeanTopMaxRank,
     "MAXMAX": MaxMaxRank,
     "MMR": MmrRank,
+    "MMRPos": MMRPos,
     "RRF": RRFRank,
     "ITCS": ITCSRank,
     "MAXSUM": MaxSumRank,
