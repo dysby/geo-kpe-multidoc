@@ -281,7 +281,9 @@ def kpe_model_factory(BACKEND_MODEL_NAME, TAGGER_NAME, **kwargs) -> BaseKPModel:
                 candidate_selection_model=candidate_selection_model,
                 **kwargs,
             )
-        kpe_model = MdPromptRank(single_doc_ranker)
+        kpe_model = MdPromptRank(
+            single_doc_ranker, rank_strategy=kwargs["md_strategy"], **kwargs
+        )
     elif rank_class == "ExtractionEvaluator":
         kpe_model = ExtractionEvaluator(
             BACKEND_MODEL_NAME,
