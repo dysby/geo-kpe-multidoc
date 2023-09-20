@@ -98,9 +98,9 @@ class MdPromptRank(BaseKPModel):
             for doc in topic_docs:
                 # append  missing candidates to check with doc
                 missing = list(topic_candidates - set(doc.candidate_set))
+                doc_max_pos = len(doc.token_ids)
                 missing_position = [
-                    (self.base_model.max_len, self.base_model.max_len)
-                    for _ in range(len(missing))
+                    (doc_max_pos, doc_max_pos) for _ in range(len(missing))
                 ]
 
                 doc.candidate_set.extend(missing)

@@ -7,7 +7,7 @@ from os import path
 from time import time
 
 import pandas as pd
-from geo_kpe_multidoc import GEO_KPE_MULTIDOC_OUTPUT_PATH
+from geo_kpe_multidoc import GEO_KPE_MULTIDOC_DEBUG, GEO_KPE_MULTIDOC_OUTPUT_PATH
 from geo_kpe_multidoc.datasets.datasets import DATASETS, load_dataset
 from geo_kpe_multidoc.evaluation.evaluation_tools import (
     evaluate_kp_extraction,
@@ -298,9 +298,6 @@ def main():
             )
             # True labels are preprocessed while loading Dataset.
 
-        # Print and Save Results
-        kpe_for_doc = output_one_top_cands(dataset.ids, model_results, true_labels)
-
         dataset_kpe = model_scores_to_dataframe(model_results, true_labels)
 
         xlim = (
@@ -324,6 +321,7 @@ def main():
         )
 
         # mlflow.log_text(kpe_for_doc, artifact_file="first-doc-extraction-sample.txt")
+        kpe_for_doc = output_one_top_cands(dataset.ids, model_results, true_labels)
         wandb.log({"first-doc-extraction-sample": kpe_for_doc})
 
         metric_names = [
@@ -341,7 +339,9 @@ def main():
         all_metrics.update(metrics.to_dict())
         wandb.log(all_metrics)
 
+    print(kpe_for_doc)
     logger.info(f"Args: {args}")
+    # Print and Save Results
     print(
         tabulate(
             performance_metrics[
@@ -353,9 +353,9 @@ def main():
         )
     )
 
-    write_resume_txt(performance_metrics, args)
-
-    save(dataset_kpe, performance_metrics, fig, args)
+    if not GEO_KPE_MULTIDOC_DEBUG:
+        write_resume_txt(performance_metrics, args)
+        save(dataset_kpe, performance_metrics, fig, args)
 
     end = time()
     logger.info(f"Processing time: {end - start:.1f}")
