@@ -38,6 +38,7 @@ class SLEDPromptRank(PromptRank):
         )
 
         # hack kwargs.max_seq_len is None...
+        self.max_len = kwargs.get("max_seq_len", 0)
         self.encoder_prompt = kwargs.get("encoder_prompt") or "Book: "
         self.decoder_prompt = (
             kwargs.get("decoder_prompt") or "This book mainly talks about "
@@ -54,7 +55,13 @@ class SLEDPromptRank(PromptRank):
         self.device = "cuda" if torch.cuda.is_available() else "cpu"
 
         self.model = AutoModelForSeq2SeqLM.from_pretrained(model_name)
-        self.tokenizer = AutoTokenizer.from_pretrained(model_name)
+        if self.max_len == 0:
+            self.tokenizer = AutoTokenizer.from_pretrained(model_name)
+            self.max_len = self.tokenizer.model_max_length
+        else:
+            self.tokenizer = AutoTokenizer.from_pretrained(
+                model_name, model_max_length=self.max_len
+            )
 
         self.model.to(self.device)
         self.model.eval()
