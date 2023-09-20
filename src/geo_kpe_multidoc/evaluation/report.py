@@ -61,7 +61,7 @@ def output_one_top_cands(
         # doc_keys = [kp for kp, _ in model_results[dataset][doc_idx][0]]
         doc_keys = model_results[dataset][doc_idx][0]
         gold_keys = true_labels[dataset][doc_idx]
-        print(f"Keyphrase extraction for {doc_id}")
+        # print(f"Keyphrase extraction for {doc_id}")
         table = tabulate(
             [
                 [dk[0] if len(dk) > 1 else dk, dk[1] if len(dk) > 1 else dk, gk]
@@ -70,7 +70,7 @@ def output_one_top_cands(
             headers=["Extracted", "Score", "Gold"],
             floatfmt=".5f",
         )
-        print(table)
+        # print(table)
     return table
 
 
