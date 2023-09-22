@@ -7,8 +7,8 @@ import torch
 from keybert.backend._sentencetransformers import SentenceTransformerBackend
 from loguru import logger
 from sentence_transformers import SentenceTransformer
+from transformers import AutoTokenizer  # XLMRobertaTokenizerFast,
 from transformers import (  # RobertaForMaskedLM,; RobertaTokenizerFast,; AutoModel,
-    AutoTokenizer,  # XLMRobertaTokenizerFast,
     LongformerConfig,
     LongformerModel,
     LongformerSelfAttention,
@@ -295,7 +295,7 @@ def to_longformer_t_v3(
     tokenizer.model_max_length = max_pos
     tokenizer.init_kwargs["model_max_length"] = max_pos
     # TODO: check this padding, not in original
-    # tokenizer.padding = "max_lenght"
+    # tokenizer.padding = "max_length"
     # tokenizer._tokenizer.truncation["max_length"] = attention_window
 
     current_max_pos, embed_size = model.embeddings.position_embeddings.weight.shape

@@ -109,8 +109,8 @@ def embed_hf_global_att(
     # text = text.lower()
 
     # Tokenize sentences
-    # TODO: why max_lenght is 2048 and not 4096?
-    # Here max_lenght was reduced to 2048 due to memory constrains
+    # TODO: why max_length is 2048 and not 4096?
+    # Here max_length was reduced to 2048 due to memory constrains
     # inputs = model.embedding_model.tokenizer(
     #     text,
     #     padding=True,

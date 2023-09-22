@@ -71,7 +71,7 @@ class EmbedRank(BaseKPModel):
     ):
         super().__init__(model, candidate_selection_model, **kwargs)
         self.counter = 0
-        # manualy set SentenceTransformer max seq lenght1
+        # manualy set SentenceTransformer max seq length
         # self.model.embedding_model.max_seq_length = 384
 
         # TODO: deal with global_attention and global_attention_dilated
