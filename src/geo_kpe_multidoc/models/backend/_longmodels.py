@@ -7,8 +7,8 @@ import torch
 from keybert.backend._sentencetransformers import SentenceTransformerBackend
 from loguru import logger
 from sentence_transformers import SentenceTransformer
-from transformers import AutoTokenizer  # XLMRobertaTokenizerFast,
 from transformers import (  # RobertaForMaskedLM,; RobertaTokenizerFast,; AutoModel,
+    AutoTokenizer,  # XLMRobertaTokenizerFast,
     LongformerConfig,
     LongformerModel,
     LongformerSelfAttention,
@@ -206,7 +206,7 @@ def to_longformer_t_v4(
     ) = model.embeddings.position_embeddings.weight.shape
 
     # add this to keep shape compability with sentence_transformer
-    tokenizer.padding = "max_lenght"
+    tokenizer.padding = "max_length"
 
     # test copy only a part of the position embeddings
     if copy_from_position:

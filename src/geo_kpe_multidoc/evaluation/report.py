@@ -139,13 +139,36 @@ def plot_score_distribuitions_with_gold(
     plt.rcParams["figure.figsize"] = (6.4, 4.8)
 
     results = results[np.isfinite(results["score"])]
+    not_gold_scores = (
+        results[~results.in_gold]
+        .sort_values(["doc", "score"], ascending=False)
+        .groupby("doc")
+        .head(15)["score"]
+    )
+    in_gold_scores = results[results.in_gold]["score"]
+
+    if results["score"].max() > 0:
+        xlim = (0, 1)
+    else:
+        xlim = (min(map(min, [in_gold_scores, not_gold_scores])), 0)
+
+    # ax = results[~results.in_gold].sort_values(['doc', 'score'], ascending=False).groupby("doc").head(15)['score'].plot.hist(density=True)
+    # results[results.in_gold]['score'].plot.hist(density=True, alpha=0.5)
+    # ax.set(ylabel=None)
+    # ax.set(yticklabels=[])  # remove the tick labels
+    # ax.tick_params(left=False)
 
     fig, ax = plt.subplots()
-    ax = results[~results["in_gold"]]["score"].plot.hist(density=True)
-    ax = results[results["in_gold"]]["score"].plot.hist(density=True, alpha=0.5)
-    if xlim is not None and np.all(np.isfinite(xlim)):
-        ax.set_xlim(xlim)
+    not_gold_scores.plot.hist(density=True, alpha=0.8, ax=ax)
+    in_gold_scores.plot.hist(density=True, alpha=0.5, ax=ax)
+    # if xlim is not None and np.all(np.isfinite(xlim)):
+    ax.set_xlim(xlim)
+    ax.set(ylabel=None)
+    # ax.set(yticklabels=[])  # remove the tick labels
+    # ax.tick_params(left=False)
+    # ax.set_title(title + "\n" + f"gold ({len(in_gold_scores)}, non-gold ({len(not_gold_scores)}))", fontsize=12)
     ax.set_title(title, fontsize=12)
+    # if show_legend:
     plt.legend(["non-gold", "gold"])
     return fig
 

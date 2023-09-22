@@ -90,7 +90,7 @@ class EmbedRank(BaseKPModel):
         )  # for intfloat/multilingual-e5-* models
 
         if max_seq_len:
-            self.model.model_max_lenght = max_seq_len
+            self.model.embedding_model.max_seq_length = max_seq_len
         # force max sequence length, for sentence-t5* models
 
         self.candidate_embedding_strategy: CandidateEmbeddingStrategy = strategy(
