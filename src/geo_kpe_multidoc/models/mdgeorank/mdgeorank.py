@@ -296,8 +296,9 @@ class MdGeoRank:
             ).pivot(index="doc", columns="candidate", values="score")
 
             candidate_scores = pd.DataFrame(
-                candidate_scores_per_doc.mean(), columns=["semantic_score"]
-            )
+                topic_model_outputs["top_n_scores"],
+                columns=["candidate", "semantic_score"],
+            ).set_index("candidate")
 
             gold_stem = topic_model_outputs["gold_kp"]
 
@@ -389,8 +390,8 @@ class MdGeoRank:
             topic_scores.set_index(["topic", topic_scores.index])
             results = pd.concat([results, topic_scores])
 
-        results = results.set_index(["topic", results.index])
-        return results
+        geo_association_results = results.set_index(["topic", results.index])
+        return geo_association_results
 
     def rank(
         self,

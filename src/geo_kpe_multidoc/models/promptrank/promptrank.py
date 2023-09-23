@@ -278,7 +278,7 @@ class PromptRank(BaseKPModel):
             self.temp_en + doc.raw_text,
             max_length=self.max_len,
             # padding="max_length",
-            # In original PromptRank was used max lenght padding
+            # In original PromptRank was used max length padding
             # It is not usefull for LongT5
             truncation=True,
             return_tensors="pt",
