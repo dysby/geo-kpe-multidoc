@@ -29,6 +29,10 @@ DATASETS = {
         "language": "en",
         "tagger": "en_core_web_trf",
     },
+    "MKDUC01-Trunk-20": {
+        "language": "en",
+        "tagger": "en_core_web_trf",
+    },
     "PT-KP": {
         "zip_file": "110-PT-BN-KP.zip",
         "language": "pt",
@@ -117,7 +121,7 @@ def load_dataset(
     root_dir: str = Data path.
     """
 
-    def _read_mdkpe(dataset_dir):
+    def _read_mdkpe(dataset_dir, trunk20=False):
         """Remove topic key and document id and keep only a list of items each corresponding to
         a topic, and each item composed by a list of docs and a list of keyphrases."""
         dataset = {}
@@ -144,6 +148,9 @@ def load_dataset(
 
         if len(ids) == 0:
             logger.warning("Extracted **zero** results")
+
+        if trunk20:
+            labels = labels[:20]
         return (ids, documents, labels)
 
     def _read_zip(filename) -> Tuple[List[str], List, List]:
@@ -193,7 +200,8 @@ def load_dataset(
         if zipfile:
             dataset = KPEDataset(name, *_read_zip(path.join(root_dir, zipfile)))
         else:
-            dataset = KPEDataset(name, *_read_mdkpe(root_dir))
+            trunk20 = True if name == "MKDUC01-Trunk-20" else False
+            dataset = KPEDataset(name, *_read_mdkpe(root_dir, trunk20))
 
     # normalize and stem labels
     lang = DATASETS[name]["language"]
@@ -213,6 +221,7 @@ def load_preprocessed(name, root_dir=GEO_KPE_MULTIDOC_DATA_PATH) -> KPEDataset:
     local_name = {
         "DUC2001": "DUC",
         "MKDUC01": "MKDUC01",
+        "MKDUC01-Trunk-20": "MKDUC01",
         # "110-PT-BN-KP": "PT-KP",
         "PT-KP": "PT-KP",
         "ES-CACIC": "ES-CACIC",
@@ -230,13 +239,15 @@ def load_preprocessed(name, root_dir=GEO_KPE_MULTIDOC_DATA_PATH) -> KPEDataset:
     ) as f:
         docs_and_keys = pickle.load(f)
 
-    if name == "MKDUC01":
+    if name in ("MKDUC01", "MKDUC01-Trunk-20"):
         topics, topic_docs, topic_labels = list(zip(*docs_and_keys))
 
         docs = [
             [(i, translate_parentesis(doc)) for i, doc in enumerate(docs)]
             for docs in topic_docs
         ]
+        if name == "MKDUC01-Trunk-20":
+            topic_labels = [topic_kp[:20] for topic_kp in topic_labels]
         return KPEDataset(name, ids=topics, documents=docs, labels=topic_labels)
 
     if name in ("DUC2001", "Inspec", "SemEval2010"):
