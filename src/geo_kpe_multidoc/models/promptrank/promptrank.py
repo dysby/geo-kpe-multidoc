@@ -57,7 +57,9 @@ class PromptRank(BaseKPModel):
         if "long" in model_name.lower():
             self.max_len = 4096
         self.temp_en = kwargs.get("encoder_prompt") or "Book: "
-        self.temp_de = kwargs.get("decoder_prompt") or "This book mainly talks about "
+        self.temp_de = kwargs.get("decoder_prompt")
+        if self.temp_de is None:
+            self.temp_de = "This book mainly talks about "
         self.enable_filter = kwargs.get("enable_filter", False)
         self.enable_pos = not kwargs.get("no_position_feature", False)
         # \gamma in original paper
@@ -89,12 +91,14 @@ class PromptRank(BaseKPModel):
                 f"{model_name} is not compatible with a Conditional Generation Architecture."
             )
 
-        self.model.to(self.device)
         self.model.eval()
+        self.model.to(self.device)
 
         self.template_len = (
             self.tokenizer(self.temp_de, return_tensors="pt")["input_ids"].shape[1] - 3
         )
+        if self.template_len < 0:
+            self.template_len = 0
 
         # Dataset       \alpha  \gamma
         # Inspec        1         66.08
