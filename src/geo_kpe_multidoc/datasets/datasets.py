@@ -150,7 +150,7 @@ def load_dataset(
             logger.warning("Extracted **zero** results")
 
         if trunk20:
-            labels = labels[:20]
+            labels = [topic_kp[:20] for topic_kp in labels]
         return (ids, documents, labels)
 
     def _read_zip(filename) -> Tuple[List[str], List, List]:
@@ -267,3 +267,7 @@ def load_preprocessed(name, root_dir=GEO_KPE_MULTIDOC_DATA_PATH) -> KPEDataset:
     docs = [translate_parentesis(doc) for doc in docs]
 
     return KPEDataset(name, ids, docs, labels)
+
+
+if __name__ == "__main__":
+    pass

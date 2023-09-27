@@ -278,8 +278,16 @@ class PromptRank(BaseKPModel):
             A list with transformer for conditional input features and candidate positional features for each keyphrase candidate in the document.
         """
 
+        # TODO: add TLDR at the end of the encoder prompt
+        # words = [word for word in doc.raw_text.split(" ")]
+        # if len(words) == (self.max_len - 10):
+        #     in_text = " ".join(words[: self.max_len - 10]) + "TL;DR:"
+        # else:
+        #     in_text = doc.raw_text + " TL;DR:"
+
         en_input = self.tokenizer(
             self.temp_en + doc.raw_text,
+            # self.temp_en + in_text,
             max_length=self.max_len,
             # padding="max_length",
             # In original PromptRank was used max length padding
@@ -351,13 +359,13 @@ class PromptRank(BaseKPModel):
             #         labels_stemed.append(" ".join(self.stemmer.stem(t) for t in tokens))
 
             j = 0
-            Matched = candidates_dedup[:15]
+            matched = candidates_dedup[:15]
             for id, temp in enumerate(candidates_dedup[:15]):
                 tokens = temp.split()
                 tt = " ".join(stemmer.stem(t) for t in tokens)
                 # if tt in labels_stemed[i] or temp in labels[i]:
                 if tt in labels_stemmed:  # or temp in labels:
-                    Matched[id] = [temp]
+                    matched[id] = [temp]
                     if j < 5:
                         num_c_5 += 1
                         num_c_10 += 1
