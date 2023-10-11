@@ -326,7 +326,9 @@ def evaluate_kp_extraction(
             results_kp[f"F1_{k}"] = []
 
         for i in range(len(model_results[dataset])):
-            top_kp = [kp for kp, _score in model_results[dataset][i][0]]
+            top_kp = list(
+                dict.fromkeys([kp for kp, _score in model_results[dataset][i][0]])
+            )
 
             candidates = model_results[dataset][i][1]
 
