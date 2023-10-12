@@ -25,8 +25,8 @@ def inv_dist(d: np.ndarray, a=1):
 
 
 def exp_dist(d: np.ndarray, a=1):
-    r"""$f(x) = exp(- x^a)$"""
-    return np.e ** (-(d**a))
+    r"""$f(x) = exp(- \lambda x)$"""
+    return np.e ** (-a * d)
 
 
 def arc_dist(d: np.ndarray, a=1):
@@ -185,6 +185,65 @@ def GetisOrdG(scores: pd.Series, weight_matrix: np.array) -> float:
 
     # getisOrdG = sum1 / sum2
     # return getisOrdG
+
+
+def centering(M):
+    """
+    Calculate the centering matrix
+    """
+    n = M.shape[0]
+    unit = np.ones([n, n])
+    identity = np.eye(n)
+    H = identity - unit / n
+
+    return np.matmul(M, H)
+
+
+def gaussian_grammat(x, sigma=None):
+    """
+    Calculate the Gram matrix of x using a Gaussian kernel.
+    If the bandwidth sigma is None, it is estimated using the median heuristic:
+    ||x_i - x_j||**2 = 2 sigma**2
+    """
+    try:
+        x.shape[1]
+    except IndexError:
+        x = x.reshape(x.shape[0], 1)
+
+    xxT = np.matmul(x, x.T)
+    xnorm = np.diag(xxT) - xxT + (np.diag(xxT) - xxT).T
+    if sigma is None:
+        mdist = np.median(xnorm[xnorm != 0])
+        sigma = np.sqrt(mdist * 0.5)
+
+    # --- If bandwidth is 0, add machine epsilon to it
+    if sigma == 0:
+        eps = 7.0 / 3 - 4.0 / 3 - 1
+        sigma += eps
+
+    KX = -0.5 * xnorm / sigma / sigma
+    np.exp(KX, KX)
+    return KX
+
+
+def hsic(locations, scores):
+    """
+    Calculate the HSIC estimator for d=2, as in [1] eq (9)
+    from: https://github.com/strumke/hsic_python/blob/master/hsic.py
+        [1]: https://link.springer.com/chapter/10.1007/11564089_7
+        [2]: https://www.researchgate.net/publication/301818817_Kernel-based_Tests_for_Joint_Independence
+    """
+    n = locations.shape[0]
+    return (
+        np.trace(
+            np.matmul(
+                centering(gaussian_grammat(locations)),
+                centering(gaussian_grammat(scores)),
+            )
+        )
+        / n
+        / n
+    )
 
 
 # """

@@ -195,8 +195,9 @@ def compute_weights_matrix(
         )
     weight_matrix = weight_matrix + weight_matrix.T  # - np.diag(0, n)
 
+    weight_matrix[np.diag_indices_from(weight_matrix)] = np.nan
     weight_matrix = weight_function(weight_matrix, weight_function_param)
-
+    weight_matrix = np.nan_to_num(weight_matrix)
     # row standartize
     weight_matrix = weight_matrix / weight_matrix.sum(axis=1)
 
@@ -334,15 +335,21 @@ class MdGeoRank:
             ].sum(axis=1)
             candidate_scores.index.name = "candidate"
 
-            topic_point_scores = gpd.GeoDataFrame(
-                candidate_scores_per_doc.join(topic_doc_coordinates.loc[topic_id])
-            ).reset_index(drop=True)
+            topic_point_scores = (
+                gpd.GeoDataFrame(
+                    candidate_scores_per_doc.join(topic_doc_coordinates.loc[topic_id])
+                )
+                .dropna()  # dropna for documents without any location
+                .reset_index(drop=True)
+            )
             # when the same location apears in multiple documents, the semantic score
             # for that location is the mean of values for that location
             topic_point_scores = (
                 topic_point_scores.groupby("_geometry").mean().reset_index()
             )
-            topic_point_scores = gpd.GeoDataFrame(topic_point_scores)
+            topic_point_scores = gpd.GeoDataFrame(
+                topic_point_scores, geometry="_geometry"
+            )
 
             # print(f"{topic_id}: topic_point_scores: {len(topic_point_scores)}
             # observations.")
