@@ -74,6 +74,7 @@ def parse_args():
     parser.add_argument("--add_query_prefix", action="store_true", help="Add support for e5 type models that require 'query: ' prefixed instruction",)
     parser.add_argument("--candidate_mode", default="mentions_no_context", type=str, help="The method for candidate mode (no_context, mentions_no_context, global_attention, global_attention_dilated_nnn, attention_rank).",)
     parser.add_argument("--md_strategy", default="MEAN", type=str, help="Candidate ranking method for Multi-document keyphrase extraction",)
+    parser.add_argument("--md_cross_doc", action="store_true", help="Do a candidate cross doc evaluation even when candidate is not found in doc",)
     parser.add_argument("--mmr", action="store_true", help="boolean flag to use EmbedRank MMR")
     parser.add_argument("--mmr_diversity", type=float, help="EmbedRank MMR diversity parameter value.",)
     parser.add_argument("--whitening", action="store_true", help="Apply whitening to the embeddings")
