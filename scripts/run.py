@@ -175,7 +175,7 @@ def _args_to_options(args):
     if args.mmr:
         options["mmr"] = True
         logger.warning("MMR is only used with EmbedRank type models.")
-        if args.mmr_diversity:
+        if args.mmr_diversity is not None:
             options["mmr_diversity"] = args.mmr_diversity
         else:
             logger.warning("EmbedRank MMR selected but diversity is default 0.8")

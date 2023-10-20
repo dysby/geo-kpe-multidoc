@@ -187,27 +187,35 @@ class MDKPERankPosCross(MDKPERank):
 
             scores_per_doc = []
             for doc_id, ranking_in_doc in single_mode_ranking_per_doc.items():
-                for candidate, score in ranking_in_doc[0]:
-                    # candidate was not found inside the document
-                    # ADD candidate as if at the end of the document
-                    # TODO: candidate was not found inside the document, only for sentence-t5-base
-                    if np.isnan(score):
-                        score = (1 + 1.2e8 / (256**3)) * math.log(
-                            cosine_similarity(
-                                documents_embeddings[doc_id],
-                                candidate_embeddings[candidate],
-                            )
+                in_candidates, _ = list(zip(*ranking_in_doc))
+                # candidate was not found inside the document
+                # ADD candidate as if at the end of the document
+                # TODO: candidate was not found inside the document, only for sentence-t5-base
+                missing_candidates = list(topic_candidates - set(in_candidates))
+                missing_candidates_scores = [
+                    (1 + 1.2e8 / (256**3))
+                    * math.log(
+                        cosine_similarity(
+                            documents_embeddings[doc_id],
+                            candidate_embeddings[candidate],
                         )
+                    )
+                    for missing_candidate in missing_candidates
+                ]
+
+                for candidate, score in itertools.chain(
+                    ranking_in_doc, zip(missing_candidates, missing_candidates_scores)
+                ):
                     scores_per_doc.append(
                         {"doc": doc_id, "candidate": candidate, "score": score}
                     )
 
             candidate_scores_per_doc = pd.DataFrame(scores_per_doc)
-            candidate_scores_per_doc.set_index("doc")
+            candidate_scores_per_doc = candidate_scores_per_doc.set_index("doc")
             # update single_mode_ranking_per_doc with new cross candidate ranking per doc
             for doc_id in doc_ids:
-                single_mode_ranking_per_doc[doc.id] = list(
-                    candidate_scores_per_doc.loc[doc.id].itertuples(
+                single_mode_ranking_per_doc[doc_id] = list(
+                    candidate_scores_per_doc.loc[doc_id].itertuples(
                         index=False, name=None
                     )
                 )
