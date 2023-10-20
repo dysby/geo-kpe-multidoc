@@ -266,7 +266,7 @@ def kpe_model_factory(BACKEND_MODEL_NAME, TAGGER_NAME, **kwargs) -> BaseKPModel:
                 candidate_embedding_strategy=kwargs["candidate_mode"],
                 **kwargs,
             )
-            if kwargs["md_cross_doc"] and not kwargs["no_positional_feature"]:
+            if kwargs["md_cross_doc"] and not kwargs["no_position_feature"]:
                 kpe_model = MDKPERankPosCross(
                     single_doc_ranker, rank_strategy=kwargs["md_strategy"], **kwargs
                 )
