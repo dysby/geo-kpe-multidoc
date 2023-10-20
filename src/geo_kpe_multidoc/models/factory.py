@@ -30,6 +30,7 @@ from geo_kpe_multidoc.models.fusion_model import FusionModel
 from geo_kpe_multidoc.models.maskrank.longmaskrank import LongformerMaskRank
 from geo_kpe_multidoc.models.maskrank.maskrank_model import MaskRank
 from geo_kpe_multidoc.models.mdkperank.mdkperank_model import MDKPERank
+from geo_kpe_multidoc.models.mdkperank.mdkperankposcross import MDKPERankPosCross
 from geo_kpe_multidoc.models.mdkperank.mdpromptrank import MdPromptRank
 from geo_kpe_multidoc.models.promptrank.promptrank import PromptRank
 from geo_kpe_multidoc.models.promptrank.sled_rank import SLEDPromptRank
@@ -265,6 +266,12 @@ def kpe_model_factory(BACKEND_MODEL_NAME, TAGGER_NAME, **kwargs) -> BaseKPModel:
                 candidate_embedding_strategy=kwargs["candidate_mode"],
                 **kwargs,
             )
+            if kwargs["md_cross_doc"] and not kwargs["no_positional_feature"]:
+                kpe_model = MDKPERankPosCross(
+                    single_doc_ranker, rank_strategy=kwargs["md_strategy"], **kwargs
+                )
+                return kpe_model
+
         kpe_model = MDKPERank(
             single_doc_ranker, rank_strategy=kwargs["md_strategy"], **kwargs
         )

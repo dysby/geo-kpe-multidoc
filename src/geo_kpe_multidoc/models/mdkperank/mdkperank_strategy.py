@@ -5,6 +5,7 @@ from typing import Dict, List, Tuple
 
 import numpy as np
 import pandas as pd
+import torch.nn.functional as F
 import umap
 from keybert._mmr import mmr
 from sklearn.cluster import HDBSCAN, KMeans
@@ -119,13 +120,30 @@ class Ranker:
     ):
         raise NotImplementedError
 
-    def __call__(self, topic_extraction_features) -> pd.DataFrame:
-        (
-            documents_embeddings,
-            candidate_embeddings,
-            candidate_document_matrix,
-            single_mode_ranking_per_doc,
-        ) = self._extract_features(topic_extraction_features)
+    def __call__(
+        self, topic_extraction_features, candidate_document_matrix=None, **kwargs
+    ) -> pd.DataFrame:
+        if kwargs.get("extract_features", True):
+            (
+                documents_embeddings,
+                candidate_embeddings,
+                calc_candidate_document_matrix,
+                single_mode_ranking_per_doc,
+            ) = self._extract_features(topic_extraction_features)
+        else:
+            (
+                documents_embeddings,
+                candidate_embeddings,
+                calc_candidate_document_matrix,
+                single_mode_ranking_per_doc,
+            ) = topic_extraction_features
+
+        candidate_document_matrix = (
+            calc_candidate_document_matrix
+            if candidate_document_matrix is None
+            else candidate_document_matrix
+        )
+
         return self._rank(
             candidate_embeddings,
             documents_embeddings,
@@ -423,6 +441,7 @@ class RRFRank(Ranker):
 
     def __init__(self, **kwargs) -> None:
         self.in_single_mode = kwargs.get("in_single_mode")
+        self.k = 60
 
     def _rank(
         self,
@@ -452,15 +471,20 @@ class RRFRank(Ranker):
             )
             score_per_document.index = candidates_embeddings.index
             score_per_document.columns = documents_embeddings.index
-        # TODO: add k parameter from original paper default k=60
 
+        # top_n_scores = list(
+        #     (1 / score_per_document.rank())
+        #     .mean(axis=1)
+        #     .sort_values(ascending=True)
+        #     .items()
+        # )
+        # TODO: add k parameter from original paper default k=60
         top_n_scores = list(
-            (1 / score_per_document.rank())
-            .mean(axis=1)
+            (1 / (self.k + score_per_document.rank()))
+            .sum(axis=1)
             .sort_values(ascending=True)
             .items()
         )
-
         ranking_p_doc = self._score_to_ranking_p_doc(score_per_document)
         return (
             documents_embeddings,
@@ -812,14 +836,16 @@ class UmapClustersRank(Ranker):
         *args,
         **kwargs,
     ):
+        candidates_embeddings_l2 = F.normalize(candidates_embeddings.to_numpy()).numpy()
+
         clusterable_embedding = umap.UMAP(
             # n_neighbors=10,
             # min_dist=0.0,
             # n_components=2,
             # random_state=42,
-            metric="cosine",
+            # metric="cosine",
             n_components=2,
-        ).fit_transform(candidates_embeddings)
+        ).fit_transform(candidates_embeddings_l2)
 
         fitted = HDBSCAN(
             min_samples=8,
@@ -857,7 +883,13 @@ class UmapClustersRank(Ranker):
             reverse=True,
         )
 
-        ranking_p_doc = None
+        # keep score per document for geo association metrics
+        score_per_document = pd.DataFrame(
+            cosine_similarity(candidates_embeddings, documents_embeddings)
+        )
+        score_per_document.index = candidates_embeddings.index
+        score_per_document.columns = documents_embeddings.index
+        ranking_p_doc = self._score_to_ranking_p_doc(score_per_document)
 
         return (
             documents_embeddings,
@@ -911,7 +943,14 @@ class ClusterCentroidsRank(Ranker):
 
         top_n_scores = [(candidates_embeddings.index[closest[i]], i) for i in ordering]
 
-        ranking_p_doc = None
+        # keep score per document for geo association metrics
+        score_per_document = pd.DataFrame(
+            cosine_similarity(candidates_embeddings, documents_embeddings)
+        )
+        score_per_document.index = candidates_embeddings.index
+        score_per_document.columns = documents_embeddings.index
+        ranking_p_doc = self._score_to_ranking_p_doc(score_per_document)
+
         return (
             documents_embeddings,
             candidates_embeddings,
@@ -1121,7 +1160,7 @@ MD_RANK_STRATEGIES = {
     "MEANTOPMAX": MeanTopMaxRank,
     "MAXMAX": MaxMaxRank,
     "MMR": MmrRank,
-    "MMRPos": MMRPos,
+    # "MMRPos": MMRPos,
     "RRF": RRFRank,
     "ITCS": ITCSRank,
     "MAXSUM": MaxSumRank,

@@ -1,4 +1,5 @@
 import os
+from collections import OrderedDict
 from itertools import islice
 from os import path
 from pathlib import Path
@@ -326,6 +327,10 @@ def evaluate_kp_extraction(
             results_kp[f"F1_{k}"] = []
 
         for i in range(len(model_results[dataset])):
+            # TODO: a = collections.OrderedDict.fromkeys([1, 2, 20, 6, 210]) if not python3.7
+            # top_kp = list(
+            #     OrderedDict.fromkeys([kp for kp, _score in model_results[dataset][i][0]])
+            # )
             top_kp = list(
                 dict.fromkeys([kp for kp, _score in model_results[dataset][i][0]])
             )

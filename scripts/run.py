@@ -237,7 +237,7 @@ def main():
 
     if isinstance(kpe_model, (MDKPERank, MdPromptRank)):
         extract_keyphases_pipeline = extract_keyphrases_topics
-        if ds_name != "MKDUC01":
+        if "MKDUC01" not in ds_name:
             logger.critical("Multi Document Ranking on single document dataset!")
     else:
         extract_keyphases_pipeline = extract_keyphrases_docs

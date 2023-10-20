@@ -26,6 +26,8 @@ class MdPromptRank(BaseKPModel):
             + base_model.name[base_model.name.index("_") :]
         )
 
+        self.cross_doc = kwargs.get("md_cross_doc", False)
+
         self.ranking_strategy = MD_RANK_STRATEGIES[rank_strategy](
             in_single_mode=True, **kwargs
         )
@@ -90,21 +92,24 @@ class MdPromptRank(BaseKPModel):
 
             candidate_document_matrix = df
 
-            single_mode_ranking_per_doc = {}
-            scores_for_candidate = {}
             topic_res = (
                 []
             )  # # List[(doc, cand_embeds, candidate_set, ranking_in_doc), ...]
+
             for doc in topic_docs:
                 # append  missing candidates to check with doc
-                missing = list(topic_candidates - set(doc.candidate_set))
-                doc_max_pos = len(doc.token_ids)
-                missing_position = [
-                    (doc_max_pos, doc_max_pos) for _ in range(len(missing))
-                ]
+                if self.cross_doc:
+                    missing = list(topic_candidates - set(doc.candidate_set))
+                    doc_max_pos = len(doc.token_ids)
+                    missing_position = list(
+                        ((doc_max_pos, doc_max_pos),) * len(missing)
+                    )
+                    # [
+                    #     (doc_max_pos, doc_max_pos) for _ in range(len(missing))
+                    # ]
 
-                doc.candidate_set.extend(missing)
-                doc.candidate_positions.extend(missing_position)
+                    doc.candidate_set.extend(missing)
+                    doc.candidate_positions.extend(missing_position)
 
                 ranking_in_doc, _candidades = self.base_model.top_n_candidates(
                     doc,
@@ -120,6 +125,7 @@ class MdPromptRank(BaseKPModel):
                 self._save_md_embeddings_in_cache(
                     (topic_res, candidate_document_matrix), topic_docs[0].topic
                 )
+
         # Rank Candidates
         (
             documents_embeddings,
@@ -127,7 +133,7 @@ class MdPromptRank(BaseKPModel):
             _wrong_candidate_document_matrix,
             top_n_scores,
             ranking_p_doc,
-        ) = self.ranking_strategy(topic_res)
+        ) = self.ranking_strategy(topic_res, candidate_document_matrix)
 
         candidates = candidate_document_matrix.index.to_list()
 
