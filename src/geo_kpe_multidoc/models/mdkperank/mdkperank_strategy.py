@@ -480,9 +480,15 @@ class RRFRank(Ranker):
         # )
         # TODO: add k parameter from original paper default k=60
         top_n_scores = list(
-            (1 / (self.k + score_per_document.rank()))
+            (
+                1
+                / (
+                    self.k
+                    + score_per_document.rank(ascending=False, na_option="bottom")
+                )
+            )
             .sum(axis=1)
-            .sort_values(ascending=True)
+            .sort_values(ascending=False)
             .items()
         )
         ranking_p_doc = self._score_to_ranking_p_doc(score_per_document)
