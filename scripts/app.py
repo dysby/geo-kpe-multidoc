@@ -7,16 +7,11 @@ import orjson
 import streamlit as st
 import torch
 from annotated_text.util import get_annotated_html
-from sentence_transformers import SentenceTransformer
-
 from geo_kpe_multidoc import GEO_KPE_MULTIDOC_DATA_PATH
-from geo_kpe_multidoc.datasets import DATASETS, KPEDataset, load_data
+from geo_kpe_multidoc.datasets.datasets import DATASETS, load_dataset
 from geo_kpe_multidoc.document import Document
-from geo_kpe_multidoc.models import EmbedRank, MaskRank
-from geo_kpe_multidoc.models.backend._longmodels import to_longformer_t_v4
-from geo_kpe_multidoc.models.embedrank.embedrank_longformer_manual import (
-    EmbedRankManual,
-)
+from geo_kpe_multidoc.models.factory import kpe_model_factory
+from sentence_transformers import SentenceTransformer
 
 # from pipelines.keyphrase_extraction_pipeline import KeyphraseExtractionPipeline
 
@@ -28,51 +23,32 @@ def load_pipeline(chosen_model, chosen_language):
     #     return KeyphraseExtractionPipeline(chosen_model)
     # elif "keyphrase-generation" in chosen_model:
     #     return KeyphraseGenerationPipeline(chosen_model, truncation=True)
-    BACKEND_MODEL_NAME = "longformer-paraphrase-multilingual-mpnet-base-v2"
+    # BACKEND_MODEL_NAME = "longformer-paraphrase-multilingual-mpnet-base-v2"
+    BACKEND_MODEL_NAME = "sentence-transformers/sentence-t5-base"
     match chosen_language:
         case "en":
             TAGGER_NAME = "en_core_web_trf"
         case "pt":
             TAGGER_NAME = "pt_core_news_lg"
 
-    match chosen_model:
-        case "EmbedRank":
-            kpe_model = EmbedRank(BACKEND_MODEL_NAME, TAGGER_NAME)
-        case "MaskRank":
-            kpe_model = MaskRank(BACKEND_MODEL_NAME, TAGGER_NAME)
-        case "EmbedRankLongformer":
-            new_max_pos = 4096
-            attention_window = 128
-            copy_from_position = 130
+    args = {
+        "experiment_name": "debug",
+        "extraction_variant": "base",
+        "kp_min_len": 2,
+        "kp_max_words": 7,
+        "rank_model": "EmbedRank",
+        "embed_model": "sentence-t5-base",
+        "no_position_feature": False,
+        "add_query_prefix": False,
+        "candidate_mode": "mentions_no_context",
+        "mmr": False,
+        "mmr_diversity": None,
+    }
 
-            model_name = (
-                f"longformer_paraphrase_mnet_max{new_max_pos}_attw{attention_window}"
-            )
-            if copy_from_position:
-                model_name += f"_cpmaxpos{copy_from_position}"
-
-            model, tokenizer = to_longformer_t_v4(
-                SentenceTransformer("paraphrase-multilingual-mpnet-base-v2"),
-                max_pos=new_max_pos,
-                attention_window=attention_window,
-                copy_from_position=copy_from_position,
-            )
-            # in RAM convertion to longformer needs this.
-            del model.embeddings.token_type_ids
-
-            device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-
-            kpe_model = EmbedRankManual(
-                model, tokenizer, TAGGER_NAME, device=device, name=model_name
-            )
-        case _:
-            raise ValueError(
-                "Model selection must be one of [EmbedRank, MaskRank, EmbedRankLongformer]."
-            )
-
-    return partial(
-        kpe_model.extract_kp_from_doc, top_n=-1, min_len=5, lemmer=chosen_language
+    kpe_model = kpe_model_factory(
+        BACKEND_MODEL_NAME, TAGGER_NAME, language=chosen_language, **args
     )
+    return kpe_model.extract_kp_from_doc
 
 
 def generate_run_id():
@@ -82,22 +58,24 @@ def generate_run_id():
 def extract_keyphrases():
     gold_keyphrases = None
 
-    if st.session_state.chosen_dataset == "--INPUT--":
-        txt = st.session_state.input_text
-    else:
-        ds = load_data(
-            st.session_state.chosen_dataset,
-            GEO_KPE_MULTIDOC_DATA_PATH,
-        )
-        d_idx = ds.ids.index(st.session_state.chosen_doc_id)
-        _, txt, gold_keyphrases = ds[d_idx]
+    txt = st.session_state.input_text
+
+    # if st.session_state.chosen_dataset == "--INPUT--":
+    #     txt = st.session_state.input_text
+    # else:
+    #     ds = load_dataset(
+    #         st.session_state.chosen_dataset,
+    #         GEO_KPE_MULTIDOC_DATA_PATH,
+    #     )
+    #     d_idx = ds.ids.index(st.session_state.chosen_doc_id)
+    #     _, txt, gold_keyphrases = ds[d_idx]
 
     # txt = remove_punctuation(txt)
     # txt = remove_whitespaces(txt)[1:]
 
     st.session_state.input_text = txt
 
-    top_n_and_scores, candidates = pipe(Document(txt, st.session_state.current_run_id))
+    top_n_and_scores, _ = pipe(Document(txt, st.session_state.current_run_id))
     st.session_state.keyphrases = top_n_and_scores
     st.session_state.gold_keyphrases = gold_keyphrases
     st.session_state.history[generate_run_id()] = {
@@ -165,7 +143,9 @@ def render_output(layout, runs, reverse=False):
             unsafe_allow_html=True,
         )
 
-        result = get_annotated_text(run.get("text"), list(run.get("keyphrases")))
+        result = get_annotated_text(
+            run.get("text"), list(run.get("keyphrases")[: st.session_state.top_n])
+        )
         layout.markdown(
             f"""
             <p style="margin-bottom: 0.5rem"><strong>Text:</strong></p>
@@ -190,8 +170,8 @@ def render_output(layout, runs, reverse=False):
             )
         layout.markdown("---")
         candidates_keyphrases = [
-            (f"{keyphrase} ({score.item():.2f})", "KEY", "#d294ff")
-            for keyphrase, score in run.get("keyphrases")
+            (f"{keyphrase} ({score:.2f})", "KEY", "#d294ff")
+            for keyphrase, score in run.get("keyphrases")[: st.session_state.top_n]
             # if keyphrase.lower() not in run.get("text").lower()
         ]
         for i in range(len(candidates_keyphrases)):
@@ -207,12 +187,13 @@ def render_output(layout, runs, reverse=False):
 
 dir_path = path.dirname(path.realpath(__file__))
 if "config" not in st.session_state:
-    with open(path.join(dir_path, "config.json"), "r") as f:
+    with open(path.join(dir_path, "config.json"), encoding="utf8") as f:
         content = f.read()
-    st.session_state.config = orjson.loads(content)
-    st.session_state.history = {}
-    st.session_state.keyphrases = []
-    st.session_state.current_run_id = 1
+        st.session_state.config = orjson.loads(content)
+        st.session_state.history = {}
+        st.session_state.keyphrases = []
+        st.session_state.current_run_id = 1
+
 
 st.set_page_config(
     page_icon="🔑",
@@ -220,7 +201,7 @@ st.set_page_config(
     layout="centered",
 )
 
-with open(path.join(dir_path, "css/style.css")) as f:
+with open(path.join(dir_path, "css/style.css"), encoding="utf8") as f:
     st.markdown(f"<style>{f.read()}</style>", unsafe_allow_html=True)
 
 st.header("Keyphrase extraction")
@@ -232,27 +213,38 @@ Try it out yourself! 👇
 st.write(description)
 
 with st.form("keyphrase-extraction-form"):
-    st.session_state.chosen_language = st.selectbox("Text Language:", ["en", "pt"])
+    # st.session_state.chosen_language = st.selectbox("Text Language:", ["en", "pt"])
+    st.session_state.chosen_language = "en"
 
-    st.session_state.chosen_model = st.selectbox(
-        "Choose model:", st.session_state.config.get("models")
-    )
+    st.session_state.chosen_model = "EmbedRank"
+    # st.session_state.chosen_model = st.selectbox(
+    #     "Choose model:", st.session_state.config.get("models")
+    # )
 
-    st.session_state.chosen_dataset = st.selectbox(
-        "Choose Dataset:", st.session_state.config.get("datasets")
-    )
+    st.session_state.chosen_dataset = "--INPUT--"
+    # st.session_state.chosen_dataset = st.selectbox(
+    #     "Choose Dataset:", st.session_state.config.get("datasets")
+    # )
+    # st.session_state.chosen_doc_id = (
+    #     st.text_input(
+    #         "Select DOC ID from Dataset",
+    #         "",
+    #     )
+    #     .replace("\n", " ")
+    #     .strip()
+    # )
 
-    st.session_state.chosen_doc_id = (
-        st.text_input(
-            "Select DOC ID from Dataset",
-            "",
-        )
-        .replace("\n", " ")
-        .strip()
-    )
+    # st.markdown(
+    #     f"Dataset / document selection has priority over input text\nIf you don't want to select dataset leave it empty."
+    # )
 
-    st.markdown(
-        f"Dataset / document selection has priority over input text\nIf you don't want to select dataset leave it empty."
+    st.session_state.top_n = st.number_input(
+        "How many keyphrases to extract?",
+        value=int(st.session_state.config.get("top_n")),
+        placeholder="Type N...",
+        min_value=1,
+        max_value=100,
+        step=1,
     )
 
     st.session_state.input_text = (
